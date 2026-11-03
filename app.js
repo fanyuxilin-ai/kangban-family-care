@@ -27,7 +27,17 @@ const seed = {
   appointmentChecks: { idCard: true, reports: false, medicines: false, questions: false, selfDescription: false },
   preVisitDescriptions: [],
   voiceNote: '',
-  nextRecordId: 5
+  nextRecordId: 5,
+  healthReadings: [
+    { id: 'bp-seed-2', date: dateOffset(-2), time: '08:10', systolic: 152, diastolic: 94, pulse: 78, source: '手动录入' },
+    { id: 'bp-seed-1', date: dateOffset(-1), time: '08:05', systolic: 149, diastolic: 93, pulse: 76, source: '模拟手表' },
+    { id: 'bp-seed-0', date: dateOffset(0), time: '07:50', systolic: 166, diastolic: 102, pulse: 88, source: '模拟手表' }
+  ],
+  alerts: [],
+  missedAlerts: {},
+  nextAlertId: 1,
+  nextReadingId: 1,
+  alertsSeeded: false
 };
 let state = loadState();
 let currentTab = 'home';
@@ -40,6 +50,7 @@ let preVisitRecorder = null;
 let preVisitRecordingStream = null;
 let preVisitAudioChunks = [];
 let preVisitAttachmentUrl = null;
+let evidenceTarget = null;
 
 function loadState() {
   try {
@@ -55,6 +66,11 @@ function loadState() {
       requester: order.requester || '小林',
       reviews: order.reviews || { family: null, escort: null }
     }));
+    loaded.healthReadings = saved.healthReadings || structuredClone(seed.healthReadings);
+    loaded.alerts = saved.alerts || [];
+    loaded.missedAlerts = saved.missedAlerts || {};
+    loaded.nextAlertId = saved.nextAlertId || 1;
+    loaded.nextReadingId = saved.nextReadingId || 1;
     return loaded;
   } catch { return structuredClone(seed); }
 }
@@ -114,13 +130,20 @@ function renderRecords() {
     <div class="timeline-row"><span class="timeline-date">${formatDate(record.date)}</span><i class="timeline-marker"></i><div class="timeline-copy"><strong>${esc(record.title)}</strong><small>${esc(record.hospital.split(' · ')[0])}</small></div></div>`).join('');
   const orderHost = document.getElementById('companionOrders');
   const statusLabel = { pending: '待陪诊员确认', accepted: '已接单', declined: '未接单', completed: '已完成' };
-  orderHost.innerHTML = `<div class="section-heading service-heading"><div><p class="eyebrow">预约、评价与再次预约</p><h2>我的陪诊安排</h2></div></div>${state.companionOrders.length ? `<div class="family-order-list">${state.companionOrders.map(o => `
-    <article class="family-order-card"><div class="family-order-top"><strong>${esc(o.service)}</strong><span class="record-status">${statusLabel[o.status] || '待确认'}</span></div>
+  orderHost.innerHTML = `<div class="section-heading service-heading"><div><p class="eyebrow">预约、评价与再次预约</p><h2>我的陪诊安排</h2></div></div>${state.companionOrders.length ? `<div class="family-order-list">${state.companionOrders.map(o => {
+    const exec = (o.status === 'accepted' || o.status === 'completed') && o.execution?.items?.length ? (() => {
+      const progress = executionProgress(o);
+      return `<div class="exec-block exec-block-family"><div class="exec-progress"><strong>履约进度 ${progress.done} / ${progress.total}</strong>${progress.all ? '<span class="exec-progress-done">服务项目已全部完成</span>' : '<span>陪诊员正在逐项执行</span>'}</div>
+        <div class="exec-list">${o.execution.items.map(item => `<div class="exec-row ${item.done ? 'is-done' : ''}"><span class="exec-mark">${item.done ? '✓' : '·'}</span><div class="exec-copy"><strong>${esc(item.label)}</strong></div>${item.evidenceId ? `<button class="exec-evidence has-evidence" data-evidence-view="${esc(item.key)}" data-order-id="${esc(o.id)}">查看佐证</button>` : ''}</div>`).join('')}</div></div>`;
+    })() : '';
+    return `<article class="family-order-card"><div class="family-order-top"><strong>${esc(o.service)}</strong><span class="record-status">${statusLabel[o.status] || '待确认'}</span></div>
       <p>${esc(o.hospital)} · ${esc(o.date)}<br>${esc(o.providerName || state.companionProfile.name)}</p>
+      ${exec}
       ${o.status === 'completed' && !o.reviews?.family ? `<button class="text-button" data-order-review="${esc(o.id)}" data-review-role="family">评价本次陪诊 →</button>` : ''}
       ${o.status === 'completed' && o.reviews?.family ? `<small class="review-complete">你已完成评价${o.reviews?.escort ? ' · 双方已互评' : ' · 等待陪诊员评价'}</small>` : ''}${reviewSummary(o)}
       ${(o.status === 'completed' || o.status === 'declined') ? `<button class="text-button" data-rebook="${esc(o.id)}">再次预约 →</button>` : ''}
-    </article>`).join('')}</div>` : `<div class="family-empty-card"><p>还没有陪诊预约。可以先查看陪诊员介绍并提交一笔演示预约。</p><button class="primary-button" data-action="book-profile">预约陪诊员</button></div>`}`;
+    </article>`;
+  }).join('')}</div>` : `<div class="family-empty-card"><p>还没有陪诊预约。可以先查看陪诊员介绍并提交一笔演示预约。</p><button class="primary-button" data-action="book-profile">预约陪诊员</button></div>`}`;
   renderMedicationReminders();
   renderCompanionViews();
   renderHomeCompanionModule();
@@ -143,6 +166,39 @@ function reviewSummary(order) {
     ['陪诊员评价家庭', order.reviews?.escort]
   ].filter(([, review]) => review);
   return entries.length ? `<div class="review-summary">${entries.map(([label, review]) => `<p><strong>${label} · ${Number(review.score)}★</strong>${review.comment ? `　${esc(review.comment)}` : ''}</p>`).join('')}</div>` : '';
+}
+
+/* ============ 陪诊履约清单与佐证（FR-09 演示版） ============ */
+const EXECUTION_ITEMS = {
+  '全程陪诊': ['到院接送', '协助取号', '陪同就诊', '取药与报告', '就诊后信息交接'],
+  '检查陪同': ['到院接送', '检查陪同', '报告领取', '就诊后信息交接'],
+  '取药与报告': ['到院取号', '取药 / 领取报告', '用药信息交接']
+};
+function executionChecklist(service) {
+  return EXECUTION_ITEMS[service] || EXECUTION_ITEMS['全程陪诊'];
+}
+function ensureExecution(order) {
+  if (order.status !== 'accepted' && order.status !== 'completed') return order;
+  if (order.execution?.items?.length) return order;
+  const items = executionChecklist(order.service).map(label => ({ key: `exec-${label}`, label, done: false, doneAt: null, evidenceId: null, evidenceName: null }));
+  order.execution = { items, startedAt: new Date().toISOString() };
+  return order;
+}
+function executionProgress(order) {
+  const items = order.execution?.items || [];
+  const done = items.filter(item => item.done).length;
+  return { done, total: items.length, all: items.length > 0 && done === items.length };
+}
+function showEvidenceModal(orderId, key) {
+  const order = state.companionOrders.find(item => item.id === orderId);
+  const item = order?.execution?.items?.find(entry => entry.key === key);
+  if (!item) { toast('没有找到该履约项'); return; }
+  if (!item.evidenceId) { toast('该项还没有上传佐证'); return; }
+  getAttachment(item.evidenceId).then(record => {
+    const preview = record?.type?.startsWith('image/') ? `<img class="report-preview" src="${URL.createObjectURL(record.blob)}" alt="履约佐证照片" />` : '<p class="privacy-small">当前设备无法预览此附件。</p>';
+    openModal(`${modalHead('陪诊履约 · 佐证查看', esc(item.label), '陪诊员在服务过程中上传的现场佐证，仅对本次预约的家庭成员可见。')}${preview}<p class="privacy-small">佐证照片保存在本机浏览器，不上传云端。</p><button class="primary-button" id="evidenceDone">返回</button>`);
+    document.getElementById('evidenceDone')?.addEventListener('click', closeModal);
+  }).catch(() => toast('读取佐证失败'));
 }
 
 function renderCompanionViews() {
@@ -168,6 +224,7 @@ function renderCompanionViews() {
     document.getElementById('availabilityButton').textContent = profile.available ? '暂停接单' : '恢复接单';
   }
   const orders = state.companionOrders;
+  orders.forEach(ensureExecution);
   const count = (status) => orders.filter(order => order.status === status).length;
   const pendingCount = document.getElementById('escortPendingCount');
   if (pendingCount) {
@@ -177,7 +234,20 @@ function renderCompanionViews() {
     const host = document.getElementById('escortOrders');
     host.innerHTML = orders.length ? orders.map(order => {
       const label = { pending: '待确认', accepted: '待服务', declined: '未接单', completed: '已完成' }[order.status] || '待确认';
-      const actions = order.status === 'pending' ? `<div class="order-actions"><button class="secondary-button" data-order-action="decline" data-order-id="${esc(order.id)}">暂不接单</button><button class="primary-button" data-order-action="accept" data-order-id="${esc(order.id)}">接受预约</button></div>` : order.status === 'accepted' ? `<button class="primary-button" data-order-action="complete" data-order-id="${esc(order.id)}">标记陪诊已完成</button>` : order.status === 'completed' && !order.reviews?.escort ? `<button class="primary-button" data-order-review="${esc(order.id)}" data-review-role="escort">评价本次家庭</button>` : order.status === 'completed' ? `<small class="review-complete">你已评价${order.reviews?.family ? ' · 双方已互评' : ' · 等待家庭评价'}</small>` : '';
+      let executionBlock = '';
+      if (order.status === 'accepted' || order.status === 'completed') {
+        const progress = executionProgress(order);
+        executionBlock = `<div class="exec-block"><div class="exec-progress"><strong>履约进度 ${progress.done} / ${progress.total}</strong>${progress.all ? '<span class="exec-progress-done">已完成全部项目</span>' : '<span>逐项完成并上传佐证</span>'}</div>
+          <div class="exec-list">${order.execution.items.map(item => `<div class="exec-row ${item.done ? 'is-done' : ''}">
+            <button class="exec-toggle" data-exec-toggle="${esc(item.key)}" data-order-id="${esc(order.id)}" ${item.done ? 'disabled' : ''}>${item.done ? '✓' : ''}</button>
+            <div class="exec-copy"><strong>${esc(item.label)}</strong>${item.done ? `<small>完成于 ${esc(item.doneAt || '')}</small>` : '<small>待执行</small>'}</div>
+            ${item.evidenceId ? `<button class="exec-evidence has-evidence" data-evidence-view="${esc(item.key)}" data-order-id="${esc(order.id)}">查看佐证</button>` : `<button class="exec-evidence" data-exec-evidence="${esc(item.key)}" data-order-id="${esc(order.id)}">上传佐证</button>`}
+          </div>`).join('')}</div></div>`;
+      }
+      const actions = order.status === 'pending' ? `<div class="order-actions"><button class="secondary-button" data-order-action="decline" data-order-id="${esc(order.id)}">暂不接单</button><button class="primary-button" data-order-action="accept" data-order-id="${esc(order.id)}">接受预约</button></div>`
+        : order.status === 'accepted' ? (() => { const progress = executionProgress(order); return `${executionBlock}${progress.all ? `<button class="primary-button" data-order-action="complete" data-order-id="${esc(order.id)}">标记陪诊已完成</button>` : '<small class="review-complete">完成全部履约项目后才能标记完成</small>'}`; })()
+        : order.status === 'completed' ? `${executionBlock}${!order.reviews?.escort ? `<button class="primary-button" data-order-review="${esc(order.id)}" data-review-role="escort">评价本次家庭</button>` : `<small class="review-complete">你已评价${order.reviews?.family ? ' · 双方已互评' : ' · 等待家庭评价'}</small>`}`
+        : '';
       return `<article class="escort-order-card"><div class="family-order-top"><strong>${esc(order.patient || '家庭预约')}</strong><span class="record-status">${label}</span></div><p>${esc(order.service)} · ${esc(order.date)}<br>${esc(order.hospital)}<br>需求：${esc(order.need || '未补充')}</p><small class="privacy-small order-share-note">本次申请仅分享以上预约信息，不包含完整病历。</small>${reviewSummary(order)}${actions}</article>`;
     }).join('') : '<div class="empty-hint">还没有预约申请。切换到家庭端创建一笔演示预约，就能在这里体验接单流程。</div>';
   }
@@ -223,16 +293,116 @@ function checkMedicationReminders() {
       const [hour, minute] = time.split(':').map(Number);
       const delta = currentMinute - (hour * 60 + minute);
       const key = `${day}|${med.id}|${time}`;
-      if (delta < 0 || delta > 3 || state.medicationTaken?.[key] || state.medicationNotified?.[key]) continue;
-      state.medicationNotified = { ...(state.medicationNotified || {}), [key]: true };
-      changed = true;
-      const message = `${med.name}${med.dose ? ` · ${med.dose}` : ''}，请按已确认医嘱核对。`;
-      if ('Notification' in window && Notification.permission === 'granted') new Notification('康伴服药提醒', { body: message, tag: key });
-      else if (document.visibilityState === 'visible') toast(`服药提醒：${med.name} · ${time}`);
+      if (delta >= 0 && delta <= 3 && !state.medicationTaken?.[key] && !state.medicationNotified?.[key]) {
+        state.medicationNotified = { ...(state.medicationNotified || {}), [key]: true };
+        changed = true;
+        const message = `${med.name}${med.dose ? ` · ${med.dose}` : ''}，请按已确认医嘱核对。`;
+        if ('Notification' in window && Notification.permission === 'granted') new Notification('康伴服药提醒', { body: message, tag: key });
+        else if (document.visibilityState === 'visible') toast(`服药提醒：${med.name} · ${time}`);
+      }
+      if (delta > 90 && !state.medicationTaken?.[key] && !state.missedAlerts?.[key]) {
+        state.missedAlerts = { ...(state.missedAlerts || {}), [key]: true };
+        changed = true;
+        createAlert('yellow', '提醒后仍未记录服药', `${med.name}（${med.dose || '按医嘱'}）计划 ${time} 服用，超过 90 分钟未记录已服。请联系妈妈确认是否漏服，不要自行补服处方药。`, '服药提醒闭环');
+      }
     }
   }
   if (changed) saveState();
 }
+
+/* ============ 健康预警（FR-02 规则版）与分级告知（FR-04） ============ */
+const ALERT_META = {
+  red: { label: '紧急', badge: 'alert-badge-red', hint: '立即处理' },
+  yellow: { label: '需要关注', badge: 'alert-badge-yellow', hint: '建议跟进' },
+  blue: { label: '一般', badge: 'alert-badge-blue', hint: '日常留意' }
+};
+const NOTIFY_PLAN = {
+  red: ['已向全体家庭成员推送 App 强提醒', '已发起电话外呼（演示）：小林 · 女儿', '已在平台后台生成人工介入记录'],
+  yellow: ['已推送 App 通知给家庭成员', '已加入今日健康汇总'],
+  blue: ['已加入今日健康汇总，家人打开首页可见']
+};
+function evaluateReading(reading) {
+  const { systolic, diastolic } = reading;
+  if (systolic >= 180 || diastolic >= 110) return { level: 'red', title: '血压明显升高', detail: `收缩压 ${systolic} mmHg / 舒张压 ${diastolic} mmHg，达到紧急阈值（≥180/≥110）。请立即联系妈妈确认情况，必要时就医。` };
+  if (systolic >= 160 || diastolic >= 100) return { level: 'yellow', title: '血压偏高', detail: `收缩压 ${systolic} mmHg / 舒张压 ${diastolic} mmHg，超过关注阈值（≥160/≥100）。建议今天复测一次并留意妈妈的状态。` };
+  if (systolic >= 140 || diastolic >= 90) return { level: 'blue', title: '血压轻度升高', detail: `收缩压 ${systolic} mmHg / 舒张压 ${diastolic} mmHg，轻度超过日常范围（≥140/≥90），已记入健康汇总。` };
+  return null;
+}
+function nowLabel() {
+  const now = new Date();
+  return `${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+function createAlert(level, title, detail, source) {
+  const alert = { id: `alert-${state.nextAlertId++}`, level, title, detail, source: source || '规则引擎', createdAt: nowLabel(), notify: NOTIFY_PLAN[level] || NOTIFY_PLAN.blue };
+  state.alerts.unshift(alert);
+  saveState(); renderHomeAlerts();
+  if ('Notification' in window && Notification.permission === 'granted') new Notification(`康伴${ALERT_META[level].label}预警：${title}`, { body: detail, tag: alert.id });
+  return alert;
+}
+function renderHomeAlerts() {
+  const host = document.getElementById('homeAlerts');
+  if (!host) return;
+  const latest = state.alerts[0];
+  if (!latest) {
+    host.innerHTML = `<div class="alert-card alert-card-calm"><span class="alert-icon">✓</span><div><strong>近期没有需要处理的预警</strong><small>录入血压读数或同步手表数据后，规则引擎会自动评估。</small></div><button class="text-button" data-action="alerts">录入 →</button></div>`;
+    return;
+  }
+  const meta = ALERT_META[latest.level];
+  const counts = { red: 0, yellow: 0, blue: 0 };
+  state.alerts.forEach(alert => { counts[alert.level] = (counts[alert.level] || 0) + 1; });
+  const countText = counts.red ? `${counts.red} 条紧急` : counts.yellow ? `${counts.yellow} 条需要关注` : `${counts.blue || 0} 条一般记录`;
+  host.innerHTML = `<div class="alert-card alert-card-${latest.level}"><span class="alert-icon alert-icon-${latest.level}">${latest.level === 'red' ? '!' : latest.level === 'yellow' ? '△' : '·'}</span><div><strong>${esc(latest.title)}</strong><small>${esc(latest.detail.split('。')[0])}。</small><small class="alert-time">${esc(latest.createdAt)} · ${countText}</small></div><button class="text-button" data-action="alerts">查看 →</button></div>`;
+}
+function showAlertCenter() {
+  const alerts = state.alerts;
+  const list = alerts.length ? alerts.map(alert => {
+    const meta = ALERT_META[alert.level];
+    return `<article class="alert-detail-card"><div class="alert-detail-head"><span class="alert-badge ${meta.badge}">${meta.label}</span><strong>${esc(alert.title)}</strong><small>${esc(alert.createdAt)}</small></div><p>${esc(alert.detail)}</p><small class="alert-source">来源：${esc(alert.source)}</small><div class="alert-notify"><strong>分级告知记录</strong>${(alert.notify || []).map(entry => `<small>› ${esc(entry)}</small>`).join('')}</div></article>`;
+  }).join('') : '<p class="privacy-small" style="margin-top:18px">还没有预警记录。下面录入一次血压读数试试。</p>';
+  openModal(`${modalHead('规则版 · 本机演示', '健康预警中心', '预警由血压读数和服药记录按固定规则生成，不构成医疗判断。红色立即电话告知，黄色推送提醒，蓝色进入每日汇总。')}
+    ${list}
+    <div class="reading-form">
+      <strong>录入血压读数（演示）</strong>
+      <div class="reading-inputs">
+        <label><span>收缩压</span><input class="input-field" id="readingSystolic" type="number" min="60" max="260" placeholder="mmHg" /></label>
+        <label><span>舒张压</span><input class="input-field" id="readingDiastolic" type="number" min="40" max="160" placeholder="mmHg" /></label>
+        <label><span>脉搏</span><input class="input-field" id="readingPulse" type="number" min="30" max="220" placeholder="次/分" /></label>
+      </div>
+      <button class="primary-button" id="saveReading">保存并评估</button>
+      <button class="secondary-button" id="mockWatchSync">模拟手表同步一次读数</button>
+      <button class="secondary-button" id="mockFallEvent">模拟手表跌倒事件</button>
+      <p class="privacy-small">演示读数保存在本机。真实手表接入（华为 Health Kit / 小米运动健康）属于后续版本。</p>
+    </div>`);
+  document.getElementById('mockWatchSync')?.addEventListener('click', () => {
+    const pool = [ [128, 82, 72], [146, 92, 78], [168, 104, 86], [122, 80, 70] ];
+    const [sys, dia, pulse] = pool[Math.floor(Math.random() * pool.length)];
+    saveReading({ systolic: sys, diastolic: dia, pulse, source: '模拟手表' });
+  });
+  document.getElementById('mockFallEvent')?.addEventListener('click', () => {
+    createAlert('red', '疑似跌倒事件', `模拟手表上报一次疑似跌倒（${nowLabel()}），设备定位：家中客厅（演示数据）。请立即联系妈妈确认情况，必要时就医。`, '模拟手表 · 跌倒监测');
+    closeModal(); toast('已生成红色预警，家人已收到电话外呼演示');
+    showAlertCenter();
+  });
+  document.getElementById('saveReading')?.addEventListener('click', () => {
+    const systolic = Number(document.getElementById('readingSystolic')?.value);
+    const diastolic = Number(document.getElementById('readingDiastolic')?.value);
+    const pulse = Number(document.getElementById('readingPulse')?.value) || 0;
+    if (!systolic || !diastolic) { toast('请先填写收缩压和舒张压'); return; }
+    saveReading({ systolic, diastolic, pulse, source: '手动录入' });
+  });
+}
+function saveReading(reading) {
+  const entry = { id: `bp-${state.nextReadingId++}`, date: dateOffset(0), time: nowLabel().split(' ')[1], ...reading };
+  state.healthReadings.unshift(entry);
+  const result = evaluateReading(entry);
+  let message = '读数正常，未触发预警';
+  if (result) {
+    createAlert(result.level, result.title, result.detail, `${entry.source} · 血压 ${entry.systolic}/${entry.diastolic}`);
+    message = `已触发${ALERT_META[result.level].label}预警并完成分级告知`;
+  }
+  saveState(); renderHomeAlerts(); closeModal(); toast(message);
+}
+
 function navigate(tab) {
   if (state.currentRole === 'escort' && !tab.startsWith('escort')) tab = 'escort';
   if (state.currentRole !== 'escort' && tab.startsWith('escort')) tab = 'home';
@@ -610,6 +780,7 @@ document.addEventListener('click', async event => {
   if (action === 'add-medication') showUpload();
   if (action === 'health-card') showHealthCard();
   if (action === 'share') showShare();
+  if (action === 'alerts') showAlertCenter();
   if (action === 'companion') navigate('companion');
   if (action === 'book-profile') showCompanionForm('全程陪诊');
   if (action === 'toggle-availability') {
@@ -730,10 +901,16 @@ document.addEventListener('click', async event => {
     const order = state.companionOrders.find(item => item.id === orderAction.dataset.orderId);
     if (order) {
       const actionName = orderAction.dataset.orderAction;
+      if (actionName === 'complete') {
+        ensureExecution(order);
+        const progress = executionProgress(order);
+        if (!progress.all) { toast('还有履约项目未完成，请逐项执行并上传佐证'); return; }
+      }
       order.status = actionName === 'accept' ? 'accepted' : actionName === 'complete' ? 'completed' : 'declined';
+      if (order.status === 'accepted') ensureExecution(order);
       if (order.status === 'completed') order.completedAt = new Date().toISOString();
       saveState(); renderRecords();
-      toast(order.status === 'accepted' ? '已接受预约，家庭端状态已更新' : order.status === 'completed' ? '已完成陪诊，可开始互评' : '已标记暂不接单');
+      toast(order.status === 'accepted' ? '已接受预约，请按履约清单逐项执行' : order.status === 'completed' ? '已完成陪诊，家庭端可查看履约记录' : '已标记暂不接单');
     }
   }
   const reviewButton = event.target.closest('[data-order-review]');
@@ -748,8 +925,25 @@ document.addEventListener('click', async event => {
   if (event.target.closest('#recordDone')) closeModal();
   if (event.target.closest('#orderDone') || event.target.closest('#infoDone')) closeModal();
   if (event.target.closest('#modalClose') || event.target.id === 'modalBackdrop') closeModal();
-  if (event.target.closest('#bellButton')) showAppointment();
+  if (event.target.closest('#bellButton')) showAlertCenter();
   if (event.target.closest('#profileSwitch')) showRoleSwitcher();
+  const execToggle = event.target.closest('[data-exec-toggle]');
+  if (execToggle) {
+    const order = state.companionOrders.find(item => item.id === execToggle.dataset.orderId);
+    const item = order?.execution?.items?.find(entry => entry.key === execToggle.dataset.execToggle);
+    if (item && !item.done) {
+      item.done = true; item.doneAt = nowLabel();
+      saveState(); renderRecords();
+      toast(`已记录：${item.label}`);
+    }
+  }
+  const execEvidence = event.target.closest('[data-exec-evidence]');
+  if (execEvidence) {
+    evidenceTarget = { orderId: execEvidence.dataset.orderId, key: execEvidence.dataset.execEvidence };
+    const input = document.getElementById('evidenceInput'); input.value = ''; input.click();
+  }
+  const evidenceView = event.target.closest('[data-evidence-view]');
+  if (evidenceView) showEvidenceModal(evidenceView.dataset.orderId, evidenceView.dataset.evidenceView);
 });
 
 document.addEventListener('submit', event => {
@@ -812,6 +1006,23 @@ document.getElementById('preVisitAudioInput').addEventListener('change', event =
   preVisitFiles.push(...Array.from(event.target.files || [])); event.target.value = '';
   const status = document.getElementById('preVisitStatus'); if (status) status.textContent = `已添加 ${preVisitFiles.length} 个附件；录音会随描述保存在本机。`;
 });
+document.getElementById('evidenceInput').addEventListener('change', async event => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file || !evidenceTarget) return;
+  const order = state.companionOrders.find(item => item.id === evidenceTarget.orderId);
+  const item = order?.execution?.items?.find(entry => entry.key === evidenceTarget.key);
+  if (!item) { toast('没有找到履约项目'); evidenceTarget = null; return; }
+  const evidenceId = `evidence-${order.id}-${item.key}`;
+  try {
+    await putAttachment(evidenceId, file);
+    item.evidenceId = evidenceId; item.evidenceName = file.name;
+    if (!item.done) { item.done = true; item.doneAt = nowLabel(); }
+    saveState(); renderRecords();
+    toast('佐证照片已保存，履约项已标记完成');
+  } catch { toast('佐证保存失败，请重试'); }
+  evidenceTarget = null;
+});
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener('click', () => {
   document.querySelectorAll('.filter-chip').forEach(item => item.classList.remove('selected')); chip.classList.add('selected');
@@ -821,7 +1032,17 @@ document.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener(
     item.hidden = category === '全部' ? false : category === '检查报告' ? type !== '检查报告' : type !== '用药记录';
   });
 }));
-displayToday(); renderRole(); renderRecords(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
+if (!state.alertsSeeded) {
+  state.alertsSeeded = true;
+  for (const reading of [...state.healthReadings].reverse()) {
+    const result = evaluateReading(reading);
+    if (result) {
+      state.alerts.unshift({ id: `alert-${state.nextAlertId++}`, level: result.level, title: result.title, detail: result.detail, source: `${reading.source} · 血压 ${reading.systolic}/${reading.diastolic}`, createdAt: `${formatDate(reading.date)} ${reading.time}`, notify: NOTIFY_PLAN[result.level] || NOTIFY_PLAN.blue });
+    }
+  }
+  saveState();
+}
+displayToday(); renderHomeAlerts(); renderRole(); renderRecords(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
 setInterval(checkMedicationReminders, 60000);
 setTimeout(checkMedicationReminders, 1500);
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
