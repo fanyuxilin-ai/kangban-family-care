@@ -69,3 +69,33 @@ nav[hidden]{display:none!important}
 .exec-copy small{font-size:8px;color:#9aa49c}
 .exec-evidence{flex:none;font-size:9px;padding:6px 9px;border-radius:8px;background:#fffefa;color:#617966;border:1px solid #e3e6dc;white-space:nowrap}
 .exec-evidence.has-evidence{background:#e8f0e5;color:#55735c;border-color:#dbe7d8}
+/* 家庭端五 Tab 分区（设计文档 §3.1） */
+.docs-quick-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 4px}
+.docs-quick-row .secondary-button{margin:0;height:46px;font-size:10px}
+.docs-library-heading{margin-top:26px}
+.insurance-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.insurance-card{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;padding:13px;box-shadow:0 4px 18px rgba(52,64,55,.045)}
+.insurance-card strong{font-size:11px;color:#445449}
+.insurance-card small{font-size:9px;line-height:1.6;color:#8a958c}
+.insurance-card:active{background:#f0f3ec}
+.insurance-channel-card{display:flex;flex-direction:column;gap:6px;background:#eef2ea;border-radius:12px;padding:12px 13px;margin-top:2px}
+.insurance-channel-card strong{font-size:11px;color:#4c6452}
+.insurance-channel-card small{font-size:9px;color:#75827a;line-height:1.5}
+.reading-list{display:flex;flex-direction:column}
+.reading-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #efeEE6}
+.reading-row:last-of-type{border-bottom:0}
+.reading-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.reading-copy strong{font-size:13px;color:#445449}
+.reading-copy small{font-size:9px;color:#8a958c}
+.reading-tag{flex:none;font-size:8px;font-weight:700;border-radius:12px;padding:4px 8px}
+.reading-tag-ok{background:#e8f0e5;color:#55735c}
+.reading-tag-red{background:#f6e0da;color:#a1543f}
+.reading-tag-yellow{background:#f6ecd8;color:#9a7c3f}
+.reading-tag-blue{background:#e5ecf3;color:#5c7690}
+.trend-card{background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;padding:13px 14px;box-shadow:0 4px 18px rgba(52,64,55,.045)}
+.trend-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f0efe9}
+.trend-row:last-of-type{border-bottom:0}
+.trend-row strong{font-size:11px}
+.trend-row .field-label{font-size:9px}
+.trend-warn{color:#a1543f}
+.trend-ok{color:#55735c}
