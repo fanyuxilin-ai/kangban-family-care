@@ -206,3 +206,7 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .hist-node-body small{font-size:8.5px;color:#9aa49c}
 .hist-node-top{display:flex;align-items:center;gap:8px}
 .hist-node-top strong{font-size:12px}
+/* 历史记录搜索框 */
+.hist-search{margin-bottom:10px}
+.hist-search .input-field{width:100%;height:42px;background:#fffefa;border:1px solid #e3e5dd;border-radius:11px;padding:0 12px;font-size:11px;color:#3b4c40}
+.hist-search .input-field::placeholder{color:#a4aea6}

@@ -251,6 +251,8 @@ function panelBlock(key, headHtml, bodyHtml, extraClass = '') {
   </div>`;
 }
 const boardOpenDays = new Set(); // 化验报告展开的日期分组
+const boardDaySeeded = new Set(); // 已做过「首日自动展开」的成员，之后尊重用户手动折叠
+let dashboardMemberId = 'm1';   // 当前打开体检看板的成员（弹窗内交互都用它）
 
 function renderHealth() {
   const host = document.getElementById('memberArchiveList');
@@ -342,6 +344,7 @@ function trendSvg(entries, metric) {
 function showMemberDashboard(memberId, metric = '') {
   const member = state.familyMembers.find(item => item.id === memberId);
   if (!member) return;
+  dashboardMemberId = memberId;
   const entries = memberMetricEntries(memberId).slice().sort((a, b) => a.date.localeCompare(b.date));
   const metrics = [...new Set(entries.map(entry => entry.metric))];
   const active = metric && metrics.includes(metric) ? metric : (dashboardMetric[memberId] && metrics.includes(dashboardMetric[memberId]) ? dashboardMetric[memberId] : metrics[0]);
@@ -370,7 +373,7 @@ function showMemberDashboard(memberId, metric = '') {
     <p class="privacy-small">演示版：体检单为模拟识别，数值可修改后入库；不做真实医疗判断。</p>`);
 }
 
-/* 历史记录区（按指标分组 + 组内时间线 + 筛选定位） */
+/* 历史记录区（按指标分组 + 组内时间线 + 筛选与搜索定位） */
 function renderBoardHistory(member, entries) {
   const conf = historyFilter[member.id] || {};
   const metricNames = [...new Set(entries.map(entry => entry.metric))];
@@ -384,15 +387,29 @@ function renderBoardHistory(member, entries) {
     }),
     `<button class="metric-chip ${abnormalOnly ? 'selected' : ''}" data-hist-abn="${member.id}">只看异常</button>`
   ].join('');
+  return panelBlock('dash-history', '<strong>🗂 历史记录</strong><small>按指标 · 时间线 · 可搜索 / 编辑 / 删除</small>', `
+    <div class="hist-search"><input class="input-field" id="histSearch" data-member-id="${member.id}" type="text" placeholder="🔍 搜索指标 / 数值 / 日期 / 来源" value="${esc(conf.search || '')}" /></div>
+    <div class="metric-chips board-filter-chips">${chips}</div>
+    <div id="histBody">${renderHistBody(member, entries)}</div>`);
+}
+function renderHistBody(member, entries) {
+  const conf = historyFilter[member.id] || {};
+  const metricNames = [...new Set(entries.map(entry => entry.metric))];
+  const activeMetric = metricNames.includes(conf.metric) ? conf.metric : 'all';
+  const abnormalOnly = !!conf.abnormalOnly;
+  const keyword = (conf.search || '').trim().toLowerCase();
   let pool = entries;
   if (activeMetric !== 'all') pool = pool.filter(entry => entry.metric === activeMetric);
   if (abnormalOnly) pool = pool.filter(entry => metricStatus(entry.metric, entry.value) !== 'normal');
+  if (keyword) {
+    pool = pool.filter(entry => [entry.metric, String(entry.value), entry.unit || '', formatDate(entry.date), entry.date, entry.source || ''].join(' ').toLowerCase().includes(keyword));
+  }
   const groups = new Map();
   pool.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => {
     if (!groups.has(entry.metric)) groups.set(entry.metric, []);
     groups.get(entry.metric).push(entry);
   });
-  const body = entries.length && groups.size
+  return entries.length && groups.size
     ? [...groups.entries()].map(([name, list]) => {
         const abnormal = list.filter(entry => metricStatus(name, entry.value) !== 'normal').length;
         return `<div class="hist-group">
@@ -407,10 +424,7 @@ function renderBoardHistory(member, entries) {
             </div>`).join('')}</div>
         </div>`;
       }).join('')
-    : `<p class="empty-hint">${entries.length ? '当前筛选下没有记录，试试其他指标或关闭「只看异常」。' : '还没有指标记录，先导入体检单。'}</p>`;
-  return panelBlock('dash-history', '<strong>🗂 历史记录</strong><small>按指标 · 时间线 · 可编辑 / 删除</small>', `
-    <div class="metric-chips board-filter-chips">${chips}</div>
-    ${body}`);
+    : `<p class="empty-hint">${!entries.length ? '还没有指标记录，先导入体检单。' : keyword ? `没有匹配「${esc(conf.search.trim())}」的记录，换个关键词试试。` : '当前筛选下没有记录，试试其他指标或关闭「只看异常」。'}</p>`;
 }
 
 /* 化验报告区（参考产品稿：按天/按类别分组、筛选芯片、异常标色） */
@@ -445,9 +459,10 @@ function renderBoardLab(member, entries, filter, abnormalCount, tracking) {
         groups.get(key).push(entry);
       });
     }
-    if (filter === 'day' && boardOpenDays.size === 0) {
+    if (filter === 'day' && !boardDaySeeded.has(member.id)) {
       const first = [...groups.keys()][0];
-      if (first) boardOpenDays.add(first);
+      if (first && !boardOpenDays.has(first)) boardOpenDays.add(first);
+      boardDaySeeded.add(member.id);
     }
     body = [...groups.entries()].map(([key, rows]) => {
       const abnormal = rows.filter(entry => metricStatus(entry.metric, entry.value) !== 'normal').length;
@@ -1473,14 +1488,14 @@ document.addEventListener('click', async event => {
   if (histAbnChip) {
     const id = histAbnChip.dataset.histAbn;
     const conf = historyFilter[id] || {};
-    historyFilter[id] = { metric: conf.metric || 'all', abnormalOnly: !conf.abnormalOnly };
+    historyFilter[id] = { ...conf, metric: conf.metric || 'all', abnormalOnly: !conf.abnormalOnly };
     showMemberDashboard(id); return;
   }
   const boardDay = event.target.closest('[data-board-day]');
   if (boardDay) {
     const key = boardDay.dataset.boardDay;
     if (boardOpenDays.has(key)) boardOpenDays.delete(key); else boardOpenDays.add(key);
-    showMemberDashboard(currentMember()?.id || 'm1');
+    showMemberDashboard(dashboardMemberId);
     return;
   }
   const histEdit = event.target.closest('[data-hist-edit]');
@@ -1549,6 +1564,17 @@ document.addEventListener('click', async event => {
   }
   const evidenceView = event.target.closest('[data-evidence-view]');
   if (evidenceView) showEvidenceModal(evidenceView.dataset.orderId, evidenceView.dataset.evidenceView);
+});
+
+/* 历史记录搜索：只刷新 #histBody，保持输入框焦点 */
+document.addEventListener('input', event => {
+  if (event.target.id !== 'histSearch') return;
+  const memberId = event.target.dataset.memberId;
+  const member = (state.familyMembers || []).find(item => item.id === memberId);
+  const host = document.getElementById('histBody');
+  if (!member || !host) return;
+  historyFilter[memberId] = { ...(historyFilter[memberId] || {}), search: event.target.value };
+  host.innerHTML = renderHistBody(member, memberMetricEntries(memberId));
 });
 
 document.addEventListener('submit', event => {
