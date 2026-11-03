@@ -342,7 +342,7 @@ function showMemberDashboard(memberId, metric = '') {
   const change = lastWeight && prevWeight ? Number((lastWeight.value - prevWeight.value).toFixed(1)) : null;
   const lastEntry = entries[entries.length - 1];
   const tracking = latestAbnormal(memberId);
-  const abnormalCount = entries.filter(entry => metricStatus(entry.metric, entry.value) !== 'normal').length;
+  const abnormalCount = tracking.length; // 口径与跟踪区一致：每个指标只看最新一次读数
   const filter = dashboardFilter[memberId] || 'day';
   openModal(`${modalHead('体检看板 · 模拟数据', `${esc(member.name)} · ${esc(member.role)} ${member.age}岁`, '身体指标统计、趋势、化验报告整理与跟踪。点右上角可切换指标，底部可导入模拟体检单。')}
     <div class="board-stats">
