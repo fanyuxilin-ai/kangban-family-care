@@ -327,6 +327,7 @@ function renderHealth() {
             <button class="secondary-button" data-member-daily="${member.id}">日常记录</button>
             <button class="primary-button" data-checkup-import="${member.id}">导入体检单</button>
           </div>
+          <button class="text-button member-board-link" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单） →</button>
         </div>` : ''}
       </article>`;
     }).join('');

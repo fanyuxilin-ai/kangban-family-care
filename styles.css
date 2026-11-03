@@ -113,6 +113,7 @@ nav[hidden]{display:none!important}
 .member-archive-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:11px}
 .member-archive-actions.member-archive-actions-3{grid-template-columns:1fr 1fr 1fr}
 .member-archive-actions .primary-button,.member-archive-actions .secondary-button{margin:0;height:42px;font-size:10px}
+.member-board-link{display:block;width:100%;text-align:right;margin-top:7px;font-size:9px;color:#5c7663;cursor:pointer}
 /* 手动录入 · 一句话 + AI 识别 + 可编辑指标行 */
 .ai-parse-block{margin-bottom:11px}
 .ai-parse-block>strong{display:block;font-size:11px;color:#445449;margin-bottom:9px}
