@@ -238,6 +238,8 @@ function latestAbnormal(memberId) {
 const expandedMembers = new Set(['m1']);
 let dashboardMetric = {};
 const dashboardFilter = {};   // 看板筛选：day / category / all / abnormal
+let readingMethod = 'manual';   // 录入读数方式：manual / voice / photo / device
+let readingSource = '手动录入'; // 当前录入来源（随方式变化）
 const collapsedPanels = new Set(); // 全局面板折叠记忆（key 见各 panelBlock / data-panel）
 /* 可折叠面板通用结构：点击头部或折叠箭头收起/展开，body 用 .section-body 包裹 */
 function panelBlock(key, headHtml, bodyHtml, extraClass = '') {
@@ -760,7 +762,7 @@ function renderHomeAlerts() {
   if (!host) return;
   const latest = state.alerts[0];
   if (!latest) {
-    host.innerHTML = `<div class="alert-card alert-card-calm"><span class="alert-icon">✓</span><div><strong>近期没有需要处理的预警</strong><small>录入血压读数或同步手表数据后，规则引擎会自动评估。</small></div><button class="text-button" data-action="alerts">录入 →</button></div>`;
+    host.innerHTML = `<div class="alert-card alert-card-calm"><span class="alert-icon">✓</span><div><strong>近期没有需要处理的预警</strong><small>录入血压读数或同步手表数据后，规则引擎会自动评估。</small></div><button class="text-button" data-action="add-reading">录入 →</button></div>`;
     return;
   }
   const meta = ALERT_META[latest.level];
@@ -778,17 +780,91 @@ function showAlertCenter() {
   openModal(`${modalHead('规则版 · 本机演示', '健康预警中心', '预警由血压读数和服药记录按固定规则生成，不构成医疗判断。红色立即电话告知，黄色推送提醒，蓝色进入每日汇总。')}
     ${list}
     <div class="reading-form">
-      <strong>录入血压读数（演示）</strong>
+      <strong>有新读数？</strong>
+      <button class="primary-button" data-action="add-reading">＋ 录入读数（手动 / 语音 / 拍照 / 硬件）</button>
+      <p class="privacy-small">录入后由规则引擎自动评估并分级告知；也可在硬件同步里模拟手表读数与跌倒事件。</p>
+    </div>`);
+}
+/* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件） ============ */
+const READING_METHODS = [
+  { id: 'manual', icon: '✍️', label: '手动录入', hint: '直接填写血压 / 脉搏数值' },
+  { id: 'voice', icon: '🎙', label: '语音录入', hint: '老人说一句话，自动转成读数' },
+  { id: 'photo', icon: '📷', label: '拍照识别', hint: '拍血压计 / 血糖仪，OCR 读数' },
+  { id: 'device', icon: '⌚', label: '硬件同步', hint: '智能手表自动同步与异常上报' }
+];
+function showReadingEntry() {
+  const member = currentMember();
+  const method = READING_METHODS.some(item => item.id === readingMethod) ? readingMethod : 'manual';
+  const chips = READING_METHODS.map(item => `<button class="metric-chip ${item.id === method ? 'selected' : ''}" data-reading-method="${item.id}">${item.icon} ${item.label}</button>`).join('');
+  const captureForm = `<div class="reading-form">
+      <strong>确认读数（来源：${esc(readingSource)}）</strong>
       <div class="reading-inputs">
         <label><span>收缩压</span><input class="input-field" id="readingSystolic" type="number" min="60" max="260" placeholder="mmHg" /></label>
         <label><span>舒张压</span><input class="input-field" id="readingDiastolic" type="number" min="40" max="160" placeholder="mmHg" /></label>
         <label><span>脉搏</span><input class="input-field" id="readingPulse" type="number" min="30" max="220" placeholder="次/分" /></label>
       </div>
       <button class="primary-button" id="saveReading">保存并评估</button>
-      <button class="secondary-button" id="mockWatchSync">模拟手表同步一次读数</button>
-      <button class="secondary-button" id="mockFallEvent">模拟手表跌倒事件</button>
-      <p class="privacy-small">演示读数保存在本机。真实手表接入（华为 Health Kit / 小米运动健康）属于后续版本。</p>
-    </div>`);
+      <p class="privacy-small">保存后由规则引擎自动评估：≥160/100 黄色预警、≥180/110 红色预警，并按级别分级告知家人。</p>
+    </div>`;
+  let capture = '';
+  if (method === 'manual') {
+    capture = captureForm;
+  } else if (method === 'voice') {
+    capture = `<div class="entry-capture-card">
+        <div class="entry-capture-icon">🎙</div>
+        <strong>语音录入（演示）</strong>
+        <p>老人对着手机或音箱说一句，语音转文字 + 意图抽取后自动填入读数，无需打字。</p>
+        <div class="entry-result" id="voiceResult" hidden></div>
+        <button class="primary-button" id="voiceMock">▶ 模拟一句语音："妈妈今天血压 152 94，脉搏 78"</button>
+        <p class="privacy-small">演示为固定语句；正式版接入语音识别（微信语音 / 讯飞）后支持自然表达与多方言。</p>
+      </div>${captureForm}`;
+  } else if (method === 'photo') {
+    capture = `<div class="entry-capture-card">
+        <div class="entry-capture-icon">📷</div>
+        <strong>拍照识别（模拟 OCR）</strong>
+        <p>拍下血压计 / 血糖仪的读数屏，识别数值后回填，家人在下方核对确认。</p>
+        <div class="entry-photo">🩺 电子血压计读数屏（模拟）<small>欧姆龙 HEM-7124 · 今日 07:50</small></div>
+        <div class="entry-result" id="photoResult" hidden></div>
+        <button class="primary-button" id="photoMock">🔍 开始识别</button>
+        <p class="privacy-small">识别结果需人工确认后入库，不做自动提交。正式版使用端侧 OCR 模型。</p>
+      </div>${captureForm}`;
+  } else {
+    capture = `<div class="entry-capture-card">
+        <div class="entry-capture-icon">⌚</div>
+        <strong>硬件设备同步（演示）</strong>
+        <p>预留华为 / 小米等智能手表接入入口：血压、心率、睡眠自动同步；跌倒检测、长时间无响应自动触发紧急预警。</p>
+        <div class="entry-result">已绑定设备（演示）：智能手表 · 电量 82% · 上次同步 ${nowLabel().split(' ')[1]}</div>
+        <button class="primary-button" id="mockWatchSync">同步一次手表血压读数</button>
+        <button class="secondary-button" id="mockFallEvent">模拟手表跌倒事件（红色预警）</button>
+        <p class="privacy-small">真实接入走华为 Health Kit / 小米运动健康开放接口，属于正式版范围；同步读数同样进入规则引擎评估。</p>
+      </div>`;
+  }
+  const activeHint = READING_METHODS.find(item => item.id === method)?.hint || '';
+  openModal(`${modalHead(`日常记录 · ${esc(member?.name || '')}`, '录入读数', '支持手动、语音、拍照与硬件同步四种方式，录入后自动进入健康趋势、体检看板与预警评估。')}
+    <div class="metric-chips entry-method-chips">${chips}</div>
+    <p class="privacy-small entry-hint">${esc(activeHint)}</p>
+    ${capture}`);
+  const fillForm = values => {
+    document.getElementById('readingSystolic').value = values[0];
+    document.getElementById('readingDiastolic').value = values[1];
+    document.getElementById('readingPulse').value = values[2];
+  };
+  document.getElementById('voiceMock')?.addEventListener('click', () => {
+    const result = document.getElementById('voiceResult');
+    if (result) { result.hidden = false; result.textContent = '“女儿，我刚量了血压，152 94，脉搏 78。” → 识别为血压读数，已填入下方表单'; }
+    readingSource = '语音录入';
+    document.querySelector('.reading-form strong').textContent = '确认读数（来源：语音录入）';
+    fillForm([152, 94, 78]);
+    toast('语音识别完成，请在下方核对');
+  });
+  document.getElementById('photoMock')?.addEventListener('click', () => {
+    const result = document.getElementById('photoResult');
+    if (result) { result.hidden = false; result.textContent = '识别结果：收缩压 146 / 舒张压 92 · 脉搏 78（置信度 96%），已填入下方表单'; }
+    readingSource = '拍照识别';
+    document.querySelector('.reading-form strong').textContent = '确认读数（来源：拍照识别）';
+    fillForm([146, 92, 78]);
+    toast('识别完成，请在下方核对');
+  });
   document.getElementById('mockWatchSync')?.addEventListener('click', () => {
     const pool = [ [128, 82, 72], [146, 92, 78], [168, 104, 86], [122, 80, 70] ];
     const [sys, dia, pulse] = pool[Math.floor(Math.random() * pool.length)];
@@ -804,7 +880,7 @@ function showAlertCenter() {
     const diastolic = Number(document.getElementById('readingDiastolic')?.value);
     const pulse = Number(document.getElementById('readingPulse')?.value) || 0;
     if (!systolic || !diastolic) { toast('请先填写收缩压和舒张压'); return; }
-    saveReading({ systolic, diastolic, pulse, source: '手动录入' });
+    saveReading({ systolic, diastolic, pulse, source: readingSource });
   });
 }
 function saveReading(reading) {
@@ -1199,6 +1275,13 @@ document.addEventListener('click', async event => {
     }
     return;
   }
+  const readingMethodChip = event.target.closest('[data-reading-method]');
+  if (readingMethodChip) {
+    readingMethod = readingMethodChip.dataset.readingMethod;
+    if (readingMethod !== 'device') readingSource = { manual: '手动录入', voice: '语音录入', photo: '拍照识别' }[readingMethod] || '手动录入';
+    showReadingEntry();
+    return;
+  }
   const tab = event.target.closest('[data-tab]');
   if (tab) { navigate(tab.dataset.tab); return; }
   const nav = event.target.closest('[data-nav]');
@@ -1210,6 +1293,7 @@ document.addEventListener('click', async event => {
   if (action === 'health-card') showHealthCard();
   if (action === 'share') showShare();
   if (action === 'alerts') showAlertCenter();
+  if (action === 'add-reading') showReadingEntry();
   if (action === 'insurance-social') showInsuranceHub('social');
   if (action === 'insurance-commercial') showInsuranceHub('commercial');
   if (action === 'ai-assistant') showInfo('AI 管理助手（规划中）', '规划能力：自动总结父母健康周报、回答健康咨询、生成就医准备清单，并支持「小康，今天该吃什么药」式语音交互。当前演示版可在「我的 · 健康趋势」查看固定统计。');
