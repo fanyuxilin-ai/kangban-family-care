@@ -46,6 +46,9 @@ jobs:
           rsync -a --exclude='.git' sources/main/ _site/main/
           rsync -a --exclude='.git' sources/family-tab-restructure/ _site/family-tab-restructure/
           rsync -a --exclude='.git' sources/family-member-management/ _site/family-member-management/
+          sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-main-v1';/" _site/main/app.js
+          sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-family-tab-v1';/" _site/family-tab-restructure/app.js
+          sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-family-member-v1';/" _site/family-member-management/app.js
           cat > _site/index.html <<'HTML'
           <!doctype html>
           <html lang="zh-CN">
