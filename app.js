@@ -238,6 +238,7 @@ function latestAbnormal(memberId) {
 const expandedMembers = new Set(['m1']);
 let dashboardMetric = {};
 const dashboardFilter = {};   // 看板筛选：day / category / all / abnormal
+const historyFilter = {};     // 历史记录筛选：{ [memberId]: { metric, abnormalOnly } }
 let readingMethod = 'manual';   // 录入读数方式：manual / voice / photo / device
 let readingSource = '手动录入'; // 当前录入来源（随方式变化）
 const collapsedPanels = new Set(); // 全局面板折叠记忆（key 见各 panelBlock / data-panel）
@@ -364,10 +365,52 @@ function showMemberDashboard(memberId, metric = '') {
       <div class="metric-chips">${metrics.map(item => `<button class="metric-chip ${item === active ? 'selected' : ''}" data-metric-chip="${esc(item)}" data-member-id="${member.id}">${esc(item)}</button>`).join('')}</div>
       ${active ? trendSvg(entries.filter(entry => entry.metric === active), active) : '<p class="empty-hint">还没有指标记录，先导入体检单。</p>'}`)}
     ${renderBoardLab(member, entries, filter, abnormalCount)}
-    ${panelBlock('dash-history', '<strong>🗂 历史记录</strong><small>时间线 · 可编辑 / 删除</small>', `
-      <div class="board-history">${entries.length ? entries.slice().reverse().map(entry => `<div class="track-row track-row-actions"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入${entry.source ? ` · ${esc(entry.source)}` : ''}</small></div><div class="track-ops"><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span><button class="text-button track-btn" data-hist-edit="${esc(entry.id)}">编辑</button><button class="text-button track-btn track-btn-del" data-hist-del="${esc(entry.id)}">删除</button></div></div>`).join('') : '<p class="empty-hint">还没有指标记录。</p>'}</div>`)}
+    ${renderBoardHistory(member, entries)}
     <button class="primary-button" data-checkup-import="${member.id}">＋ 导入体检单（模拟 OCR）</button>
     <p class="privacy-small">演示版：体检单为模拟识别，数值可修改后入库；不做真实医疗判断。</p>`);
+}
+
+/* 历史记录区（按指标分组 + 组内时间线 + 筛选定位） */
+function renderBoardHistory(member, entries) {
+  const conf = historyFilter[member.id] || {};
+  const metricNames = [...new Set(entries.map(entry => entry.metric))];
+  const activeMetric = metricNames.includes(conf.metric) ? conf.metric : 'all';
+  const abnormalOnly = !!conf.abnormalOnly;
+  const chips = [
+    `<button class="metric-chip ${activeMetric === 'all' && !abnormalOnly ? 'selected' : ''}" data-hist-filter="all" data-member-id="${member.id}">全部</button>`,
+    ...metricNames.map(name => {
+      const abnormal = entries.filter(entry => entry.metric === name && metricStatus(name, entry.value) !== 'normal').length;
+      return `<button class="metric-chip ${activeMetric === name && !abnormalOnly ? 'selected' : ''}" data-hist-filter="${esc(name)}" data-member-id="${member.id}">${esc(name)}${abnormal ? ` ·${abnormal}` : ''}</button>`;
+    }),
+    `<button class="metric-chip ${abnormalOnly ? 'selected' : ''}" data-hist-abn="${member.id}">只看异常</button>`
+  ].join('');
+  let pool = entries;
+  if (activeMetric !== 'all') pool = pool.filter(entry => entry.metric === activeMetric);
+  if (abnormalOnly) pool = pool.filter(entry => metricStatus(entry.metric, entry.value) !== 'normal');
+  const groups = new Map();
+  pool.slice().sort((a, b) => b.date.localeCompare(a.date)).forEach(entry => {
+    if (!groups.has(entry.metric)) groups.set(entry.metric, []);
+    groups.get(entry.metric).push(entry);
+  });
+  const body = entries.length && groups.size
+    ? [...groups.entries()].map(([name, list]) => {
+        const abnormal = list.filter(entry => metricStatus(name, entry.value) !== 'normal').length;
+        return `<div class="hist-group">
+          <div class="hist-group-head"><strong>${esc(name)}</strong><small>${list.length} 条记录${abnormal ? ` · <b>${abnormal} 条异常</b>` : ' · 全部正常'}</small></div>
+          <div class="hist-timeline">${list.map(entry => `<div class="hist-node">
+              <span class="hist-dot ${metricStatus(name, entry.value) !== 'normal' ? 'hist-dot-abn' : ''}"></span>
+              <div class="hist-node-body">
+                <div class="hist-node-top"><strong>${entry.value} ${esc(entry.unit || '')}</strong><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span></div>
+                <small>${formatDate(entry.date)}${entry.source ? ` · ${esc(entry.source)}` : ''}</small>
+                <div class="track-ops"><button class="text-button track-btn" data-hist-edit="${esc(entry.id)}">编辑</button><button class="text-button track-btn track-btn-del" data-hist-del="${esc(entry.id)}">删除</button></div>
+              </div>
+            </div>`).join('')}</div>
+        </div>`;
+      }).join('')
+    : `<p class="empty-hint">${entries.length ? '当前筛选下没有记录，试试其他指标或关闭「只看异常」。' : '还没有指标记录，先导入体检单。'}</p>`;
+  return panelBlock('dash-history', '<strong>🗂 历史记录</strong><small>按指标 · 时间线 · 可编辑 / 删除</small>', `
+    <div class="metric-chips board-filter-chips">${chips}</div>
+    ${body}`);
 }
 
 /* 化验报告区（参考产品稿：按天/按类别分组、筛选芯片、异常标色） */
@@ -1420,6 +1463,19 @@ document.addEventListener('click', async event => {
   if (metricChip) { showMemberDashboard(metricChip.dataset.memberId, metricChip.dataset.metricChip); return; }
   const boardFilterChip = event.target.closest('[data-board-filter]');
   if (boardFilterChip) { dashboardFilter[boardFilterChip.dataset.memberId] = boardFilterChip.dataset.boardFilter; showMemberDashboard(boardFilterChip.dataset.memberId); return; }
+  const histFilterChip = event.target.closest('[data-hist-filter]');
+  if (histFilterChip) {
+    const id = histFilterChip.dataset.memberId;
+    historyFilter[id] = { ...(historyFilter[id] || {}), metric: histFilterChip.dataset.histFilter, abnormalOnly: false };
+    showMemberDashboard(id); return;
+  }
+  const histAbnChip = event.target.closest('[data-hist-abn]');
+  if (histAbnChip) {
+    const id = histAbnChip.dataset.histAbn;
+    const conf = historyFilter[id] || {};
+    historyFilter[id] = { metric: conf.metric || 'all', abnormalOnly: !conf.abnormalOnly };
+    showMemberDashboard(id); return;
+  }
   const boardDay = event.target.closest('[data-board-day]');
   if (boardDay) {
     const key = boardDay.dataset.boardDay;

@@ -191,3 +191,18 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .member-tracking-title{display:block;font-size:9px;font-weight:700;color:#8a958c;padding:6px 0 2px}
 .member-tracking .track-row:first-of-type{border-top:0}
 .member-tracking-empty{margin:12px 0 0;font-size:9px;color:#8a958c}
+/* 历史记录：按指标分组 + 时间线 */
+.hist-group{margin-bottom:12px}
+.hist-group:last-of-type{margin-bottom:2px}
+.hist-group-head{display:flex;align-items:baseline;gap:8px;padding:2px 0 8px}
+.hist-group-head strong{font-size:11px}
+.hist-group-head small{font-size:9px;color:#8a958c}
+.hist-group-head b{color:#a1543f}
+.hist-timeline{position:relative;margin-left:5px;padding-left:14px;border-left:1.5px solid #e3e6dc;display:flex;flex-direction:column;gap:10px}
+.hist-node{position:relative}
+.hist-dot{position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;background:#a7bfa9;border:2px solid #fff;box-shadow:0 0 0 1px #dfe5da}
+.hist-dot-abn{background:#c97a5f;box-shadow:0 0 0 1px #e8cfc2}
+.hist-node-body{display:flex;flex-direction:column;gap:3px}
+.hist-node-body small{font-size:8.5px;color:#9aa49c}
+.hist-node-top{display:flex;align-items:center;gap:8px}
+.hist-node-top strong{font-size:12px}
