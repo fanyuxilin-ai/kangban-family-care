@@ -328,7 +328,7 @@ function renderHealth() {
           <div class="member-archive-actions member-archive-actions-3">
             <button class="secondary-button" data-member-edit="${member.id}">编辑档案</button>
             <button class="secondary-button" data-member-daily="${member.id}">日常记录</button>
-            <button class="primary-button" data-checkup-import="${member.id}">导入体检单</button>
+            <button class="secondary-button" data-checkup-import="${member.id}">导入体检单</button>
           </div>
         </div>` : ''}
       </article>`;
