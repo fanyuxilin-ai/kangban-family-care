@@ -284,6 +284,11 @@ function renderHealth() {
       <p class="privacy-small">演示版为固定统计；正式版的周报 / 月报由 AI 管理助手生成子女可读摘要。</p>
     </div>`;
   }
+  const trackHost = document.getElementById('healthTracking');
+  if (trackHost) {
+    const tracking = member ? latestAbnormal(member.id) : [];
+    trackHost.innerHTML = tracking.length ? `<div class="trend-card tracking-card">${tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}<p class="privacy-small">每个指标只跟踪最新一次读数；数据来自日常记录与体检导入，可在体检看板查看趋势。</p></div>` : `<p class="empty-hint">${esc(member?.name || '该成员')}当前没有异常指标，继续保持。</p>`;
+  }
 }
 
 function showMemberEdit(memberId) {
@@ -409,11 +414,10 @@ function renderBoardLab(member, entries, filter, abnormalCount, tracking) {
       </div>`;
     }).join('');
   }
-  const followUp = tracking.length ? `<div class="board-follow">${tracking.slice(0, 3).map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}</div>` : '';
   return `<div class="board-block">
     <div class="board-block-head"><strong>🧪 化验报告</strong><small>${abnormalCount ? `${abnormalCount} 项异常待随访` : '暂无异常'}</small></div>
     <div class="metric-chips board-filter-chips">${chips}</div>
-    ${legend}${body}${followUp}
+    ${legend}${body}
   </div>`;
 }
 

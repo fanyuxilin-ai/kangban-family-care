@@ -166,3 +166,4 @@ nav[hidden]{display:none!important}
 .track-ops{display:flex;align-items:center;gap:2px;flex:none}
 .track-btn{font-size:9px;padding:5px 4px}
 .track-btn-del{color:#b06a55}
+.tracking-card .track-row:first-child{border-top:0}
