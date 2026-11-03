@@ -37,9 +37,9 @@
           <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
         </div>
 
-        <section class="section-block alerts-section">
-          <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测</p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button></div>
-          <div id="homeAlerts"></div>
+        <section class="section-block alerts-section collapsible" data-panel="home-alerts">
+          <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测</p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-alerts" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="homeAlerts"></div></div>
         </section>
 
         <section class="section-block quick-section">
@@ -51,9 +51,9 @@
           </div>
         </section>
 
-        <section class="section-block medication-section">
-          <div class="section-heading"><div><p class="eyebrow">按已确认医嘱提醒</p><h2>今日服药提醒</h2></div><button class="text-button" data-action="medications">管理 <span>→</span></button></div>
-          <div id="homeMedicationReminders"></div>
+        <section class="section-block medication-section collapsible" data-panel="home-medication">
+          <div class="section-heading"><div><p class="eyebrow">按已确认医嘱提醒</p><h2>今日服药提醒</h2></div><button class="text-button" data-action="medications">管理 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-medication" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="homeMedicationReminders"></div></div>
         </section>
         <div class="privacy-note"><span>✳</span><span>健康资料仅在你授权后分享，你可以随时撤回。</span></div>
       </section>
@@ -62,25 +62,26 @@
         <div class="page-heading"><p class="eyebrow">家庭健康档案 · 模拟账号演示</p><h1>健康档案</h1><p class="subtle">父母和子女四份档案，都能展开、编辑；点「体检看板」查看趋势与异常跟踪。</p></div>
         <div class="section-heading"><div><p class="eyebrow">父母 + 子女 · 四份档案</p><h2>家庭成员</h2></div></div>
         <div id="memberArchiveList"></div>
-        <section class="section-block">
-          <div class="section-heading"><div><p class="eyebrow">手动录入 + 设备同步</p><h2>日常记录</h2></div><button class="text-button" data-action="alerts">录入读数 <span>→</span></button></div>
-          <div id="healthReadingsList"></div>
+        <section class="section-block collapsible" data-panel="health-readings">
+          <div class="section-heading"><div><p class="eyebrow">手动录入 + 设备同步</p><h2>日常记录</h2></div><button class="text-button" data-action="alerts">录入读数 <span>→</span></button><button class="section-collapse" data-panel-toggle="health-readings" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="healthReadingsList"></div></div>
         </section>
-        <section class="section-block">
-          <div class="section-heading"><div><p class="eyebrow">周报 · 月报</p><h2>健康趋势</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button></div>
-          <div id="healthTrend"></div>
+        <section class="section-block collapsible" data-panel="health-trend">
+          <div class="section-heading"><div><p class="eyebrow">周报 · 月报</p><h2>健康趋势</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="health-trend" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="healthTrend"></div></div>
         </section>
-        <section class="section-block">
-          <div class="section-heading"><div><p class="eyebrow">最新读数超出参考范围 · 持续关注</p><h2>异常指标跟踪</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button></div>
-          <div id="healthTracking"></div>
+        <section class="section-block collapsible" data-panel="health-tracking">
+          <div class="section-heading"><div><p class="eyebrow">最新读数超出参考范围 · 持续关注</p><h2>异常指标跟踪</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="health-tracking" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="healthTracking"></div></div>
         </section>
         <div class="privacy-note"><span>✳</span><span>健康档案由家庭成员共同维护（家庭无隐私），所有查看与修改均留痕。</span></div>
       </section>
 
       <section class="view" id="view-docs">
         <div class="page-heading"><p class="eyebrow">就医凭证，按次整理</p><h1>医疗资料</h1><p class="subtle">信息卡、就诊清单、资料库和报销入口都在这一区。</p></div>
-        <section class="section-block">
-          <div class="section-heading"><div><p class="eyebrow">妈妈 · 68岁</p><h2>就医信息卡</h2></div><button class="text-button" data-action="health-card">查看全部 <span>→</span></button></div>
+        <section class="section-block collapsible" data-panel="docs-info-card">
+          <div class="section-heading"><div><p class="eyebrow">妈妈 · 68岁</p><h2>就医信息卡</h2></div><button class="text-button" data-action="health-card">查看全部 <span>→</span></button><button class="section-collapse" data-panel-toggle="docs-info-card" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body">
           <div class="info-card">
             <div class="info-card-head"><span class="mini-avatar">陈</span><div><strong>陈兰英</strong><span class="muted-small">信息由家人共同整理</span></div><span class="verified"><span>✓</span> 已核对</span></div>
             <div class="info-grid">
@@ -91,36 +92,49 @@
             </div>
             <button class="card-link" data-action="health-card">打开就医信息卡 <span>↗</span></button>
           </div>
+          </div>
         </section>
         <div class="docs-quick-row">
           <button class="secondary-button" data-action="appointment">就诊准备清单</button>
           <button class="secondary-button" data-action="share">生成就诊分享码</button>
         </div>
-        <section class="section-block">
-          <div class="section-heading"><div><p class="eyebrow">保单优先 · 成员B负责模块</p><h2>保险报销</h2></div></div>
+        <section class="section-block collapsible" data-panel="docs-insurance">
+          <div class="section-heading"><div><p class="eyebrow">保单优先 · 成员B负责模块</p><h2>保险报销</h2></div><button class="section-collapse" data-panel-toggle="docs-insurance" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body">
           <div class="insurance-grid">
             <button class="insurance-card" data-action="insurance-social"><strong>社保医疗保险</strong><small>参保档案 · 就医材料包 · 零星报销</small></button>
             <button class="insurance-card" data-action="insurance-commercial"><strong>商业医疗保险</strong><small>保单管理 · 材料清单 · 理赔进度</small></button>
           </div>
+          </div>
         </section>
-        <div class="page-heading docs-library-heading"><p class="eyebrow">拍照上传 · OCR 识别入库</p><h2>资料库</h2><p class="subtle">所有资料按时间整理，方便复诊时快速找到。</p></div>
-        <div class="record-summary"><div><strong id="recordCount">0</strong><span>份资料</span></div><div class="summary-divider"></div><div><strong>已核对</strong><span>关键病史</span></div><button class="add-record" data-action="upload">＋ 添加</button></div>
-        <div class="filter-row"><button class="filter-chip selected">全部</button><button class="filter-chip">检查报告</button><button class="filter-chip">用药记录</button></div>
-        <div id="recordList" class="record-list"></div>
+        <section class="section-block collapsible docs-library-block" data-panel="docs-library">
+          <div class="section-heading"><div><p class="eyebrow">拍照上传 · OCR 识别入库</p><h2>资料库</h2></div><button class="section-collapse" data-panel-toggle="docs-library" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body">
+          <div class="record-summary"><div><strong id="recordCount">0</strong><span>份资料</span></div><div class="summary-divider"></div><div><strong>已核对</strong><span>关键病史</span></div><button class="add-record" data-action="upload">＋ 添加</button></div>
+          <div class="filter-row"><button class="filter-chip selected">全部</button><button class="filter-chip">检查报告</button><button class="filter-chip">用药记录</button></div>
+          <div id="recordList" class="record-list"></div>
+          </div>
+        </section>
       </section>
 
       <section class="view" id="view-companion">
         <div class="page-heading"><p class="eyebrow">有人同行，心里更踏实</p><h1>陪诊服务</h1><p class="subtle">先把需要说清楚，服务人员会与你确认安排。</p></div>
         <div class="companion-intro"><div class="companion-art"><span class="sun"></span><span class="person person-a"></span><span class="person person-b"></span><span class="bench"></span><span class="leaf leaf-a">✦</span><span class="leaf leaf-b">✳</span></div><div class="companion-intro-copy"><strong>就诊当天，安心有人陪</strong><p>陪同取号、院内引导、检查陪同和就诊后信息交接。</p></div></div>
-        <div class="section-heading service-heading"><div><p class="eyebrow">演示陪诊员</p><h2>认识服务人员</h2></div></div>
-        <article class="escort-profile-card" id="familyEscortProfile"></article>
+        <section class="section-block collapsible" data-panel="companion-profile">
+          <div class="section-heading"><div><p class="eyebrow">演示陪诊员</p><h2>认识服务人员</h2></div><button class="section-collapse" data-panel-toggle="companion-profile" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><article class="escort-profile-card" id="familyEscortProfile"></article></div>
+        </section>
         <div id="companionOrders"></div>
-        <div class="section-heading service-heading"><div><p class="eyebrow">演示服务</p><h2>选择需要的帮助</h2></div></div>
-        <div class="service-list">
+        <section class="section-block collapsible" data-panel="companion-services">
+          <div class="section-heading"><div><p class="eyebrow">演示服务</p><h2>选择需要的帮助</h2></div><button class="section-collapse" data-panel-toggle="companion-services" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body">
+          <div class="service-list">
           <button class="service-row" data-service="全程陪诊"><span class="service-icon service-purple">☼</span><span class="service-text"><strong>全程陪诊</strong><small>从到院到离院，全程协助</small></span><span class="service-arrow">→</span></button>
           <button class="service-row" data-service="检查陪同"><span class="service-icon service-green">＋</span><span class="service-text"><strong>检查陪同</strong><small>陪同检查、协助路线安排</small></span><span class="service-arrow">→</span></button>
           <button class="service-row" data-service="取药与报告"><span class="service-icon service-peach">⌂</span><span class="service-text"><strong>取药与报告</strong><small>按授权协助取药或领取报告</small></span><span class="service-arrow">→</span></button>
-        </div>
+          </div>
+          </div>
+        </section>
         <div class="boundary-note"><strong>服务边界说明</strong><p>陪诊人员提供流程协助，不提供诊断或治疗建议。涉及病情的问题请咨询医生。</p></div>
       </section>
 

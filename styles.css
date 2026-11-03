@@ -169,3 +169,14 @@ nav[hidden]{display:none!important}
 .tracking-card .track-row:first-child{border-top:0}
 .checkup-category{font-size:9px;font-weight:700;color:#6d8272;background:#eef2ea;border-radius:8px;padding:5px 9px;margin:10px 0 2px}
 .checkup-category:first-child{margin-top:0}
+/* 全局面板可折叠 */
+.collapsible > .section-body{min-width:0}
+.collapsible.collapsed > .section-body{display:none}
+button.panel-head{width:100%;text-align:left;background:transparent;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer}
+.panel-chevron{font-style:normal;font-size:11px;color:#9aa49c;margin-left:auto;flex:none;transition:transform .15s}
+.collapsible.collapsed .panel-chevron{transform:rotate(-90deg)}
+.section-collapse{flex:none;border:0;background:transparent;color:#9aa49c;font-size:11px;line-height:1;padding:6px 4px 6px 8px;cursor:pointer;transition:transform .15s;font-family:inherit}
+.section-block.collapsed .section-collapse,.collapsible.collapsed .section-collapse{transform:rotate(-90deg)}
+.section-heading{align-items:center}
+.docs-library-block .section-heading{margin-bottom:0}
+.collapsible.collapsed .board-block-head{margin-bottom:0}

@@ -168,7 +168,7 @@ function renderRecords() {
     <div class="timeline-row"><span class="timeline-date">${formatDate(record.date)}</span><i class="timeline-marker"></i><div class="timeline-copy"><strong>${esc(record.title)}</strong><small>${esc(record.hospital.split(' · ')[0])}</small></div></div>`).join('');
   const orderHost = document.getElementById('companionOrders');
   const statusLabel = { pending: '待陪诊员确认', accepted: '已接单', declined: '未接单', completed: '已完成' };
-  orderHost.innerHTML = `<div class="section-heading service-heading"><div><p class="eyebrow">预约、评价与再次预约</p><h2>我的陪诊安排</h2></div></div>${state.companionOrders.length ? `<div class="family-order-list">${state.companionOrders.map(o => {
+  orderHost.innerHTML = `<div class="collapsible ${collapsedPanels.has('companion-orders') ? 'collapsed' : ''}" data-panel="companion-orders"><div class="section-heading service-heading"><div><p class="eyebrow">预约、评价与再次预约</p><h2>我的陪诊安排</h2></div><button class="section-collapse" data-panel-toggle="companion-orders" aria-label="折叠或展开">▾</button></div><div class="section-body">${state.companionOrders.length ? `<div class="family-order-list">${state.companionOrders.map(o => {
     const exec = (o.status === 'accepted' || o.status === 'completed') && o.execution?.items?.length ? (() => {
       const progress = executionProgress(o);
       return `<div class="exec-block exec-block-family"><div class="exec-progress"><strong>履约进度 ${progress.done} / ${progress.total}</strong>${progress.all ? '<span class="exec-progress-done">服务项目已全部完成</span>' : '<span>陪诊员正在逐项执行</span>'}</div>
@@ -181,7 +181,7 @@ function renderRecords() {
       ${o.status === 'completed' && o.reviews?.family ? `<small class="review-complete">你已完成评价${o.reviews?.escort ? ' · 双方已互评' : ' · 等待陪诊员评价'}</small>` : ''}${reviewSummary(o)}
       ${(o.status === 'completed' || o.status === 'declined') ? `<button class="text-button" data-rebook="${esc(o.id)}">再次预约 →</button>` : ''}
     </article>`;
-  }).join('')}</div>` : `<div class="family-empty-card"><p>还没有陪诊预约。可以先查看陪诊员介绍并提交一笔演示预约。</p><button class="primary-button" data-action="book-profile">预约陪诊员</button></div>`}`;
+  }).join('')}</div>` : `<div class="family-empty-card"><p>还没有陪诊预约。可以先查看陪诊员介绍并提交一笔演示预约。</p><button class="primary-button" data-action="book-profile">预约陪诊员</button></div>`}</div></div>`;
   renderMedicationReminders();
   renderHomeCompanionModule();
   renderHealth();
@@ -238,6 +238,15 @@ function latestAbnormal(memberId) {
 const expandedMembers = new Set(['m1']);
 let dashboardMetric = {};
 const dashboardFilter = {};   // 看板筛选：day / category / all / abnormal
+const collapsedPanels = new Set(); // 全局面板折叠记忆（key 见各 panelBlock / data-panel）
+/* 可折叠面板通用结构：点击头部或折叠箭头收起/展开，body 用 .section-body 包裹 */
+function panelBlock(key, headHtml, bodyHtml, extraClass = '') {
+  const collapsed = collapsedPanels.has(key);
+  return `<div class="board-block collapsible ${extraClass} ${collapsed ? 'collapsed' : ''}" data-panel="${key}">
+    <button type="button" class="board-block-head panel-head" data-panel-toggle="${key}">${headHtml}<i class="panel-chevron" aria-hidden="true">▾</i></button>
+    <div class="section-body">${bodyHtml}</div>
+  </div>`;
+}
 const boardOpenDays = new Set(); // 化验报告展开的日期分组
 
 function renderHealth() {
@@ -363,16 +372,12 @@ function showMemberDashboard(memberId, metric = '') {
       <div><span>记录次数</span><strong>${entries.length} 次</strong><small>身体指标跟踪</small></div>
       <div><span>异常待随访</span><strong class="${abnormalCount ? 'trend-warn' : 'trend-ok'}">${abnormalCount} 项</strong><small>异常指标跟踪</small></div>
     </div>
-    <div class="board-block">
-      <div class="board-block-head"><strong>📈 趋势图</strong></div>
+    ${panelBlock('dash-trend', '<strong>📈 趋势图</strong>', `
       <div class="metric-chips">${metrics.map(item => `<button class="metric-chip ${item === active ? 'selected' : ''}" data-metric-chip="${esc(item)}" data-member-id="${member.id}">${esc(item)}</button>`).join('')}</div>
-      ${active ? trendSvg(entries.filter(entry => entry.metric === active), active) : '<p class="empty-hint">还没有指标记录，先导入体检单。</p>'}
-    </div>
-    ${renderBoardLab(member, entries, filter, abnormalCount, tracking)}
-    <div class="board-block">
-      <div class="board-block-head"><strong>🗂 历史记录</strong><small>时间线 · 可编辑 / 删除</small></div>
-      <div class="board-history">${entries.length ? entries.slice().reverse().map(entry => `<div class="track-row track-row-actions"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入${entry.source ? ` · ${esc(entry.source)}` : ''}</small></div><div class="track-ops"><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span><button class="text-button track-btn" data-hist-edit="${esc(entry.id)}">编辑</button><button class="text-button track-btn track-btn-del" data-hist-del="${esc(entry.id)}">删除</button></div></div>`).join('') : '<p class="empty-hint">还没有指标记录。</p>'}</div>
-    </div>
+      ${active ? trendSvg(entries.filter(entry => entry.metric === active), active) : '<p class="empty-hint">还没有指标记录，先导入体检单。</p>'}`)}
+    ${renderBoardLab(member, entries, filter, abnormalCount)}
+    ${panelBlock('dash-history', '<strong>🗂 历史记录</strong><small>时间线 · 可编辑 / 删除</small>', `
+      <div class="board-history">${entries.length ? entries.slice().reverse().map(entry => `<div class="track-row track-row-actions"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入${entry.source ? ` · ${esc(entry.source)}` : ''}</small></div><div class="track-ops"><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span><button class="text-button track-btn" data-hist-edit="${esc(entry.id)}">编辑</button><button class="text-button track-btn track-btn-del" data-hist-del="${esc(entry.id)}">删除</button></div></div>`).join('') : '<p class="empty-hint">还没有指标记录。</p>'}</div>`)}
     <button class="primary-button" data-checkup-import="${member.id}">＋ 导入体检单（模拟 OCR）</button>
     <p class="privacy-small">演示版：体检单为模拟识别，数值可修改后入库；不做真实医疗判断。</p>`);
 }
@@ -422,11 +427,9 @@ function renderBoardLab(member, entries, filter, abnormalCount, tracking) {
       </div>`;
     }).join('');
   }
-  return `<div class="board-block">
-    <div class="board-block-head"><strong>🧪 化验报告</strong><small>${abnormalCount ? `${abnormalCount} 项异常待随访` : '暂无异常'}</small></div>
+  return panelBlock('dash-lab', `<strong>🧪 化验报告</strong><small>${abnormalCount ? `${abnormalCount} 项异常待随访` : '暂无异常'}</small>`, `
     <div class="metric-chips board-filter-chips">${chips}</div>
-    ${legend}${body}
-  </div>`;
+    ${legend}${body}`);
 }
 
 /* 历史记录 · 编辑单条指标 */
@@ -1186,6 +1189,16 @@ function startListening() {
 function stopListening() { try { window.activeRecognition?.stop(); } catch {} window.activeRecognition = null; }
 
 document.addEventListener('click', async event => {
+  const panelToggle = event.target.closest('[data-panel-toggle]');
+  if (panelToggle) {
+    const key = panelToggle.dataset.panelToggle;
+    const host = panelToggle.closest('.collapsible');
+    if (host) {
+      const nowCollapsed = host.classList.toggle('collapsed');
+      if (nowCollapsed) collapsedPanels.add(key); else collapsedPanels.delete(key);
+    }
+    return;
+  }
   const tab = event.target.closest('[data-tab]');
   if (tab) { navigate(tab.dataset.tab); return; }
   const nav = event.target.closest('[data-nav]');
