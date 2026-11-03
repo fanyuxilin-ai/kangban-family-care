@@ -51,6 +51,11 @@
           </div>
         </section>
 
+        <section class="section-block alerts-section">
+          <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测</p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button></div>
+          <div id="homeAlerts"></div>
+        </section>
+
         <section class="section-block quick-section">
           <div class="section-heading"><div><p class="eyebrow">现在可以做</p><h2>常用服务</h2></div></div>
           <div class="quick-grid">
@@ -154,6 +159,7 @@
   <input type="file" id="libraryInput" accept="image/*,.pdf" hidden />
   <input type="file" id="preVisitPhotoInput" accept="image/*" capture="environment" multiple hidden />
   <input type="file" id="preVisitAudioInput" accept="audio/*" multiple hidden />
+  <input type="file" id="evidenceInput" accept="image/*" capture="environment" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="vendor/tesseract.min.js"></script>
   <script src="app.js"></script>
