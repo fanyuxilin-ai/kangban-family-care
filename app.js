@@ -28,17 +28,9 @@ const seed = {
   preVisitDescriptions: [],
   voiceNote: '',
   nextRecordId: 5,
-  healthReadings: [
-    { id: 'bp-seed-2', memberId: 'm1', date: dateOffset(-2), time: '08:10', systolic: 152, diastolic: 94, pulse: 78, source: '手动录入' },
-    { id: 'bp-seed-1', memberId: 'm1', date: dateOffset(-1), time: '08:05', systolic: 149, diastolic: 93, pulse: 76, source: '模拟手表' },
-    { id: 'bp-seed-0', memberId: 'm1', date: dateOffset(0), time: '07:50', systolic: 166, diastolic: 102, pulse: 88, source: '模拟手表' },
-    { id: 'bp-seed-m2-1', memberId: 'm2', date: dateOffset(-3), time: '09:15', systolic: 148, diastolic: 91, pulse: 74, source: '欧姆龙血压计' },
-    { id: 'bp-seed-m2-0', memberId: 'm2', date: dateOffset(0), time: '08:20', systolic: 158, diastolic: 96, pulse: 80, source: '模拟手表' }
-  ],
   alerts: [],
   missedAlerts: {},
   nextAlertId: 1,
-  nextReadingId: 1,
   alertsSeeded: false,
   familyMembers: [
     { id: 'm1', name: '陈兰英', role: '母亲', age: 68, conditions: '高血压', allergies: '青霉素', medications: '氨氯地平 5mg · 每日一次；阿司匹林 100mg · 每日一次', surgeries: '无记录', avatarClass: 'member-avatar-1' },
@@ -116,7 +108,6 @@ function loadState() {
       requester: order.requester || '小林',
       reviews: order.reviews || { family: null, escort: null }
     }));
-    loaded.healthReadings = saved.healthReadings || structuredClone(seed.healthReadings);
     loaded.metricDefs = saved.metricDefs || {};
     loaded.familyMembers = saved.familyMembers || structuredClone(seed.familyMembers);
     loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
@@ -125,7 +116,6 @@ function loadState() {
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
-    loaded.nextReadingId = saved.nextReadingId || 1;
     return loaded;
   } catch { return structuredClone(seed); }
 }
@@ -257,7 +247,21 @@ function memberMetricEntries(memberId) {
 function latestAbnormal(memberId) {
   const byMetric = {};
   memberMetricEntries(memberId).slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(entry => { byMetric[entry.metric] = entry; });
-  return Object.values(byMetric).filter(entry => metricStatus(entry.metric, entry.value) !== 'normal');
+  const abnormal = Object.values(byMetric).filter(entry => metricStatus(entry.metric, entry.value) !== 'normal');
+  /* 血压对合并：同一时刻的收缩压+舒张压都异常时合并为一条「血压 166/102」，与日常记录展示口径一致，同一读数不重复出现 */
+  const sys = abnormal.find(entry => entry.metric === '收缩压');
+  const dia = abnormal.find(entry => entry.metric === '舒张压');
+  if (sys && dia && sys.date === dia.date && (sys.time || '') === (dia.time || '')) {
+    return abnormal.filter(entry => entry !== sys && entry !== dia).concat([{ ...sys, metric: '血压', value: `${sys.value}/${dia.value}`, unit: 'mmHg' }]);
+  }
+  return abnormal;
+}
+/* 合并血压行（metric='血压', value='166/102'）的判定与展示 */
+function bpReadingState(value) {
+  const [sys, dia] = String(value).split('/').map(Number);
+  const abnormal = sys >= 140 || dia >= 90;
+  const level = sys >= 180 || dia >= 110 ? 'red' : sys >= 160 || dia >= 100 ? 'yellow' : 'blue';
+  return { abnormal, level, label: abnormal ? '需要关注' : '正常', tag: abnormal ? 'reading-tag-yellow' : 'reading-tag-ok' };
 }
 const expandedMembers = new Set(['m1']);
 let dashboardMetric = {};
@@ -293,7 +297,13 @@ function renderHealth() {
       const open = expandedMembers.has(member.id);
       const entries = memberMetricEntries(member.id);
       const tracking = latestAbnormal(member.id);
-      const trackRows = tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`);
+      const trackRows = tracking.map(entry => {
+        if (entry.metric === '血压') {
+          const bp = bpReadingState(entry.value);
+          return `<div class="track-row"><div><strong>血压 ${esc(String(entry.value))} <small>mmHg</small></strong><small>${formatDate(entry.date)} 录入 · 收缩压<140 且舒张压<90 为正常</small></div><span class="reading-tag ${bp.tag}">跟踪中</span></div>`;
+        }
+        return `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`;
+      });
       const trackingHtml = tracking.length
         ? `<div class="member-tracking"><span class="member-tracking-title">异常指标跟踪 · 共 ${tracking.length} 项</span>${previewRows(trackRows, `track-${member.id}`)}</div>`
         : `<p class="member-tracking-empty">无异常指标，继续保持 ✓</p>`;
@@ -1060,15 +1070,17 @@ function saveDailyEntries(memberId, rows, source) {
   let message = `${member.name} 的 ${rows.length} 项日常记录已保存`;
   if (sys && dia) {
     const pulse = rows.find(row => row.metric === '心率')?.value || 0;
-    const entry = { id: `bp-${state.nextReadingId++}`, memberId, date, time, systolic: sys.value, diastolic: dia.value, pulse, source };
-    state.healthReadings.unshift(entry);
-    const result = evaluateReading(entry);
+    const result = evaluateReading({ systolic: sys.value, diastolic: dia.value, pulse });
     if (result) {
       createAlert(result.level, result.title, result.detail, `${source} · 血压 ${sys.value}/${dia.value}`);
       message += `，血压触发${ALERT_META[result.level].label}预警并完成分级告知`;
     }
   }
-  saveState(); renderHomeAlerts(); renderHealth(); closeModal();
+  saveState(); renderHomeAlerts(); renderHealth();
+  /* 若数据看板正开着，就地刷新，保证「日常记录 + 体检单」联动可见 */
+  const boardTitle = document.getElementById('modalTitle')?.textContent || '';
+  if (!document.getElementById('modalBackdrop')?.hidden && boardTitle.includes('数据看板')) showMemberDashboard(memberId);
+  closeModal();
   toast(`${message}，可在数据看板查看趋势`);
 }
 /* 日常记录数据源：channel = daily 的指标（血压合并为一条展示用） */
@@ -1096,12 +1108,9 @@ function mergeBpEntries(entries) {
 }
 function dailyEntryRow(entry) {
   const abnormal = entry.metric === '血压' ? null : metricStatus(entry.metric, Number(entry.value));
-  const tag = entry.metric === '血压'
-    ? (Number(String(entry.value).split('/')[0]) >= 140 || Number(String(entry.value).split('/')[1]) >= 90 ? 'reading-tag-yellow' : 'reading-tag-ok')
-    : statusTagOf(Number(entry.value), entry.metric);
-  const tagLabel = entry.metric === '血压'
-    ? (Number(String(entry.value).split('/')[0]) >= 140 || Number(String(entry.value).split('/')[1]) >= 90 ? '需要关注' : '正常')
-    : statusLabelOf(Number(entry.value), entry.metric);
+  const bp = entry.metric === '血压' ? bpReadingState(entry.value) : null;
+  const tag = bp ? bp.tag : statusTagOf(Number(entry.value), entry.metric);
+  const tagLabel = bp ? bp.label : statusLabelOf(Number(entry.value), entry.metric);
   return `<div class="reading-row"><div class="reading-copy"><strong>${esc(entry.metric)} ${esc(String(entry.value))} <small>${esc(entry.unit || '')}</small></strong><small>${formatDate(entry.date)}${entry.time ? ` ${esc(entry.time)}` : ''} · ${esc(entry.source || '手动录入')}</small></div><span class="reading-tag ${tag}">${tagLabel}</span></div>`;
 }
 /* 日常记录弹窗：某个成员的完整日常记录（任意指标，可编辑/删除） */
@@ -1859,10 +1868,17 @@ document.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener(
 }));
 if (!state.alertsSeeded) {
   state.alertsSeeded = true;
-  for (const reading of [...state.healthReadings].reverse()) {
+  /* 唯一数据源是 bodyMetrics：按「同成员 + 同日期 + 同时刻」配对收缩压/舒张压生成初始预警 */
+  const pool = state.bodyMetrics || [];
+  const seedReadings = [];
+  pool.filter(entry => entry.metric === '收缩压').forEach(sys => {
+    const dia = pool.find(entry => entry.metric === '舒张压' && entry.memberId === sys.memberId && entry.date === sys.date && (entry.time || '') === (sys.time || ''));
+    if (dia) seedReadings.push({ date: sys.date, time: sys.time, systolic: sys.value, diastolic: dia.value, source: sys.source });
+  });
+  for (const reading of seedReadings.reverse()) {
     const result = evaluateReading(reading);
     if (result) {
-      state.alerts.unshift({ id: `alert-${state.nextAlertId++}`, level: result.level, title: result.title, detail: result.detail, source: `${reading.source} · 血压 ${reading.systolic}/${reading.diastolic}`, createdAt: `${formatDate(reading.date)} ${reading.time}`, notify: NOTIFY_PLAN[result.level] || NOTIFY_PLAN.blue });
+      state.alerts.unshift({ id: `alert-${state.nextAlertId++}`, level: result.level, title: result.title, detail: result.detail, source: `${reading.source || '手动录入'} · 血压 ${reading.systolic}/${reading.diastolic}`, createdAt: `${formatDate(reading.date)} ${reading.time || ''}`.trim(), notify: NOTIFY_PLAN[result.level] || NOTIFY_PLAN.blue });
     }
   }
   saveState();
