@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f6f1" />
+  <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
+  <title>康伴 · 家庭就医助手</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="康伴首页">
+        <span class="brand-mark"><i></i><b></b></span>
+        <span>康伴</span>
+      </a>
+      <button class="profile-switch" id="profileSwitch" aria-label="切换演示角色">
+        <span class="avatar avatar-lilac" id="roleAvatar">陈</span><span id="roleLabel">家庭端 · 小林</span><span class="chevron">⌄</span>
+      </button>
+    </header>
+
+    <main id="appMain">
+      <section class="view active" id="view-home">
+        <div class="greeting-row">
+          <div><p class="eyebrow" id="todayLabel">家庭健康档案</p><h1>早上好，<span>小林</span></h1><p class="subtle">今天也一起，把就医准备做好。</p></div>
+          <button class="icon-button" id="bellButton" aria-label="通知">♧<span class="notify-dot"></span></button>
+        </div>
+
+        <div class="hero-card">
+          <div class="hero-top"><span class="pill pill-light"><span class="status-dot"></span> 家庭档案已就绪</span><span class="hero-spark">✳</span></div>
+          <p class="hero-kicker">下一次就诊</p>
+          <h2>市第一人民医院</h2>
+          <div class="appointment-meta"><span>心内科 · 复诊</span><span class="meta-divider"></span><span id="nextVisitDate">即将复诊</span></div>
+          <button class="hero-action" data-action="appointment">查看就诊准备 <span>→</span></button>
+          <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
+        </div>
+
+        <section class="section-block">
+          <div class="section-heading"><div><p class="eyebrow">妈妈 · 68岁</p><h2>就医信息卡</h2></div><button class="text-button" data-action="health-card">查看全部 <span>→</span></button></div>
+          <div class="info-card">
+            <div class="info-card-head"><span class="mini-avatar">陈</span><div><strong>陈兰英</strong><span class="muted-small">信息由家人共同整理</span></div><span class="verified"><span>✓</span> 已核对</span></div>
+            <div class="info-grid">
+              <div><span class="field-label">过敏史</span><strong class="alert-text">青霉素</strong></div>
+              <div><span class="field-label">长期用药</span><strong>2 种 <span class="tiny-arrow">↗</span></strong></div>
+              <div><span class="field-label">既往史</span><strong>高血压</strong></div>
+              <div><span class="field-label">最近更新</span><strong>10月22日</strong></div>
+            </div>
+            <button class="card-link" data-action="health-card">打开就医信息卡 <span>↗</span></button>
+          </div>
+        </section>
+
+        <section class="section-block quick-section">
+          <div class="section-heading"><div><p class="eyebrow">现在可以做</p><h2>常用服务</h2></div></div>
+          <div class="quick-grid">
+            <button class="quick-item" data-action="upload"><span class="quick-icon icon-upload">↥</span><strong>整理资料</strong><small>拍照或语音补充</small></button>
+            <button class="quick-item" data-action="share"><span class="quick-icon icon-share">⌁</span><strong>就诊分享</strong><small>由妈妈授权查看</small></button>
+            <button class="quick-item" data-action="companion"><span class="quick-icon icon-heart">♡</span><strong>预约陪诊</strong><small>需要时有人陪伴</small></button>
+          </div>
+        </section>
+
+        <section class="section-block family-companion-home">
+          <div class="section-heading"><div><p class="eyebrow">家庭陪诊服务</p><h2>我的陪诊</h2></div><button class="text-button" data-action="companion">全部安排 <span>→</span></button></div>
+          <div id="homeCompanionModule"></div>
+        </section>
+
+        <section class="section-block medication-section">
+          <div class="section-heading"><div><p class="eyebrow">按已确认医嘱提醒</p><h2>今日服药提醒</h2></div><button class="text-button" data-action="medications">管理 <span>→</span></button></div>
+          <div id="homeMedicationReminders"></div>
+        </section>
+
+        <section class="section-block recent-block">
+          <div class="section-heading"><div><p class="eyebrow">最近整理</p><h2>资料时间线</h2></div><button class="text-button" data-nav="records">全部资料 <span>→</span></button></div>
+          <div class="timeline-preview" id="homeTimeline"></div>
+        </section>
+        <div class="privacy-note"><span>✳</span><span>健康资料仅在你授权后分享，你可以随时撤回。</span></div>
+      </section>
+
+      <section class="view" id="view-records">
+        <div class="page-heading"><p class="eyebrow">妈妈的健康资料</p><h1>资料库</h1><p class="subtle">所有资料按时间整理，方便复诊时快速找到。</p></div>
+        <div class="record-summary"><div><strong id="recordCount">0</strong><span>份资料</span></div><div class="summary-divider"></div><div><strong>已核对</strong><span>关键病史</span></div><button class="add-record" data-action="upload">＋ 添加</button></div>
+        <div class="filter-row"><button class="filter-chip selected">全部</button><button class="filter-chip">检查报告</button><button class="filter-chip">用药记录</button></div>
+        <div id="recordList" class="record-list"></div>
+      </section>
+
+      <section class="view" id="view-companion">
+        <div class="page-heading"><p class="eyebrow">有人同行，心里更踏实</p><h1>陪诊服务</h1><p class="subtle">先把需要说清楚，服务人员会与你确认安排。</p></div>
+        <div class="companion-intro"><div class="companion-art"><span class="sun"></span><span class="person person-a"></span><span class="person person-b"></span><span class="bench"></span><span class="leaf leaf-a">✦</span><span class="leaf leaf-b">✳</span></div><div class="companion-intro-copy"><strong>就诊当天，安心有人陪</strong><p>陪同取号、院内引导、检查陪同和就诊后信息交接。</p></div></div>
+        <div class="section-heading service-heading"><div><p class="eyebrow">演示陪诊员</p><h2>认识服务人员</h2></div></div>
+        <article class="escort-profile-card" id="familyEscortProfile"></article>
+        <div id="companionOrders"></div>
+        <div class="section-heading service-heading"><div><p class="eyebrow">演示服务</p><h2>选择需要的帮助</h2></div></div>
+        <div class="service-list">
+          <button class="service-row" data-service="全程陪诊"><span class="service-icon service-purple">☼</span><span class="service-text"><strong>全程陪诊</strong><small>从到院到离院，全程协助</small></span><span class="service-arrow">→</span></button>
+          <button class="service-row" data-service="检查陪同"><span class="service-icon service-green">＋</span><span class="service-text"><strong>检查陪同</strong><small>陪同检查、协助路线安排</small></span><span class="service-arrow">→</span></button>
+          <button class="service-row" data-service="取药与报告"><span class="service-icon service-peach">⌂</span><span class="service-text"><strong>取药与报告</strong><small>按授权协助取药或领取报告</small></span><span class="service-arrow">→</span></button>
+        </div>
+        <div class="boundary-note"><strong>服务边界说明</strong><p>陪诊人员提供流程协助，不提供诊断或治疗建议。涉及病情的问题请咨询医生。</p></div>
+      </section>
+
+      <section class="view" id="view-escort">
+        <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 演示角色</p><h1>预约与服务</h1><p class="subtle">查看预约、回应需求，并记录陪诊完成情况。</p></div>
+        <div class="escort-status-card"><div><span class="eyebrow">当前接单状态</span><strong id="escortAvailabilityLabel">可预约</strong><small id="escortAvailabilityText">家庭可以向你提交预约申请</small></div><button class="secondary-button compact-button" data-action="toggle-availability" id="availabilityButton">暂停接单</button></div>
+        <div class="escort-stat-grid"><div><strong id="escortPendingCount">0</strong><span>待确认</span></div><div><strong id="escortAcceptedCount">0</strong><span>待服务</span></div><div><strong id="escortCompletedCount">0</strong><span>已完成</span></div></div>
+        <div id="escortOrders" class="escort-order-list"></div>
+        <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。只查看家属明确分享的本次预约信息。</p></div>
+      </section>
+
+      <section class="view" id="view-escort-profile">
+        <div class="page-heading"><p class="eyebrow">陪诊员个人资料 · 演示角色</p><h1>自我介绍</h1><p class="subtle">让家庭了解你的陪诊经验、服务范围和可预约时间。</p></div>
+        <form class="escort-profile-form" id="escortProfileForm">
+          <label><span class="field-label-block">姓名 / 称呼</span><input class="input-field" name="name" id="escortNameInput" maxlength="24" required /></label>
+          <label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" id="escortExperienceInput" maxlength="40" /></label>
+          <label><span class="field-label-block">服务区域</span><input class="input-field" name="area" id="escortAreaInput" maxlength="60" /></label>
+          <label><span class="field-label-block">可预约时间</span><input class="input-field" name="availability" id="escortAvailabilityInput" maxlength="80" /></label>
+          <label><span class="field-label-block">自我介绍</span><textarea name="bio" id="escortBioInput" maxlength="240" placeholder="介绍你可以提供的协助方式"></textarea></label>
+          <button class="primary-button" type="submit">保存演示资料</button>
+        </form>
+        <div class="boundary-note"><strong>资料说明</strong><p>当前内容保存在本机浏览器，仅用于演示角色切换，不代表真实服务资质核验。</p></div>
+      </section>
+
+      <section class="view" id="view-me">
+        <div class="page-heading"><p class="eyebrow">照顾家人的同时，也照顾好自己</p><h1>我的家庭</h1></div>
+        <div class="family-card"><div class="family-avatar-large">陈</div><div><strong>陈兰英</strong><span>妈妈 · 68岁</span><small>档案由小林协助管理</small></div><button class="quiet-action" data-action="health-card">查看档案 →</button></div>
+        <div class="settings-list">
+          <button class="settings-row" data-action="share"><span class="settings-icon">⌁</span><span>授权与访问记录</span><span class="service-arrow">→</span></button>
+          <button class="settings-row" data-action="privacy"><span class="settings-icon">◈</span><span>隐私与资料管理</span><span class="service-arrow">→</span></button>
+          <button class="settings-row" data-action="help"><span class="settings-icon">?</span><span>帮助与服务说明</span><span class="service-arrow">→</span></button>
+        </div>
+        <p class="demo-disclaimer">康伴演示版 · 病例为虚构数据<br>本原型仅用于产品演示，不连接医疗机构或真实患者信息。</p>
+      </section>
+    </main>
+
+    <nav class="tabbar" aria-label="家庭端主导航" id="familyTabs">
+      <button class="tab active" data-tab="home"><span class="tab-icon">⌂</span><span>首页</span></button>
+      <button class="tab" data-tab="records"><span class="tab-icon">▤</span><span>资料</span></button>
+      <button class="tab" data-tab="companion"><span class="tab-icon">♡</span><span>陪诊</span></button>
+      <button class="tab" data-tab="me"><span class="tab-icon">◉</span><span>我的</span></button>
+    </nav>
+    <nav class="tabbar" aria-label="陪诊员端主导航" id="escortTabs" hidden>
+      <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
+      <button class="tab" data-tab="escort-profile"><span class="tab-icon">◉</span><span>我的介绍</span></button>
+    </nav>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="关闭">×</button>
+      <div id="modalContent"></div>
+    </section>
+  </div>
+  <input type="file" id="fileInput" accept="image/*,.pdf" capture="environment" hidden />
+  <input type="file" id="libraryInput" accept="image/*,.pdf" hidden />
+  <input type="file" id="preVisitPhotoInput" accept="image/*" capture="environment" multiple hidden />
+  <input type="file" id="preVisitAudioInput" accept="audio/*" multiple hidden />
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="vendor/tesseract.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
