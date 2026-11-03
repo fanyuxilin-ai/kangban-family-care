@@ -92,11 +92,7 @@ nav[hidden]{display:none!important}
 .reading-tag-red{background:#f6e0da;color:#a1543f}
 .reading-tag-yellow{background:#f6ecd8;color:#9a7c3f}
 .reading-tag-blue{background:#e5ecf3;color:#5c7690}
-.trend-card{background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;padding:13px 14px;box-shadow:0 4px 18px rgba(52,64,55,.045)}
-.trend-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f0efe9}
-.trend-row:last-of-type{border-bottom:0}
-.trend-row strong{font-size:11px}
-.trend-row .field-label{font-size:9px}
+.trend-svg{width:100%;height:auto;display:block}
 .trend-warn{color:#a1543f}
 .trend-ok{color:#55735c}
 /* 模拟账号 · 四人健康档案 + 体检看板 */
@@ -166,7 +162,6 @@ nav[hidden]{display:none!important}
 .track-ops{display:flex;align-items:center;gap:2px;flex:none}
 .track-btn{font-size:9px;padding:5px 4px}
 .track-btn-del{color:#b06a55}
-.tracking-card .track-row:first-child{border-top:0}
 .checkup-category{font-size:9px;font-weight:700;color:#6d8272;background:#eef2ea;border-radius:8px;padding:5px 9px;margin:10px 0 2px}
 .checkup-category:first-child{margin-top:0}
 /* 全局面板可折叠 */
@@ -191,3 +186,8 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .entry-result{background:#fffefa;border:1px solid #e3e6dc;border-radius:10px;padding:9px 11px;font-size:10px;line-height:1.6;color:#5c7663}
 .entry-photo{background:#fffefa;border:1.5px dashed #c9d3c5;border-radius:11px;padding:18px 12px;text-align:center;font-size:12px;font-weight:700;color:#4c6452;display:flex;flex-direction:column;gap:5px}
 .entry-photo small{font-weight:400;font-size:9px;color:#9aa49c}
+/* 成员档案卡内的异常指标跟踪 */
+.member-tracking{margin-top:13px;border-top:1px solid #f0efe9;padding-top:6px}
+.member-tracking-title{display:block;font-size:9px;font-weight:700;color:#8a958c;padding:6px 0 2px}
+.member-tracking .track-row:first-of-type{border-top:0}
+.member-tracking-empty{margin:12px 0 0;font-size:9px;color:#8a958c}

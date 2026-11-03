@@ -257,11 +257,14 @@ function renderHealth() {
     host.innerHTML = state.familyMembers.map(member => {
       const open = expandedMembers.has(member.id);
       const entries = memberMetricEntries(member.id);
-      const abnormal = latestAbnormal(member.id).length;
+      const tracking = latestAbnormal(member.id);
+      const trackingHtml = tracking.length
+        ? `<div class="member-tracking"><span class="member-tracking-title">异常指标跟踪</span>${tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}</div>`
+        : `<p class="member-tracking-empty">无异常指标，继续保持 ✓</p>`;
       return `<article class="member-archive ${open ? 'is-open' : ''}">
         <button class="member-archive-head" data-member-toggle="${member.id}" aria-expanded="${open}">
           <span class="member-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span>
-          <div class="member-archive-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age}岁 · ${entries.length} 条指标${abnormal ? ` · <b class="member-alert-count">${abnormal} 项异常跟踪</b>` : ' · 无异常'}</small></div>
+          <div class="member-archive-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age}岁 · ${entries.length} 条指标${tracking.length ? ` · <b class="member-alert-count">${tracking.length} 项异常跟踪</b>` : ' · 无异常'}</small></div>
           <span class="member-chevron">${open ? '⌃' : '⌄'}</span>
         </button>
         ${open ? `<div class="member-archive-body">
@@ -271,6 +274,7 @@ function renderHealth() {
             <div><span class="field-label">长期用药</span><strong>${esc(member.medications)}</strong></div>
             <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
           </div>
+          ${trackingHtml}
           <div class="member-archive-actions">
             <button class="secondary-button" data-member-edit="${member.id}">编辑档案</button>
             <button class="primary-button" data-member-dashboard="${member.id}">体检看板 →</button>
@@ -288,24 +292,6 @@ function renderHealth() {
       const result = evaluateReading(r);
       return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
     }).join('')}</div>` : `<p class="empty-hint">${esc(member?.name || '该成员')}还没有血压记录，可到预警中心录入或导入体检单。</p>`;
-  }
-  const trendHost = document.getElementById('healthTrend');
-  if (trendHost) {
-    const week = readings.filter(r => r.date >= dateOffset(-7));
-    const avg = nums => nums.length ? Math.round(nums.reduce((sum, n) => sum + n, 0) / nums.length) : null;
-    const sys = avg(week.map(r => r.systolic)); const dia = avg(week.map(r => r.diastolic));
-    const highs = week.filter(r => r.systolic >= 140 || r.diastolic >= 90).length;
-    trendHost.innerHTML = `<div class="trend-card">
-      <div class="trend-row"><span class="field-label">${esc(member?.name || '')} 近 7 天平均血压</span><strong>${sys ? `${sys}/${dia} mmHg` : '暂无数据'}</strong></div>
-      <div class="trend-row"><span class="field-label">超标次数（≥140/90）</span><strong class="${highs ? 'trend-warn' : 'trend-ok'}">${highs} 次</strong></div>
-      <div class="trend-row"><span class="field-label">本周记录</span><strong>${week.length} 条</strong></div>
-      <p class="privacy-small">演示版为固定统计；正式版的周报 / 月报由 AI 管理助手生成子女可读摘要。</p>
-    </div>`;
-  }
-  const trackHost = document.getElementById('healthTracking');
-  if (trackHost) {
-    const tracking = member ? latestAbnormal(member.id) : [];
-    trackHost.innerHTML = tracking.length ? `<div class="trend-card tracking-card">${tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}<p class="privacy-small">每个指标只跟踪最新一次读数；数据来自日常记录与体检导入，可在体检看板查看趋势。</p></div>` : `<p class="empty-hint">${esc(member?.name || '该成员')}当前没有异常指标，继续保持。</p>`;
   }
 }
 
