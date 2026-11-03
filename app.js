@@ -307,14 +307,7 @@ function renderHealth() {
       const trackingHtml = tracking.length
         ? `<div class="member-tracking"><span class="member-tracking-title">异常指标跟踪 · 共 ${tracking.length} 项</span>${previewRows(trackRows, `track-${member.id}`)}</div>`
         : `<p class="member-tracking-empty">无异常指标，继续保持 ✓</p>`;
-      /* 日常记录：读数按成员归属（各设备接口各归各人），卡片内只看自己的数据；任意指标，血压合并展示 */
-      const dailyAll = mergeBpEntries(dailyEntries(member.id));
-      const dailyRows = dailyAll.map(entry => dailyEntryRow(entry));
-      const dailyHtml = `<div class="member-daily">
-          <div class="member-daily-head"><span class="member-tracking-title">日常记录 · 共 ${dailyAll.length} 条</span><button class="text-button" data-member-reading="${member.id}">录入读数 →</button></div>
-          ${dailyAll.length ? `<div class="reading-list">${previewRows(dailyRows, `daily-${member.id}`)}</div>` : `<p class="member-tracking-empty">还没有日常记录，点右上「录入读数」试试。</p>`}
-          <button class="text-button member-board-link" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单） →</button>
-        </div>`;
+      /* 日常记录列表收敛到底部【日常记录】按钮（弹窗内查看完整列表+录入），卡内不再重复展示 */
       return `<article class="member-archive ${open ? 'is-open' : ''}">
         <button class="member-archive-head" data-member-toggle="${member.id}" aria-expanded="${open}">
           <span class="member-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span>
@@ -329,7 +322,6 @@ function renderHealth() {
             <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
           </div>
           ${trackingHtml}
-          ${dailyHtml}
           <div class="member-archive-actions member-archive-actions-3">
             <button class="secondary-button" data-member-edit="${member.id}">编辑档案</button>
             <button class="secondary-button" data-member-daily="${member.id}">日常记录</button>
@@ -1122,6 +1114,7 @@ function showDailyLog(memberId) {
   openModal(`${modalHead(`日常记录 · ${esc(member.name)}`, '任意健康指标 · 设备数据', '手动、语音、拍照、硬件四种通道的读数都按成员归属；指标可自由增删改，这些数据和体检单一起构成数据看板。')}
     ${body}
     <button class="primary-button" data-member-reading="${member.id}">＋ 录入读数（手动 / 语音 / 拍照 / 硬件）</button>
+    <button class="secondary-button" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单） →</button>
     <p class="privacy-small">正式版中血糖仪、血压计、体温计、手表各自通过厂商接口接入，数据自动归到对应家庭成员名下。</p>`);
 }
 
