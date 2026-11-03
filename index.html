@@ -37,20 +37,6 @@
           <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
         </div>
 
-        <section class="section-block">
-          <div class="section-heading"><div><p class="eyebrow">妈妈 · 68岁</p><h2>就医信息卡</h2></div><button class="text-button" data-action="health-card">查看全部 <span>→</span></button></div>
-          <div class="info-card">
-            <div class="info-card-head"><span class="mini-avatar">陈</span><div><strong>陈兰英</strong><span class="muted-small">信息由家人共同整理</span></div><span class="verified"><span>✓</span> 已核对</span></div>
-            <div class="info-grid">
-              <div><span class="field-label">过敏史</span><strong class="alert-text">青霉素</strong></div>
-              <div><span class="field-label">长期用药</span><strong>2 种 <span class="tiny-arrow">↗</span></strong></div>
-              <div><span class="field-label">既往史</span><strong>高血压</strong></div>
-              <div><span class="field-label">最近更新</span><strong>10月22日</strong></div>
-            </div>
-            <button class="card-link" data-action="health-card">打开就医信息卡 <span>↗</span></button>
-          </div>
-        </section>
-
         <section class="section-block alerts-section">
           <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测</p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button></div>
           <div id="homeAlerts"></div>
@@ -65,25 +51,65 @@
           </div>
         </section>
 
-        <section class="section-block family-companion-home">
-          <div class="section-heading"><div><p class="eyebrow">家庭陪诊服务</p><h2>我的陪诊</h2></div><button class="text-button" data-action="companion">全部安排 <span>→</span></button></div>
-          <div id="homeCompanionModule"></div>
-        </section>
-
         <section class="section-block medication-section">
           <div class="section-heading"><div><p class="eyebrow">按已确认医嘱提醒</p><h2>今日服药提醒</h2></div><button class="text-button" data-action="medications">管理 <span>→</span></button></div>
           <div id="homeMedicationReminders"></div>
         </section>
-
-        <section class="section-block recent-block">
-          <div class="section-heading"><div><p class="eyebrow">最近整理</p><h2>资料时间线</h2></div><button class="text-button" data-nav="records">全部资料 <span>→</span></button></div>
-          <div class="timeline-preview" id="homeTimeline"></div>
-        </section>
         <div class="privacy-note"><span>✳</span><span>健康资料仅在你授权后分享，你可以随时撤回。</span></div>
       </section>
 
-      <section class="view" id="view-records">
-        <div class="page-heading"><p class="eyebrow">妈妈的健康资料</p><h1>资料库</h1><p class="subtle">所有资料按时间整理，方便复诊时快速找到。</p></div>
+      <section class="view" id="view-health">
+        <div class="page-heading"><p class="eyebrow">妈妈的长期健康</p><h1>健康档案</h1><p class="subtle">慢病、过敏、用药与日常记录都在这里，变化一眼看懂。</p></div>
+        <section class="section-block">
+          <div class="section-heading"><div><p class="eyebrow">由家人共同维护 · 最近核对 10月22日</p><h2>健康概览</h2></div></div>
+          <div class="info-card">
+            <div class="info-card-head"><span class="mini-avatar">陈</span><div><strong>陈兰英 · 68岁</strong><span class="muted-small">家庭无隐私：家人间信息互通</span></div><span class="verified"><span>✓</span> 已核对</span></div>
+            <div class="info-grid">
+              <div><span class="field-label">慢病</span><strong>高血压</strong></div>
+              <div><span class="field-label">过敏史</span><strong class="alert-text">青霉素</strong></div>
+              <div><span class="field-label">长期用药</span><strong>2 种</strong></div>
+              <div><span class="field-label">手术史</span><strong>无记录</strong></div>
+            </div>
+          </div>
+        </section>
+        <section class="section-block">
+          <div class="section-heading"><div><p class="eyebrow">手动录入 + 设备同步</p><h2>日常记录</h2></div><button class="text-button" data-action="alerts">录入读数 <span>→</span></button></div>
+          <div id="healthReadingsList"></div>
+        </section>
+        <section class="section-block">
+          <div class="section-heading"><div><p class="eyebrow">周报 · 月报</p><h2>健康趋势</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button></div>
+          <div id="healthTrend"></div>
+        </section>
+        <div class="privacy-note"><span>✳</span><span>健康档案由家庭成员共同维护，所有查看与修改均留痕。</span></div>
+      </section>
+
+      <section class="view" id="view-docs">
+        <div class="page-heading"><p class="eyebrow">就医凭证，按次整理</p><h1>医疗资料</h1><p class="subtle">信息卡、就诊清单、资料库和报销入口都在这一区。</p></div>
+        <section class="section-block">
+          <div class="section-heading"><div><p class="eyebrow">妈妈 · 68岁</p><h2>就医信息卡</h2></div><button class="text-button" data-action="health-card">查看全部 <span>→</span></button></div>
+          <div class="info-card">
+            <div class="info-card-head"><span class="mini-avatar">陈</span><div><strong>陈兰英</strong><span class="muted-small">信息由家人共同整理</span></div><span class="verified"><span>✓</span> 已核对</span></div>
+            <div class="info-grid">
+              <div><span class="field-label">过敏史</span><strong class="alert-text">青霉素</strong></div>
+              <div><span class="field-label">长期用药</span><strong>2 种 <span class="tiny-arrow">↗</span></strong></div>
+              <div><span class="field-label">既往史</span><strong>高血压</strong></div>
+              <div><span class="field-label">最近更新</span><strong>10月22日</strong></div>
+            </div>
+            <button class="card-link" data-action="health-card">打开就医信息卡 <span>↗</span></button>
+          </div>
+        </section>
+        <div class="docs-quick-row">
+          <button class="secondary-button" data-action="appointment">就诊准备清单</button>
+          <button class="secondary-button" data-action="share">生成就诊分享码</button>
+        </div>
+        <section class="section-block">
+          <div class="section-heading"><div><p class="eyebrow">保单优先 · 成员B负责模块</p><h2>保险报销</h2></div></div>
+          <div class="insurance-grid">
+            <button class="insurance-card" data-action="insurance-social"><strong>社保医疗保险</strong><small>参保档案 · 就医材料包 · 零星报销</small></button>
+            <button class="insurance-card" data-action="insurance-commercial"><strong>商业医疗保险</strong><small>保单管理 · 材料清单 · 理赔进度</small></button>
+          </div>
+        </section>
+        <div class="page-heading docs-library-heading"><p class="eyebrow">拍照上传 · OCR 识别入库</p><h2>资料库</h2><p class="subtle">所有资料按时间整理，方便复诊时快速找到。</p></div>
         <div class="record-summary"><div><strong id="recordCount">0</strong><span>份资料</span></div><div class="summary-divider"></div><div><strong>已核对</strong><span>关键病史</span></div><button class="add-record" data-action="upload">＋ 添加</button></div>
         <div class="filter-row"><button class="filter-chip selected">全部</button><button class="filter-chip">检查报告</button><button class="filter-chip">用药记录</button></div>
         <div id="recordList" class="record-list"></div>
@@ -130,6 +156,8 @@
         <div class="family-card"><div class="family-avatar-large">陈</div><div><strong>陈兰英</strong><span>妈妈 · 68岁</span><small>档案由小林协助管理</small></div><button class="quiet-action" data-action="health-card">查看档案 →</button></div>
         <div class="settings-list">
           <button class="settings-row" data-action="share"><span class="settings-icon">⌁</span><span>授权与访问记录</span><span class="service-arrow">→</span></button>
+          <button class="settings-row" data-action="ai-assistant"><span class="settings-icon">✳</span><span>AI 管理助手</span><span class="service-arrow">→</span></button>
+          <button class="settings-row" data-action="devices"><span class="settings-icon">⌚</span><span>设备管理（手表接入）</span><span class="service-arrow">→</span></button>
           <button class="settings-row" data-action="privacy"><span class="settings-icon">◈</span><span>隐私与资料管理</span><span class="service-arrow">→</span></button>
           <button class="settings-row" data-action="help"><span class="settings-icon">?</span><span>帮助与服务说明</span><span class="service-arrow">→</span></button>
         </div>
@@ -139,7 +167,8 @@
 
     <nav class="tabbar" aria-label="家庭端主导航" id="familyTabs">
       <button class="tab active" data-tab="home"><span class="tab-icon">⌂</span><span>首页</span></button>
-      <button class="tab" data-tab="records"><span class="tab-icon">▤</span><span>资料</span></button>
+      <button class="tab" data-tab="health"><span class="tab-icon">✚</span><span>健康档案</span></button>
+      <button class="tab" data-tab="docs"><span class="tab-icon">▤</span><span>医疗资料</span></button>
       <button class="tab" data-tab="companion"><span class="tab-icon">♡</span><span>陪诊</span></button>
       <button class="tab" data-tab="me"><span class="tab-icon">◉</span><span>我的</span></button>
     </nav>

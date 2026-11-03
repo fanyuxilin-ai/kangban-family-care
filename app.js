@@ -126,7 +126,8 @@ function renderRecords() {
       <span class="record-status">${esc(record.state)}</span>
     </article>`).join('') : '<p class="empty-hint">还没有资料，添加一份检查报告试试。</p>';
   const preview = sorted.slice(0, 3);
-  document.getElementById('homeTimeline').innerHTML = preview.map(record => `
+  const timelineHost = document.getElementById('homeTimeline');
+  if (timelineHost) timelineHost.innerHTML = preview.map(record => `
     <div class="timeline-row"><span class="timeline-date">${formatDate(record.date)}</span><i class="timeline-marker"></i><div class="timeline-copy"><strong>${esc(record.title)}</strong><small>${esc(record.hospital.split(' · ')[0])}</small></div></div>`).join('');
   const orderHost = document.getElementById('companionOrders');
   const statusLabel = { pending: '待陪诊员确认', accepted: '已接单', declined: '未接单', completed: '已完成' };
@@ -145,8 +146,48 @@ function renderRecords() {
     </article>`;
   }).join('')}</div>` : `<div class="family-empty-card"><p>还没有陪诊预约。可以先查看陪诊员介绍并提交一笔演示预约。</p><button class="primary-button" data-action="book-profile">预约陪诊员</button></div>`}`;
   renderMedicationReminders();
-  renderCompanionViews();
   renderHomeCompanionModule();
+  renderHealth();
+  renderCompanionViews();
+}
+
+/* ============ 健康档案 Tab（FR-01：档案 · 日常记录 · 趋势） ============ */
+function renderHealth() {
+  const readings = state.healthReadings || [];
+  const listHost = document.getElementById('healthReadingsList');
+  if (listHost) {
+    listHost.innerHTML = readings.length ? `<div class="reading-list">${readings.slice(0, 6).map(r => {
+      const result = evaluateReading(r);
+      return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
+    }).join('')}${readings.length > 6 ? `<p class="privacy-small" style="text-align:center">仅显示最近 6 条，完整记录见预警中心。</p>` : ''}</div>` : '<p class="empty-hint">还没有血压记录，点右上角「录入读数」添加一条。</p>';
+  }
+  const trendHost = document.getElementById('healthTrend');
+  if (trendHost) {
+    const week = readings.filter(r => r.date >= dateOffset(-7));
+    const avg = nums => nums.length ? Math.round(nums.reduce((sum, n) => sum + n, 0) / nums.length) : null;
+    const sys = avg(week.map(r => r.systolic)); const dia = avg(week.map(r => r.diastolic));
+    const highs = week.filter(r => r.systolic >= 140 || r.diastolic >= 90).length;
+    trendHost.innerHTML = `<div class="trend-card">
+      <div class="trend-row"><span class="field-label">近 7 天平均血压</span><strong>${sys ? `${sys}/${dia} mmHg` : '暂无数据'}</strong></div>
+      <div class="trend-row"><span class="field-label">超标次数（≥140/90）</span><strong class="${highs ? 'trend-warn' : 'trend-ok'}">${highs} 次</strong></div>
+      <div class="trend-row"><span class="field-label">本周记录</span><strong>${week.length} 条</strong></div>
+      <p class="privacy-small">演示版为固定统计；正式版的周报 / 月报由 AI 管理助手生成子女可读摘要。</p>
+    </div>`;
+  }
+}
+
+function showInsuranceHub(channel) {
+  const isSocial = channel === 'social';
+  openModal(`${modalHead('保险报销 · 保单优先', isSocial ? '社保医疗保险' : '商业医疗保险', '从参保档案或保单进入，创建或关联一次就诊的材料包；材料包只保存一份，各渠道分别维护材料清单和办理进度。')}
+    <div class="insurance-channel-card"><strong>${isSocial ? '医保参保档案' : '演示保单'}：陈兰英</strong><small>${isSocial ? '深圳市职工医保（演示） · 异地就医备案未办理' : '百万医疗险（演示保单） · 保额 200 万 · 生效中'}</small></div>
+    <div class="share-log"><h3>材料包与办理进度（演示）</h3>
+      <div class="log-row"><span>10月22日 市一院门诊 · 材料包</span><small>已提交</small></div>
+      <div class="log-row"><span>${isSocial ? '医保零星报销' : '商业险理赔申请'}</span><small>待补件</small></div>
+    </div>
+    <div class="health-highlight">进度状态：待整理 → 已提交 → 待补件 → 处理中 → 已办结。演示版不做保险销售、不自动判断承保或赔付金额。</div>
+    <button class="primary-button" id="insuranceTodo">创建 / 关联就诊材料包</button>
+    <p class="privacy-small">完整模块由成员B按需求文档 FR-07 开发，当前为医疗资料分区下的入口演示。</p>`);
+  document.getElementById('insuranceTodo')?.addEventListener('click', () => { closeModal(); toast('演示版：材料包功能开发中，入口与信息架构已就位'); });
 }
 
 function renderHomeCompanionModule() {
@@ -781,6 +822,10 @@ document.addEventListener('click', async event => {
   if (action === 'health-card') showHealthCard();
   if (action === 'share') showShare();
   if (action === 'alerts') showAlertCenter();
+  if (action === 'insurance-social') showInsuranceHub('social');
+  if (action === 'insurance-commercial') showInsuranceHub('commercial');
+  if (action === 'ai-assistant') showInfo('AI 管理助手（规划中）', '规划能力：自动总结父母健康周报、回答健康咨询、生成就医准备清单，并支持「小康，今天该吃什么药」式语音交互。当前演示版可在「我的 · 健康趋势」查看固定统计。');
+  if (action === 'devices') showInfo('设备管理（规划中）', '计划预留华为运动健康、小米运动健康等智能手表接入入口，同步睡眠、运动与跌倒监测数据。当前演示版可在预警中心「模拟手表同步」体验。');
   if (action === 'companion') navigate('companion');
   if (action === 'book-profile') showCompanionForm('全程陪诊');
   if (action === 'toggle-availability') {
