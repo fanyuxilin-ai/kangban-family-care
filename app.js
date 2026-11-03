@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'kangban-demo-v4';
+const STORAGE_KEY = 'kangban-demo-v5';
 function dateOffset(days) {
   const date = new Date(); date.setHours(12,0,0,0); date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -47,7 +47,7 @@ const seed = {
     { id: 'm4', name: '周晓东', role: '儿子', age: 42, conditions: '高血脂 · 超重', allergies: '无已知过敏', medications: '阿托伐他汀 20mg · 每晚一次', surgeries: '无记录', avatarClass: 'member-avatar-4' }
   ],
   currentMemberId: 'm1',
-  nextMetricId: 32,
+  nextMetricId: 37,
   metricDefs: {},
   bodyMetrics: [
     { id: 'bm-1', memberId: 'm1', metric: '体重', value: 58.4, unit: 'kg', date: dateOffset(-20) },
@@ -72,16 +72,21 @@ const seed = {
     { id: 'bm-20', memberId: 'm4', metric: '体重', value: 74.5, unit: 'kg', date: dateOffset(-12) },
     { id: 'bm-21', memberId: 'm4', metric: 'BMI', value: 25.4, unit: '', date: dateOffset(-12) },
     /* 日常记录（血压计/手表）同步进看板的血压指标 */
-    { id: 'bm-22', memberId: 'm1', metric: '收缩压', value: 152, unit: 'mmHg', date: dateOffset(-2), source: '手动录入' },
-    { id: 'bm-23', memberId: 'm1', metric: '舒张压', value: 94, unit: 'mmHg', date: dateOffset(-2), source: '手动录入' },
-    { id: 'bm-24', memberId: 'm1', metric: '收缩压', value: 149, unit: 'mmHg', date: dateOffset(-1), source: '模拟手表' },
-    { id: 'bm-25', memberId: 'm1', metric: '舒张压', value: 93, unit: 'mmHg', date: dateOffset(-1), source: '模拟手表' },
-    { id: 'bm-26', memberId: 'm1', metric: '收缩压', value: 166, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' },
-    { id: 'bm-27', memberId: 'm1', metric: '舒张压', value: 102, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' },
-    { id: 'bm-28', memberId: 'm2', metric: '收缩压', value: 148, unit: 'mmHg', date: dateOffset(-3), source: '欧姆龙血压计' },
-    { id: 'bm-29', memberId: 'm2', metric: '舒张压', value: 91, unit: 'mmHg', date: dateOffset(-3), source: '欧姆龙血压计' },
-    { id: 'bm-30', memberId: 'm2', metric: '收缩压', value: 158, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' },
-    { id: 'bm-31', memberId: 'm2', metric: '舒张压', value: 96, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' }
+    { id: 'bm-22', memberId: 'm1', metric: '收缩压', value: 152, unit: 'mmHg', date: dateOffset(-2), time: '08:10', source: '手动录入', channel: 'daily' },
+    { id: 'bm-23', memberId: 'm1', metric: '舒张压', value: 94, unit: 'mmHg', date: dateOffset(-2), time: '08:10', source: '手动录入', channel: 'daily' },
+    { id: 'bm-24', memberId: 'm1', metric: '收缩压', value: 149, unit: 'mmHg', date: dateOffset(-1), time: '08:05', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-25', memberId: 'm1', metric: '舒张压', value: 93, unit: 'mmHg', date: dateOffset(-1), time: '08:05', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-26', memberId: 'm1', metric: '收缩压', value: 166, unit: 'mmHg', date: dateOffset(0), time: '07:50', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-27', memberId: 'm1', metric: '舒张压', value: 102, unit: 'mmHg', date: dateOffset(0), time: '07:50', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-28', memberId: 'm2', metric: '收缩压', value: 148, unit: 'mmHg', date: dateOffset(-3), time: '09:15', source: '欧姆龙血压计', channel: 'daily' },
+    { id: 'bm-29', memberId: 'm2', metric: '舒张压', value: 91, unit: 'mmHg', date: dateOffset(-3), time: '09:15', source: '欧姆龙血压计', channel: 'daily' },
+    { id: 'bm-30', memberId: 'm2', metric: '收缩压', value: 158, unit: 'mmHg', date: dateOffset(0), time: '08:20', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-31', memberId: 'm2', metric: '舒张压', value: 96, unit: 'mmHg', date: dateOffset(0), time: '08:20', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-32', memberId: 'm1', metric: '血糖', value: 6.3, unit: 'mmol/L', date: dateOffset(-1), time: '07:20', source: '手动录入', channel: 'daily' },
+    { id: 'bm-33', memberId: 'm1', metric: '血氧', value: 97, unit: '%', date: dateOffset(0), time: '07:50', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-34', memberId: 'm1', metric: '体重', value: 58.6, unit: 'kg', date: dateOffset(0), time: '07:30', source: '体重秤', channel: 'daily' },
+    { id: 'bm-35', memberId: 'm2', metric: '心率', value: 102, unit: '次/分', date: dateOffset(-1), time: '09:15', source: '模拟手表', channel: 'daily' },
+    { id: 'bm-36', memberId: 'm2', metric: '血糖', value: 7.9, unit: 'mmol/L', date: dateOffset(0), time: '08:00', source: '血糖仪', channel: 'daily' }
   ]
 };
 let state = loadState();
@@ -116,7 +121,7 @@ function loadState() {
     loaded.familyMembers = saved.familyMembers || structuredClone(seed.familyMembers);
     loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
     loaded.currentMemberId = saved.currentMemberId || 'm1';
-    loaded.nextMetricId = saved.nextMetricId || 32;
+    loaded.nextMetricId = saved.nextMetricId || 37;
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
@@ -206,11 +211,17 @@ const METRIC_DEFS = {
   '体重': { unit: 'kg' },
   'BMI': { unit: '', low: 18.5, high: 24 },
   '空腹血糖': { unit: 'mmol/L', low: 3.9, high: 6.1 },
+  '血糖': { unit: 'mmol/L', low: 3.9, high: 6.1 },
   '收缩压': { unit: 'mmHg', low: 90, high: 139 },
   '舒张压': { unit: 'mmHg', low: 60, high: 89 },
+  '心率': { unit: '次/分', low: 60, high: 100 },
+  '血氧': { unit: '%', low: 95 },
+  '体温': { unit: '℃', low: 35.5, high: 37.3 },
   '总胆固醇': { unit: 'mmol/L', high: 5.2 },
   '尿酸': { unit: 'μmol/L', low: 208, high: 428 }
 };
+/* 日常录入常用指标（一键加行 / AI 联想） */
+const DAILY_METRICS = ['血压', '血糖', '心率', '血氧', '体重', '体温', '尿酸'];
 function currentMember() {
   return (state.familyMembers || []).find(member => member.id === state.currentMemberId) || (state.familyMembers || [])[0];
 }
@@ -277,14 +288,11 @@ function renderHealth() {
       const trackingHtml = tracking.length
         ? `<div class="member-tracking"><span class="member-tracking-title">异常指标跟踪</span>${tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}</div>`
         : `<p class="member-tracking-empty">无异常指标，继续保持 ✓</p>`;
-      /* 日常记录：读数按成员归属（各设备接口各归各人），卡片内只看自己的数据 */
-      const readings = (state.healthReadings || []).filter(reading => reading.memberId === member.id).slice(0, 3);
+      /* 日常记录：读数按成员归属（各设备接口各归各人），卡片内只看自己的数据；任意指标，血压合并展示 */
+      const dailyList = mergeBpEntries(dailyEntries(member.id)).slice(0, 3);
       const dailyHtml = `<div class="member-daily">
-          <div class="member-daily-head"><span class="member-tracking-title">日常记录 · 血压（${readings.length ? `最近 ${Math.min(readings.length, 3)} 条` : '暂无'}）</span><button class="text-button" data-member-reading="${member.id}">录入读数 →</button></div>
-          ${readings.length ? `<div class="reading-list">${readings.map(r => {
-            const result = evaluateReading(r);
-            return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
-          }).join('')}</div>` : `<p class="member-tracking-empty">还没有日常读数，点右上「录入读数」试试。</p>`}
+          <div class="member-daily-head"><span class="member-tracking-title">日常记录 · ${dailyList.length ? `最近 ${dailyList.length} 条` : '暂无'}</span><button class="text-button" data-member-reading="${member.id}">录入读数 →</button></div>
+          ${dailyList.length ? `<div class="reading-list">${dailyList.map(entry => dailyEntryRow(entry)).join('')}</div>` : `<p class="member-tracking-empty">还没有日常记录，点右上「录入读数」试试。</p>`}
           <button class="text-button member-board-link" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单） →</button>
         </div>`;
       return `<article class="member-archive ${open ? 'is-open' : ''}">
@@ -512,7 +520,8 @@ function showHistEdit(entryId) {
     const date = String(data.get('date') || entry.date);
     if (!Number.isFinite(value) || value <= 0) { toast('请输入有效数值'); return; }
     entry.value = value; entry.date = date;
-    saveState(); renderHealth(); showMemberDashboard(entry.memberId);
+    saveState(); renderHealth();
+    if (histEditContext === 'daily') { showDailyLog(entry.memberId); } else { showMemberDashboard(entry.memberId); }
     toast(`${entry.metric} 已更新为 ${value}${def.unit ? ` ${def.unit}` : ''}（${statusLabelOf(value, entry.metric)}）`);
   });
 }
@@ -597,7 +606,7 @@ function showCheckupConfirm(memberId) {
       }
     });
     edited.forEach(row => {
-      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0), source: '体检导入', category: row.category });
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0), source: '体检导入', category: row.category, channel: 'checkup' });
     });
     saveState(); renderHealth(); closeModal();
     const abnormal = edited.filter(row => checkupRowStatus(row, row.value) !== 'normal');
@@ -846,23 +855,30 @@ function showAlertCenter() {
 }
 /* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件，读数按成员归属） ============ */
 let readingMemberId = 'm1';   // 当前录入读数的目标成员（设备数据各归各人）
+let histEditContext = 'dashboard'; // 编辑/删除后的返回上下文：dashboard / daily
 const READING_METHODS = [
   { id: 'manual', icon: '✍️', label: '手动录入', hint: '一句话描述读数，AI 识别后回填核对' },
   { id: 'voice', icon: '🎙', label: '语音录入', hint: '老人说一句话，自动转成读数' },
   { id: 'photo', icon: '📷', label: '拍照识别', hint: '拍血压计 / 血糖仪，OCR 读数' },
   { id: 'device', icon: '⌚', label: '硬件同步', hint: '智能手表自动同步与异常上报' }
 ];
-/* 一句话 → 结构化读数（演示版本地解析；正式版由大模型做意图抽取） */
-function parseReadingText(text) {
-  const flat = String(text || '').replace(/[，,。;；！？]/g, ' ');
-  const result = {};
-  const slash = flat.match(/(?:血压)?\s*(\d{2,3})\s*[\/／|到\-~]\s*(\d{2,3})/);
-  const spoken = slash ? null : flat.match(/血压[^\d]{0,4}(\d{2,3})\s+(\d{2,3})/);
-  const bp = slash || spoken;
-  if (bp) { result.systolic = Number(bp[1]); result.diastolic = Number(bp[2]); }
-  const pulse = flat.match(/(?:脉搏|心率|pulse)\D{0,4}(\d{2,3})/i);
-  if (pulse) result.pulse = Number(pulse[1]);
-  return result.systolic && result.diastolic ? result : null;
+/* 一句话 → 结构化指标行（可多指标混录，按原文出现顺序输出；演示版本地解析，正式版由大模型做意图抽取） */
+function parseReadingRows(text) {
+  const flat = String(text || '').replace(/[，,。;；！？、]/g, ' ');
+  const found = [];
+  const push = (index, metric, value, unit) => { if (Number.isFinite(value) && value > 0) found.push({ index, metric, value, unit }); };
+  /* 血压：血压 152/94 / 血压 152 94 / 裸 152/94 */
+  const slash = /血压[^\d]{0,4}(\d{2,3})\s*[\/／|到\-~]\s*(\d{2,3})/.exec(flat);
+  const spoken = slash ? null : /血压[^\d]{0,4}(\d{2,3})\s+(\d{2,3})/.exec(flat);
+  const bare = slash || spoken ? null : /(?<!\d)(\d{2,3})\s*[\/／]\s*(\d{2,3})(?!\d)/.exec(flat);
+  const bp = slash || spoken || bare;
+  if (bp) { push(bp.index, '收缩压', Number(bp[1]), 'mmHg'); push(bp.index, '舒张压', Number(bp[2]), 'mmHg'); }
+  const words = [['血糖', '血糖', 'mmol/L'], ['体重', '体重', 'kg'], ['脉搏', '心率', '次/分'], ['心率', '心率', '次/分'], ['血氧', '血氧', '%'], ['体温', '体温', '℃'], ['尿酸', '尿酸', 'μmol/L'], ['胆固醇', '总胆固醇', 'mmol/L']];
+  words.forEach(([word, metric, unit]) => {
+    const m = new RegExp(`${word}[^\\d.]{0,4}(\\d+(?:\\.\\d+)?)`).exec(flat);
+    if (m) push(m.index, metric, Number(m[1]), unit);
+  });
+  return found.sort((a, b) => a.index - b.index).map(({ metric, value, unit }) => ({ metric, value, unit }));
 }
 function showReadingEntry(memberId) {
   const member = state.familyMembers.find(item => item.id === memberId) || currentMember();
@@ -882,14 +898,20 @@ function showReadingEntry(memberId) {
     </div>`;
   let capture = '';
   if (method === 'manual') {
+    const quickChips = DAILY_METRICS.map(name => `<button class="metric-chip" data-quick-metric="${esc(name)}">＋ ${esc(name)}</button>`).join('') + `<button class="metric-chip" data-quick-metric="__custom">＋ 自定义</button>`;
     capture = `<div class="ai-parse-block">
-      <strong>手动录入 · 一句话 + AI 识别</strong>
+      <strong>手动录入 · 一句话 + AI 识别，指标可自由编辑</strong>
       <div class="ai-parse-row">
-        <input class="input-field" id="manualText" placeholder="例：今天早上血压 152/94，脉搏 78" />
+        <input class="input-field" id="manualText" placeholder="例：早上血糖 6.8，血压 152/94，脉搏 78" />
         <button class="secondary-button" id="aiParseReading">✳ AI 识别</button>
       </div>
       <div class="entry-result" id="aiParseResult" hidden></div>
-      ${captureForm}
+      <div class="metric-chips quick-metric-chips">${quickChips}</div>
+      <datalist id="metricSuggestions">${[...Object.keys(METRIC_DEFS), ...Object.keys(state.metricDefs || {})].map(name => `<option value="${esc(name)}"></option>`).join('')}</datalist>
+      <div id="manualRows" class="manual-rows"></div>
+      <button class="text-button" id="addManualRow">＋ 再记一项</button>
+      <button class="primary-button" id="saveDailyEntries" style="margin-top:10px">核对无误，保存全部</button>
+      <p class="privacy-small">识别结果每行都能改：指标名、数值、单位、增删行都可以。保存后记到 ${esc(member.name)} 名下并同步进数据看板；血压仍由规则引擎自动评估分级。</p>
     </div>`;
   } else if (method === 'voice') {
     capture = `<div class="entry-capture-card">
@@ -931,21 +953,56 @@ function showReadingEntry(memberId) {
     document.getElementById('readingDiastolic').value = values[1];
     document.getElementById('readingPulse').value = values[2];
   };
+  /* 手动通道：可编辑指标行（AI 识别回填 / 快捷加行 / 自由增删改） */
+  const manualRowsHost = document.getElementById('manualRows');
+  const addManualRow = (metric = '', value = '', unit = '') => {
+    if (!manualRowsHost) return;
+    const row = document.createElement('div');
+    row.className = 'manual-row';
+    row.innerHTML = `<input class="input-field row-metric" list="metricSuggestions" placeholder="指标名" value="${esc(metric)}" />
+      <input class="input-field row-value" type="number" step="0.1" placeholder="数值" value="${esc(String(value))}" />
+      <input class="input-field row-unit" placeholder="单位" value="${esc(unit)}" />
+      <button class="text-button row-del" type="button" aria-label="删除该行">×</button>`;
+    row.querySelector('.row-del')?.addEventListener('click', () => row.remove());
+    manualRowsHost.appendChild(row);
+  };
+  const quickMetricUnits = { '血压': '', '血糖': 'mmol/L', '心率': '次/分', '血氧': '%', '体重': 'kg', '体温': '℃', '尿酸': 'μmol/L' };
+  document.querySelectorAll('[data-quick-metric]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const name = chip.dataset.quickMetric;
+      if (name === '__custom') { addManualRow(); manualRowsHost?.lastElementChild?.querySelector('.row-metric')?.focus(); return; }
+      if (name === '血压') { addManualRow('收缩压', '', 'mmHg'); addManualRow('舒张压', '', 'mmHg'); return; }
+      addManualRow(name, '', quickMetricUnits[name] || '');
+      manualRowsHost?.lastElementChild?.querySelector('.row-value')?.focus();
+    });
+  });
+  if (manualRowsHost && !manualRowsHost.children.length) addManualRow();
+  document.getElementById('addManualRow')?.addEventListener('click', () => addManualRow());
   document.getElementById('aiParseReading')?.addEventListener('click', () => {
     const text = document.getElementById('manualText')?.value || '';
     if (!text.trim()) { toast('先输入一句读数描述，再点 AI 识别'); return; }
-    const parsed = parseReadingText(text);
+    const parsed = parseReadingRows(text);
     const result = document.getElementById('aiParseResult');
-    if (!parsed) {
-      if (result) { result.hidden = false; result.textContent = `没能从「${text.trim()}」里识别出血压读数，请按「血压 152/94，脉搏 78」的格式描述，或直接在下方填写。`; }
+    if (!parsed.length) {
+      if (result) { result.hidden = false; result.textContent = `没能从「${text.trim()}」里识别出指标，试试「血糖 6.8」「血压 152/94」「体重 58.5」这种说法，或点上面的常用指标直接加行。`; }
       return;
     }
-    fillForm([parsed.systolic, parsed.diastolic, parsed.pulse || '']);
+    manualRowsHost.innerHTML = '';
+    parsed.forEach(row => addManualRow(row.metric, row.value, row.unit));
     if (result) {
       result.hidden = false;
-      result.textContent = `AI 识别结果：收缩压 ${parsed.systolic} / 舒张压 ${parsed.diastolic}${parsed.pulse ? ` · 脉搏 ${parsed.pulse} 次/分` : '（未提及脉搏）'}，已填入下方表单，请核对后保存。`;
+      result.textContent = `AI 识别出 ${parsed.length} 项指标：${parsed.map(row => `${row.metric} ${row.value}${row.unit || ''}`).join(' · ')}，已生成可编辑行，请核对后保存。`;
     }
-    toast('AI 识别完成，请在下方核对');
+    toast(`AI 识别出 ${parsed.length} 项指标，请核对`);
+  });
+  document.getElementById('saveDailyEntries')?.addEventListener('click', () => {
+    const rows = [...document.querySelectorAll('.manual-row')].map(row => ({
+      metric: row.querySelector('.row-metric')?.value.trim() || '',
+      value: Number(row.querySelector('.row-value')?.value),
+      unit: row.querySelector('.row-unit')?.value.trim() || ''
+    })).filter(row => row.metric && Number.isFinite(row.value) && row.value > 0);
+    if (!rows.length) { toast('请至少填写一行有效的指标和数值'); return; }
+    saveDailyEntries(readingMemberId, rows, '手动录入');
   });
   document.getElementById('voiceMock')?.addEventListener('click', () => {
     const result = document.getElementById('voiceResult');
@@ -988,7 +1045,7 @@ function saveReading(reading) {
   state.healthReadings.unshift(entry);
   /* 日常记录同步进数据看板：血压作为 收缩压/舒张压 指标入池，与体检单数据同源展示 */
   [['收缩压', entry.systolic], ['舒张压', entry.diastolic]].forEach(([metric, value]) => {
-    state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric, value, unit: 'mmHg', date: entry.date, source: entry.source });
+    state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric, value, unit: 'mmHg', date: entry.date, time: entry.time, source: entry.source, channel: 'daily' });
   });
   const result = evaluateReading(entry);
   let message = `${member?.name || '家人'} 的读数已保存，未触发预警`;
@@ -998,19 +1055,74 @@ function saveReading(reading) {
   }
   saveState(); renderHomeAlerts(); renderHealth(); closeModal(); toast(message);
 }
-/* 日常记录弹窗：某个成员的完整日常读数列表 */
+/* 通用日常录入：任意指标行入库；若包含收缩压+舒张压则联动血压预警引擎 */
+function saveDailyEntries(memberId, rows, source) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  if (!member || !rows.length) return;
+  const date = dateOffset(0);
+  const time = nowLabel().split(' ')[1];
+  rows.forEach(row => {
+    state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit || metricDef(row.metric)?.unit || '', date, time, source, channel: 'daily' });
+  });
+  const sys = rows.find(row => row.metric === '收缩压');
+  const dia = rows.find(row => row.metric === '舒张压');
+  let message = `${member.name} 的 ${rows.length} 项日常记录已保存`;
+  if (sys && dia) {
+    const pulse = rows.find(row => row.metric === '心率')?.value || 0;
+    const entry = { id: `bp-${state.nextReadingId++}`, memberId, date, time, systolic: sys.value, diastolic: dia.value, pulse, source };
+    state.healthReadings.unshift(entry);
+    const result = evaluateReading(entry);
+    if (result) {
+      createAlert(result.level, result.title, result.detail, `${source} · 血压 ${sys.value}/${dia.value}`);
+      message += `，血压触发${ALERT_META[result.level].label}预警并完成分级告知`;
+    }
+  }
+  saveState(); renderHomeAlerts(); renderHealth(); closeModal();
+  toast(`${message}，可在数据看板查看趋势`);
+}
+/* 日常记录数据源：channel = daily 的指标（血压合并为一条展示用） */
+function dailyEntries(memberId) {
+  return (state.bodyMetrics || []).filter(entry => entry.memberId === memberId && entry.channel === 'daily')
+    .slice().sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || ''));
+}
+/* 把同一时刻的 收缩压+舒张压 合并成一条 152/94 展示行 */
+function mergeBpEntries(entries) {
+  const merged = [];
+  const used = new Set();
+  entries.forEach(entry => {
+    if (used.has(entry.id)) return;
+    if (entry.metric === '收缩压') {
+      const dia = entries.find(other => other.metric === '舒张压' && other.date === entry.date && (other.time || '') === (entry.time || '') && !used.has(other.id));
+      if (dia) {
+        used.add(dia.id);
+        merged.push({ ...entry, metric: '血压', value: `${entry.value}/${dia.value}`, unit: 'mmHg' });
+        return;
+      }
+    }
+    merged.push(entry);
+  });
+  return merged;
+}
+function dailyEntryRow(entry) {
+  const abnormal = entry.metric === '血压' ? null : metricStatus(entry.metric, Number(entry.value));
+  const tag = entry.metric === '血压'
+    ? (Number(String(entry.value).split('/')[0]) >= 140 || Number(String(entry.value).split('/')[1]) >= 90 ? 'reading-tag-yellow' : 'reading-tag-ok')
+    : statusTagOf(Number(entry.value), entry.metric);
+  const tagLabel = entry.metric === '血压'
+    ? (Number(String(entry.value).split('/')[0]) >= 140 || Number(String(entry.value).split('/')[1]) >= 90 ? '需要关注' : '正常')
+    : statusLabelOf(Number(entry.value), entry.metric);
+  return `<div class="reading-row"><div class="reading-copy"><strong>${esc(entry.metric)} ${esc(String(entry.value))} <small>${esc(entry.unit || '')}</small></strong><small>${formatDate(entry.date)}${entry.time ? ` ${esc(entry.time)}` : ''} · ${esc(entry.source || '手动录入')}</small></div><span class="reading-tag ${tag}">${tagLabel}</span></div>`;
+}
+/* 日常记录弹窗：某个成员的完整日常记录（任意指标，可编辑/删除） */
 function showDailyLog(memberId) {
   const member = state.familyMembers.find(item => item.id === memberId);
   if (!member) return;
-  const readings = (state.healthReadings || []).filter(reading => reading.memberId === memberId);
-  const body = readings.length ? `<div class="reading-list">${readings.map(r => {
-    const result = evaluateReading(r);
-    return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
-  }).join('')}</div>` : '<p class="empty-hint">还没有日常读数，点下方按钮录入第一条。</p>';
-  openModal(`${modalHead(`日常记录 · ${esc(member.name)}`, '血压与设备数据', '手动、语音、拍照、硬件四种通道的读数都按成员归属；这些数据和体检单一起构成数据看板。')}
+  const entries = mergeBpEntries(dailyEntries(memberId));
+  const body = entries.length ? `<div class="reading-list">${entries.map(entry => `<div class="daily-log-row">${dailyEntryRow(entry)}<span class="daily-row-ops"><button class="text-button" data-hist-edit="${entry.id}" data-edit-context="daily">编辑</button><button class="text-button" data-hist-del="${entry.id}" data-edit-context="daily">删除</button></span></div>`).join('')}</div>` : '<p class="empty-hint">还没有日常记录，点下方按钮录入第一条。</p>';
+  openModal(`${modalHead(`日常记录 · ${esc(member.name)}`, '任意健康指标 · 设备数据', '手动、语音、拍照、硬件四种通道的读数都按成员归属；指标可自由增删改，这些数据和体检单一起构成数据看板。')}
     ${body}
     <button class="primary-button" data-member-reading="${member.id}">＋ 录入读数（手动 / 语音 / 拍照 / 硬件）</button>
-    <p class="privacy-small">正式版中血压计、血糖仪、手表各自通过厂商接口接入，数据自动归到对应家庭成员名下。</p>`);
+    <p class="privacy-small">正式版中血糖仪、血压计、体温计、手表各自通过厂商接口接入，数据自动归到对应家庭成员名下。</p>`);
 }
 
 function navigate(tab) {
@@ -1577,14 +1689,20 @@ document.addEventListener('click', async event => {
     return;
   }
   const histEdit = event.target.closest('[data-hist-edit]');
-  if (histEdit) { showHistEdit(histEdit.dataset.histEdit); return; }
+  if (histEdit) { histEditContext = histEdit.dataset.editContext || 'dashboard'; showHistEdit(histEdit.dataset.histEdit); return; }
   const histDel = event.target.closest('[data-hist-del]');
   if (histDel) {
     const entry = (state.bodyMetrics || []).find(item => item.id === histDel.dataset.histDel);
     if (entry) {
-      state.bodyMetrics = state.bodyMetrics.filter(item => item.id !== entry.id);
-      saveState(); renderHealth(); showMemberDashboard(entry.memberId);
-      toast(`已删除 ${entry.metric} 记录（${formatDate(entry.date)}）；如误删可重新导入体检单`);
+      let removed = [entry.id];
+      /* 日常记录里血压成对展示：删除收缩压时把同时刻的舒张压一并删除 */
+      if (histDel.dataset.editContext === 'daily' && entry.metric === '收缩压') {
+        state.bodyMetrics.filter(item => item.memberId === entry.memberId && item.metric === '舒张压' && item.date === entry.date && (item.time || '') === (entry.time || '')).forEach(item => removed.push(item.id));
+      }
+      state.bodyMetrics = state.bodyMetrics.filter(item => !removed.includes(item.id));
+      saveState(); renderHealth();
+      if (histDel.dataset.editContext === 'daily') { showDailyLog(entry.memberId); } else { showMemberDashboard(entry.memberId); }
+      toast(`已删除 ${entry.metric} 记录（${formatDate(entry.date)}）`);
     }
     return;
   }
