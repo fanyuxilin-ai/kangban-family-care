@@ -67,14 +67,27 @@ jobs:
           <body><main>
             <div class="eyebrow">KANGBAN · PREVIEW</div>
             <h1>康伴分支预览</h1>
-            <p>选择一个版本查看。每个版本独立保存演示数据，分支更新后会自动刷新预览。</p>
+            <p>选择一个版本查看。分支更新后，预览会自动刷新。</p>
             <ul>
               <li><a href="main/"><span>主线版本<small>main</small></span><span>打开 →</span></a></li>
               <li><a href="family-tab-restructure/"><span>家庭端改版<small>feat/family-tab-restructure</small></span><span>打开 →</span></a></li>
               <li><a href="family-member-management/"><span>我的改动<small>feat/family-member-management</small></span><span>打开 →</span></a></li>
             </ul>
-          </main></body></html>
+          </main>
+          <script>if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).catch(()=>{});</script>
+          </body></html>
           HTML
+          cat > _site/service-worker.js <<'WORKER'
+          self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
+          self.addEventListener('activate', event => {
+            event.waitUntil((async () => {
+              const keys = await caches.keys();
+              await Promise.all(keys.map(key => caches.delete(key)));
+              await self.registration.unregister();
+              await self.clients.claim();
+            })());
+          });
+          WORKER
           touch _site/.nojekyll
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
