@@ -111,7 +111,20 @@ nav[hidden]{display:none!important}
 .member-archive-body{padding:2px 14px 13px;border-top:1px solid #f0efe9}
 .member-archive-body .info-grid{margin-top:11px}
 .member-archive-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:11px}
+.member-archive-actions.member-archive-actions-3{grid-template-columns:1fr 1fr 1fr}
 .member-archive-actions .primary-button,.member-archive-actions .secondary-button{margin:0;height:42px;font-size:10px}
+/* 成员卡内 · 日常记录（读数按成员归属） */
+.member-daily{margin-top:13px;border-top:1px solid #f0efe9;padding-top:6px}
+.member-daily-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0 2px}
+.member-daily-head .text-button{font-size:9px;flex:none}
+.member-daily .reading-row{padding:8px 2px}
+.member-board-link{display:block;width:100%;text-align:right;margin-top:7px;font-size:9px;color:#5c7663}
+/* 手动录入 · 一句话 + AI 识别 */
+.ai-parse-block{margin-bottom:11px}
+.ai-parse-block>strong{display:block;font-size:11px;color:#445449;margin-bottom:9px}
+.ai-parse-row{display:flex;gap:8px;margin-bottom:9px}
+.ai-parse-row .input-field{flex:1;min-width:0}
+.ai-parse-row .secondary-button{flex:none;margin:0;white-space:nowrap;height:40px}
 .member-edit-form{display:flex;flex-direction:column;gap:11px;margin-top:2px}
 .board-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:13px}
 .board-stats>div{background:#f4f6f0;border-radius:11px;padding:10px 8px;display:flex;flex-direction:column;gap:4px;text-align:left}

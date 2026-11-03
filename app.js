@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'kangban-demo-v3';
+const STORAGE_KEY = 'kangban-demo-v4';
 function dateOffset(days) {
   const date = new Date(); date.setHours(12,0,0,0); date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -29,9 +29,11 @@ const seed = {
   voiceNote: '',
   nextRecordId: 5,
   healthReadings: [
-    { id: 'bp-seed-2', date: dateOffset(-2), time: '08:10', systolic: 152, diastolic: 94, pulse: 78, source: '手动录入' },
-    { id: 'bp-seed-1', date: dateOffset(-1), time: '08:05', systolic: 149, diastolic: 93, pulse: 76, source: '模拟手表' },
-    { id: 'bp-seed-0', date: dateOffset(0), time: '07:50', systolic: 166, diastolic: 102, pulse: 88, source: '模拟手表' }
+    { id: 'bp-seed-2', memberId: 'm1', date: dateOffset(-2), time: '08:10', systolic: 152, diastolic: 94, pulse: 78, source: '手动录入' },
+    { id: 'bp-seed-1', memberId: 'm1', date: dateOffset(-1), time: '08:05', systolic: 149, diastolic: 93, pulse: 76, source: '模拟手表' },
+    { id: 'bp-seed-0', memberId: 'm1', date: dateOffset(0), time: '07:50', systolic: 166, diastolic: 102, pulse: 88, source: '模拟手表' },
+    { id: 'bp-seed-m2-1', memberId: 'm2', date: dateOffset(-3), time: '09:15', systolic: 148, diastolic: 91, pulse: 74, source: '欧姆龙血压计' },
+    { id: 'bp-seed-m2-0', memberId: 'm2', date: dateOffset(0), time: '08:20', systolic: 158, diastolic: 96, pulse: 80, source: '模拟手表' }
   ],
   alerts: [],
   missedAlerts: {},
@@ -45,7 +47,7 @@ const seed = {
     { id: 'm4', name: '周晓东', role: '儿子', age: 42, conditions: '高血脂 · 超重', allergies: '无已知过敏', medications: '阿托伐他汀 20mg · 每晚一次', surgeries: '无记录', avatarClass: 'member-avatar-4' }
   ],
   currentMemberId: 'm1',
-  nextMetricId: 22,
+  nextMetricId: 32,
   metricDefs: {},
   bodyMetrics: [
     { id: 'bm-1', memberId: 'm1', metric: '体重', value: 58.4, unit: 'kg', date: dateOffset(-20) },
@@ -68,7 +70,18 @@ const seed = {
     { id: 'bm-18', memberId: 'm4', metric: '总胆固醇', value: 5.9, unit: 'mmol/L', date: dateOffset(-20) },
     { id: 'bm-19', memberId: 'm4', metric: '总胆固醇', value: 6.1, unit: 'mmol/L', date: dateOffset(-4) },
     { id: 'bm-20', memberId: 'm4', metric: '体重', value: 74.5, unit: 'kg', date: dateOffset(-12) },
-    { id: 'bm-21', memberId: 'm4', metric: 'BMI', value: 25.4, unit: '', date: dateOffset(-12) }
+    { id: 'bm-21', memberId: 'm4', metric: 'BMI', value: 25.4, unit: '', date: dateOffset(-12) },
+    /* 日常记录（血压计/手表）同步进看板的血压指标 */
+    { id: 'bm-22', memberId: 'm1', metric: '收缩压', value: 152, unit: 'mmHg', date: dateOffset(-2), source: '手动录入' },
+    { id: 'bm-23', memberId: 'm1', metric: '舒张压', value: 94, unit: 'mmHg', date: dateOffset(-2), source: '手动录入' },
+    { id: 'bm-24', memberId: 'm1', metric: '收缩压', value: 149, unit: 'mmHg', date: dateOffset(-1), source: '模拟手表' },
+    { id: 'bm-25', memberId: 'm1', metric: '舒张压', value: 93, unit: 'mmHg', date: dateOffset(-1), source: '模拟手表' },
+    { id: 'bm-26', memberId: 'm1', metric: '收缩压', value: 166, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' },
+    { id: 'bm-27', memberId: 'm1', metric: '舒张压', value: 102, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' },
+    { id: 'bm-28', memberId: 'm2', metric: '收缩压', value: 148, unit: 'mmHg', date: dateOffset(-3), source: '欧姆龙血压计' },
+    { id: 'bm-29', memberId: 'm2', metric: '舒张压', value: 91, unit: 'mmHg', date: dateOffset(-3), source: '欧姆龙血压计' },
+    { id: 'bm-30', memberId: 'm2', metric: '收缩压', value: 158, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' },
+    { id: 'bm-31', memberId: 'm2', metric: '舒张压', value: 96, unit: 'mmHg', date: dateOffset(0), source: '模拟手表' }
   ]
 };
 let state = loadState();
@@ -103,7 +116,7 @@ function loadState() {
     loaded.familyMembers = saved.familyMembers || structuredClone(seed.familyMembers);
     loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
     loaded.currentMemberId = saved.currentMemberId || 'm1';
-    loaded.nextMetricId = saved.nextMetricId || 22;
+    loaded.nextMetricId = saved.nextMetricId || 32;
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
@@ -264,6 +277,16 @@ function renderHealth() {
       const trackingHtml = tracking.length
         ? `<div class="member-tracking"><span class="member-tracking-title">异常指标跟踪</span>${tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}</div>`
         : `<p class="member-tracking-empty">无异常指标，继续保持 ✓</p>`;
+      /* 日常记录：读数按成员归属（各设备接口各归各人），卡片内只看自己的数据 */
+      const readings = (state.healthReadings || []).filter(reading => reading.memberId === member.id).slice(0, 3);
+      const dailyHtml = `<div class="member-daily">
+          <div class="member-daily-head"><span class="member-tracking-title">日常记录 · 血压（${readings.length ? `最近 ${Math.min(readings.length, 3)} 条` : '暂无'}）</span><button class="text-button" data-member-reading="${member.id}">录入读数 →</button></div>
+          ${readings.length ? `<div class="reading-list">${readings.map(r => {
+            const result = evaluateReading(r);
+            return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
+          }).join('')}</div>` : `<p class="member-tracking-empty">还没有日常读数，点右上「录入读数」试试。</p>`}
+          <button class="text-button member-board-link" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单） →</button>
+        </div>`;
       return `<article class="member-archive ${open ? 'is-open' : ''}">
         <button class="member-archive-head" data-member-toggle="${member.id}" aria-expanded="${open}">
           <span class="member-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span>
@@ -278,23 +301,15 @@ function renderHealth() {
             <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
           </div>
           ${trackingHtml}
-          <div class="member-archive-actions">
+          ${dailyHtml}
+          <div class="member-archive-actions member-archive-actions-3">
             <button class="secondary-button" data-member-edit="${member.id}">编辑档案</button>
-            <button class="primary-button" data-member-dashboard="${member.id}">体检看板 →</button>
+            <button class="secondary-button" data-member-daily="${member.id}">日常记录</button>
+            <button class="primary-button" data-checkup-import="${member.id}">导入体检单</button>
           </div>
         </div>` : ''}
       </article>`;
     }).join('');
-  }
-  const member = currentMember();
-  const isM1 = member?.id === 'm1';
-  const readings = isM1 ? (state.healthReadings || []) : [];
-  const listHost = document.getElementById('healthReadingsList');
-  if (listHost) {
-    listHost.innerHTML = readings.length ? `<div class="reading-list">${readings.slice(0, 6).map(r => {
-      const result = evaluateReading(r);
-      return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
-    }).join('')}</div>` : `<p class="empty-hint">${esc(member?.name || '该成员')}还没有血压记录，可到预警中心录入或导入体检单。</p>`;
   }
 }
 
@@ -357,7 +372,7 @@ function showMemberDashboard(memberId, metric = '') {
   const tracking = latestAbnormal(memberId);
   const abnormalCount = tracking.length; // 口径与跟踪区一致：每个指标只看最新一次读数
   const filter = dashboardFilter[memberId] || 'day';
-  openModal(`${modalHead('体检看板 · 模拟数据', `${esc(member.name)} · ${esc(member.role)} ${member.age}岁`, '身体指标统计、趋势、化验报告整理与跟踪。点右上角可切换指标，底部可导入模拟体检单。')}
+  openModal(`${modalHead('数据看板 · 日常记录 + 体检单', `${esc(member.name)} · ${esc(member.role)} ${member.age}岁`, '汇总「日常记录」和「导入体检单」两个来源的数据：身体指标统计、趋势、化验报告整理与跟踪。点右上角可切换指标，底部可导入模拟体检单。')}
     <div class="board-stats">
       <div><span>最近体重</span><strong>${lastWeight ? `${lastWeight.value} kg` : '—'}</strong><small>最近一次</small></div>
       <div><span>体重变化</span><strong>${change === null ? '—' : `${change > 0 ? '↑' : change < 0 ? '↓' : '—'}${Math.abs(change)} kg`}</strong><small>记录两次后显示</small></div>
@@ -829,30 +844,53 @@ function showAlertCenter() {
       <p class="privacy-small">录入后由规则引擎自动评估并分级告知；也可在硬件同步里模拟手表读数与跌倒事件。</p>
     </div>`);
 }
-/* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件） ============ */
+/* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件，读数按成员归属） ============ */
+let readingMemberId = 'm1';   // 当前录入读数的目标成员（设备数据各归各人）
 const READING_METHODS = [
-  { id: 'manual', icon: '✍️', label: '手动录入', hint: '直接填写血压 / 脉搏数值' },
+  { id: 'manual', icon: '✍️', label: '手动录入', hint: '一句话描述读数，AI 识别后回填核对' },
   { id: 'voice', icon: '🎙', label: '语音录入', hint: '老人说一句话，自动转成读数' },
   { id: 'photo', icon: '📷', label: '拍照识别', hint: '拍血压计 / 血糖仪，OCR 读数' },
   { id: 'device', icon: '⌚', label: '硬件同步', hint: '智能手表自动同步与异常上报' }
 ];
-function showReadingEntry() {
-  const member = currentMember();
+/* 一句话 → 结构化读数（演示版本地解析；正式版由大模型做意图抽取） */
+function parseReadingText(text) {
+  const flat = String(text || '').replace(/[，,。;；！？]/g, ' ');
+  const result = {};
+  const slash = flat.match(/(?:血压)?\s*(\d{2,3})\s*[\/／|到\-~]\s*(\d{2,3})/);
+  const spoken = slash ? null : flat.match(/血压[^\d]{0,4}(\d{2,3})\s+(\d{2,3})/);
+  const bp = slash || spoken;
+  if (bp) { result.systolic = Number(bp[1]); result.diastolic = Number(bp[2]); }
+  const pulse = flat.match(/(?:脉搏|心率|pulse)\D{0,4}(\d{2,3})/i);
+  if (pulse) result.pulse = Number(pulse[1]);
+  return result.systolic && result.diastolic ? result : null;
+}
+function showReadingEntry(memberId) {
+  const member = state.familyMembers.find(item => item.id === memberId) || currentMember();
+  if (!member) return;
+  readingMemberId = member.id;
   const method = READING_METHODS.some(item => item.id === readingMethod) ? readingMethod : 'manual';
   const chips = READING_METHODS.map(item => `<button class="metric-chip ${item.id === method ? 'selected' : ''}" data-reading-method="${item.id}">${item.icon} ${item.label}</button>`).join('');
   const captureForm = `<div class="reading-form">
-      <strong>确认读数（来源：${esc(readingSource)}）</strong>
+      <strong>确认 ${esc(member.name)} 的读数（来源：${esc(readingSource)}）</strong>
       <div class="reading-inputs">
         <label><span>收缩压</span><input class="input-field" id="readingSystolic" type="number" min="60" max="260" placeholder="mmHg" /></label>
         <label><span>舒张压</span><input class="input-field" id="readingDiastolic" type="number" min="40" max="160" placeholder="mmHg" /></label>
         <label><span>脉搏</span><input class="input-field" id="readingPulse" type="number" min="30" max="220" placeholder="次/分" /></label>
       </div>
-      <button class="primary-button" id="saveReading">保存并评估</button>
-      <p class="privacy-small">保存后由规则引擎自动评估：≥160/100 黄色预警、≥180/110 红色预警，并按级别分级告知家人。</p>
+      <button class="primary-button" id="saveReading">核对无误，保存并评估</button>
+      <p class="privacy-small">读数会记到 ${esc(member.name)} 名下并同步进数据看板；保存后由规则引擎自动评估：≥160/100 黄色预警、≥180/110 红色预警，并按级别分级告知家人。</p>
     </div>`;
   let capture = '';
   if (method === 'manual') {
-    capture = captureForm;
+    capture = `<div class="ai-parse-block">
+      <strong>手动录入 · 一句话 + AI 识别</strong>
+      <div class="ai-parse-row">
+        <input class="input-field" id="manualText" placeholder="例：今天早上血压 152/94，脉搏 78" />
+        <button class="secondary-button" id="aiParseReading">✳ AI 识别</button>
+      </div>
+      <div class="entry-result" id="aiParseResult" hidden></div>
+      ${captureForm}
+    </div>`;
   } else if (method === 'voice') {
     capture = `<div class="entry-capture-card">
         <div class="entry-capture-icon">🎙</div>
@@ -884,7 +922,7 @@ function showReadingEntry() {
       </div>`;
   }
   const activeHint = READING_METHODS.find(item => item.id === method)?.hint || '';
-  openModal(`${modalHead(`日常记录 · ${esc(member?.name || '')}`, '录入读数', '支持手动、语音、拍照与硬件同步四种方式，录入后自动进入健康趋势、体检看板与预警评估。')}
+  openModal(`${modalHead(`日常记录 · ${esc(member.name)}`, '录入读数', `支持手动、语音、拍照与硬件同步四种方式，读数记到 ${esc(member.name)} 名下（各设备接口各归各人），录入后自动进入数据看板与预警评估。`)}
     <div class="metric-chips entry-method-chips">${chips}</div>
     <p class="privacy-small entry-hint">${esc(activeHint)}</p>
     ${capture}`);
@@ -893,11 +931,27 @@ function showReadingEntry() {
     document.getElementById('readingDiastolic').value = values[1];
     document.getElementById('readingPulse').value = values[2];
   };
+  document.getElementById('aiParseReading')?.addEventListener('click', () => {
+    const text = document.getElementById('manualText')?.value || '';
+    if (!text.trim()) { toast('先输入一句读数描述，再点 AI 识别'); return; }
+    const parsed = parseReadingText(text);
+    const result = document.getElementById('aiParseResult');
+    if (!parsed) {
+      if (result) { result.hidden = false; result.textContent = `没能从「${text.trim()}」里识别出血压读数，请按「血压 152/94，脉搏 78」的格式描述，或直接在下方填写。`; }
+      return;
+    }
+    fillForm([parsed.systolic, parsed.diastolic, parsed.pulse || '']);
+    if (result) {
+      result.hidden = false;
+      result.textContent = `AI 识别结果：收缩压 ${parsed.systolic} / 舒张压 ${parsed.diastolic}${parsed.pulse ? ` · 脉搏 ${parsed.pulse} 次/分` : '（未提及脉搏）'}，已填入下方表单，请核对后保存。`;
+    }
+    toast('AI 识别完成，请在下方核对');
+  });
   document.getElementById('voiceMock')?.addEventListener('click', () => {
     const result = document.getElementById('voiceResult');
     if (result) { result.hidden = false; result.textContent = '“女儿，我刚量了血压，152 94，脉搏 78。” → 识别为血压读数，已填入下方表单'; }
     readingSource = '语音录入';
-    document.querySelector('.reading-form strong').textContent = '确认读数（来源：语音录入）';
+    document.querySelector('.reading-form strong').textContent = `确认 ${esc(member.name)} 的读数（来源：语音录入）`;
     fillForm([152, 94, 78]);
     toast('语音识别完成，请在下方核对');
   });
@@ -905,14 +959,14 @@ function showReadingEntry() {
     const result = document.getElementById('photoResult');
     if (result) { result.hidden = false; result.textContent = '识别结果：收缩压 146 / 舒张压 92 · 脉搏 78（置信度 96%），已填入下方表单'; }
     readingSource = '拍照识别';
-    document.querySelector('.reading-form strong').textContent = '确认读数（来源：拍照识别）';
+    document.querySelector('.reading-form strong').textContent = `确认 ${esc(member.name)} 的读数（来源：拍照识别）`;
     fillForm([146, 92, 78]);
     toast('识别完成，请在下方核对');
   });
   document.getElementById('mockWatchSync')?.addEventListener('click', () => {
     const pool = [ [128, 82, 72], [146, 92, 78], [168, 104, 86], [122, 80, 70] ];
     const [sys, dia, pulse] = pool[Math.floor(Math.random() * pool.length)];
-    saveReading({ systolic: sys, diastolic: dia, pulse, source: '模拟手表' });
+    saveReading({ memberId: readingMemberId, systolic: sys, diastolic: dia, pulse, source: '模拟手表' });
   });
   document.getElementById('mockFallEvent')?.addEventListener('click', () => {
     createAlert('red', '疑似跌倒事件', `模拟手表上报一次疑似跌倒（${nowLabel()}），设备定位：家中客厅（演示数据）。请立即联系妈妈确认情况，必要时就医。`, '模拟手表 · 跌倒监测');
@@ -924,19 +978,39 @@ function showReadingEntry() {
     const diastolic = Number(document.getElementById('readingDiastolic')?.value);
     const pulse = Number(document.getElementById('readingPulse')?.value) || 0;
     if (!systolic || !diastolic) { toast('请先填写收缩压和舒张压'); return; }
-    saveReading({ systolic, diastolic, pulse, source: readingSource });
+    saveReading({ memberId: readingMemberId, systolic, diastolic, pulse, source: readingSource });
   });
 }
 function saveReading(reading) {
-  const entry = { id: `bp-${state.nextReadingId++}`, date: dateOffset(0), time: nowLabel().split(' ')[1], ...reading };
+  const memberId = reading.memberId || currentMember()?.id || 'm1';
+  const member = state.familyMembers.find(item => item.id === memberId);
+  const entry = { id: `bp-${state.nextReadingId++}`, memberId, date: dateOffset(0), time: nowLabel().split(' ')[1], ...reading, memberId };
   state.healthReadings.unshift(entry);
+  /* 日常记录同步进数据看板：血压作为 收缩压/舒张压 指标入池，与体检单数据同源展示 */
+  [['收缩压', entry.systolic], ['舒张压', entry.diastolic]].forEach(([metric, value]) => {
+    state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric, value, unit: 'mmHg', date: entry.date, source: entry.source });
+  });
   const result = evaluateReading(entry);
-  let message = '读数正常，未触发预警';
+  let message = `${member?.name || '家人'} 的读数已保存，未触发预警`;
   if (result) {
     createAlert(result.level, result.title, result.detail, `${entry.source} · 血压 ${entry.systolic}/${entry.diastolic}`);
-    message = `已触发${ALERT_META[result.level].label}预警并完成分级告知`;
+    message = `${member?.name || '家人'} 的读数已触发${ALERT_META[result.level].label}预警并完成分级告知`;
   }
-  saveState(); renderHomeAlerts(); closeModal(); toast(message);
+  saveState(); renderHomeAlerts(); renderHealth(); closeModal(); toast(message);
+}
+/* 日常记录弹窗：某个成员的完整日常读数列表 */
+function showDailyLog(memberId) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  if (!member) return;
+  const readings = (state.healthReadings || []).filter(reading => reading.memberId === memberId);
+  const body = readings.length ? `<div class="reading-list">${readings.map(r => {
+    const result = evaluateReading(r);
+    return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
+  }).join('')}</div>` : '<p class="empty-hint">还没有日常读数，点下方按钮录入第一条。</p>';
+  openModal(`${modalHead(`日常记录 · ${esc(member.name)}`, '血压与设备数据', '手动、语音、拍照、硬件四种通道的读数都按成员归属；这些数据和体检单一起构成数据看板。')}
+    ${body}
+    <button class="primary-button" data-member-reading="${member.id}">＋ 录入读数（手动 / 语音 / 拍照 / 硬件）</button>
+    <p class="privacy-small">正式版中血压计、血糖仪、手表各自通过厂商接口接入，数据自动归到对应家庭成员名下。</p>`);
 }
 
 function navigate(tab) {
@@ -1472,6 +1546,10 @@ document.addEventListener('click', async event => {
   }
   const memberEditButton = event.target.closest('[data-member-edit]');
   if (memberEditButton) { showMemberEdit(memberEditButton.dataset.memberEdit); return; }
+  const memberReadingButton = event.target.closest('[data-member-reading]');
+  if (memberReadingButton) { showReadingEntry(memberReadingButton.dataset.memberReading); return; }
+  const memberDailyButton = event.target.closest('[data-member-daily]');
+  if (memberDailyButton) { showDailyLog(memberDailyButton.dataset.memberDaily); return; }
   const dashboardButton = event.target.closest('[data-member-dashboard]');
   if (dashboardButton) { showMemberDashboard(dashboardButton.dataset.memberDashboard); return; }
   const metricChip = event.target.closest('[data-metric-chip]');
