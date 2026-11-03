@@ -37,7 +37,38 @@ const seed = {
   missedAlerts: {},
   nextAlertId: 1,
   nextReadingId: 1,
-  alertsSeeded: false
+  alertsSeeded: false,
+  familyMembers: [
+    { id: 'm1', name: '陈兰英', role: '母亲', age: 68, conditions: '高血压', allergies: '青霉素', medications: '氨氯地平 5mg · 每日一次；阿司匹林 100mg · 每日一次', surgeries: '无记录', avatarClass: 'member-avatar-1' },
+    { id: 'm2', name: '周建国', role: '父亲', age: 71, conditions: '2型糖尿病 · 高血压', allergies: '无已知过敏', medications: '二甲双胍 0.5g · 每日两次', surgeries: '2019年 白内障手术', avatarClass: 'member-avatar-2' },
+    { id: 'm3', name: '周晓林', role: '女儿', age: 38, conditions: '无慢性病', allergies: '花粉过敏', medications: '无需长期用药', surgeries: '无记录', avatarClass: 'member-avatar-3' },
+    { id: 'm4', name: '周晓东', role: '儿子', age: 42, conditions: '高血脂 · 超重', allergies: '无已知过敏', medications: '阿托伐他汀 20mg · 每晚一次', surgeries: '无记录', avatarClass: 'member-avatar-4' }
+  ],
+  currentMemberId: 'm1',
+  nextMetricId: 22,
+  bodyMetrics: [
+    { id: 'bm-1', memberId: 'm1', metric: '体重', value: 58.4, unit: 'kg', date: dateOffset(-20) },
+    { id: 'bm-2', memberId: 'm1', metric: 'BMI', value: 23.1, unit: '', date: dateOffset(-20) },
+    { id: 'bm-3', memberId: 'm1', metric: '体重', value: 59.1, unit: 'kg', date: dateOffset(-10) },
+    { id: 'bm-4', memberId: 'm1', metric: 'BMI', value: 23.4, unit: '', date: dateOffset(-10) },
+    { id: 'bm-5', memberId: 'm1', metric: '空腹血糖', value: 5.4, unit: 'mmol/L', date: dateOffset(-18) },
+    { id: 'bm-6', memberId: 'm1', metric: '空腹血糖', value: 5.8, unit: 'mmol/L', date: dateOffset(-8) },
+    { id: 'bm-7', memberId: 'm1', metric: '空腹血糖', value: 6.4, unit: 'mmol/L', date: dateOffset(-2) },
+    { id: 'bm-8', memberId: 'm1', metric: '总胆固醇', value: 5.1, unit: 'mmol/L', date: dateOffset(-30) },
+    { id: 'bm-9', memberId: 'm1', metric: '总胆固醇', value: 5.5, unit: 'mmol/L', date: dateOffset(-6) },
+    { id: 'bm-10', memberId: 'm2', metric: '空腹血糖', value: 7.6, unit: 'mmol/L', date: dateOffset(-15) },
+    { id: 'bm-11', memberId: 'm2', metric: '空腹血糖', value: 8.2, unit: 'mmol/L', date: dateOffset(-4) },
+    { id: 'bm-12', memberId: 'm2', metric: '收缩压', value: 146, unit: 'mmHg', date: dateOffset(-7) },
+    { id: 'bm-13', memberId: 'm2', metric: '收缩压', value: 138, unit: 'mmHg', date: dateOffset(-1) },
+    { id: 'bm-14', memberId: 'm2', metric: '尿酸', value: 468, unit: 'μmol/L', date: dateOffset(-9) },
+    { id: 'bm-15', memberId: 'm3', metric: '体重', value: 52.0, unit: 'kg', date: dateOffset(-14) },
+    { id: 'bm-16', memberId: 'm3', metric: 'BMI', value: 20.1, unit: '', date: dateOffset(-14) },
+    { id: 'bm-17', memberId: 'm3', metric: '体重', value: 52.3, unit: 'kg', date: dateOffset(-2) },
+    { id: 'bm-18', memberId: 'm4', metric: '总胆固醇', value: 5.9, unit: 'mmol/L', date: dateOffset(-20) },
+    { id: 'bm-19', memberId: 'm4', metric: '总胆固醇', value: 6.1, unit: 'mmol/L', date: dateOffset(-4) },
+    { id: 'bm-20', memberId: 'm4', metric: '体重', value: 74.5, unit: 'kg', date: dateOffset(-12) },
+    { id: 'bm-21', memberId: 'm4', metric: 'BMI', value: 25.4, unit: '', date: dateOffset(-12) }
+  ]
 };
 let state = loadState();
 let currentTab = 'home';
@@ -67,6 +98,10 @@ function loadState() {
       reviews: order.reviews || { family: null, escort: null }
     }));
     loaded.healthReadings = saved.healthReadings || structuredClone(seed.healthReadings);
+    loaded.familyMembers = saved.familyMembers || structuredClone(seed.familyMembers);
+    loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
+    loaded.currentMemberId = saved.currentMemberId || 'm1';
+    loaded.nextMetricId = saved.nextMetricId || 22;
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
@@ -151,15 +186,88 @@ function renderRecords() {
   renderCompanionViews();
 }
 
-/* ============ 健康档案 Tab（FR-01：档案 · 日常记录 · 趋势） ============ */
+/* ============ 健康档案 Tab（FR-01：模拟账号 · 四人档案 · 体检看板） ============ */
+const METRIC_DEFS = {
+  '体重': { unit: 'kg' },
+  'BMI': { unit: '', low: 18.5, high: 24 },
+  '空腹血糖': { unit: 'mmol/L', low: 3.9, high: 6.1 },
+  '收缩压': { unit: 'mmHg', low: 90, high: 139 },
+  '舒张压': { unit: 'mmHg', low: 60, high: 89 },
+  '总胆固醇': { unit: 'mmol/L', high: 5.2 },
+  '尿酸': { unit: 'μmol/L', low: 208, high: 428 }
+};
+function currentMember() {
+  return (state.familyMembers || []).find(member => member.id === state.currentMemberId) || (state.familyMembers || [])[0];
+}
+function metricStatus(metric, value) {
+  const def = METRIC_DEFS[metric];
+  if (!def || (def.low == null && def.high == null)) return 'normal';
+  if (def.high != null && value > def.high) return 'high';
+  if (def.low != null && value < def.low) return 'low';
+  return 'normal';
+}
+function refText(metric) {
+  const def = METRIC_DEFS[metric] || {};
+  if (def.low != null && def.high != null) return `参考 ${def.low} – ${def.high} ${def.unit || ''}`.trim();
+  if (def.high != null) return `参考 < ${def.high} ${def.unit || ''}`.trim();
+  return '无固定参考范围';
+}
+function statusLabelOf(value, metric) {
+  const status = metricStatus(metric, value);
+  return { normal: '正常', high: '偏高', low: '偏低' }[status];
+}
+function statusTagOf(value, metric) {
+  const status = metricStatus(metric, value);
+  return status === 'normal' ? 'reading-tag-ok' : status === 'high' ? 'reading-tag-yellow' : 'reading-tag-blue';
+}
+function memberMetricEntries(memberId) {
+  return (state.bodyMetrics || []).filter(entry => entry.memberId === memberId);
+}
+function latestAbnormal(memberId) {
+  const byMetric = {};
+  memberMetricEntries(memberId).slice().sort((a, b) => a.date.localeCompare(b.date)).forEach(entry => { byMetric[entry.metric] = entry; });
+  return Object.values(byMetric).filter(entry => metricStatus(entry.metric, entry.value) !== 'normal');
+}
+const expandedMembers = new Set(['m1']);
+let dashboardMetric = {};
+
 function renderHealth() {
-  const readings = state.healthReadings || [];
+  const host = document.getElementById('memberArchiveList');
+  if (host) {
+    host.innerHTML = state.familyMembers.map(member => {
+      const open = expandedMembers.has(member.id);
+      const entries = memberMetricEntries(member.id);
+      const abnormal = latestAbnormal(member.id).length;
+      return `<article class="member-archive ${open ? 'is-open' : ''}">
+        <button class="member-archive-head" data-member-toggle="${member.id}" aria-expanded="${open}">
+          <span class="member-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span>
+          <div class="member-archive-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age}岁 · ${entries.length} 条指标${abnormal ? ` · <b class="member-alert-count">${abnormal} 项异常跟踪</b>` : ' · 无异常'}</small></div>
+          <span class="member-chevron">${open ? '⌃' : '⌄'}</span>
+        </button>
+        ${open ? `<div class="member-archive-body">
+          <div class="info-grid">
+            <div><span class="field-label">慢病</span><strong>${esc(member.conditions)}</strong></div>
+            <div><span class="field-label">过敏史</span><strong class="${/无/.test(member.allergies) ? '' : 'alert-text'}">${esc(member.allergies)}</strong></div>
+            <div><span class="field-label">长期用药</span><strong>${esc(member.medications)}</strong></div>
+            <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
+          </div>
+          <div class="member-archive-actions">
+            <button class="secondary-button" data-member-edit="${member.id}">编辑档案</button>
+            <button class="primary-button" data-member-dashboard="${member.id}">体检看板 →</button>
+          </div>
+        </div>` : ''}
+      </article>`;
+    }).join('');
+  }
+  const member = currentMember();
+  const isM1 = member?.id === 'm1';
+  const readings = isM1 ? (state.healthReadings || []) : [];
   const listHost = document.getElementById('healthReadingsList');
   if (listHost) {
     listHost.innerHTML = readings.length ? `<div class="reading-list">${readings.slice(0, 6).map(r => {
       const result = evaluateReading(r);
       return `<div class="reading-row"><div class="reading-copy"><strong>${r.systolic}/${r.diastolic} <small>mmHg</small></strong><small>${formatDate(r.date)} ${esc(r.time || '')} · 脉搏 ${r.pulse || '—'} 次/分 · ${esc(r.source || '手动录入')}</small></div><span class="reading-tag ${result ? `reading-tag-${result.level}` : 'reading-tag-ok'}">${result ? ALERT_META[result.level].label : '正常'}</span></div>`;
-    }).join('')}${readings.length > 6 ? `<p class="privacy-small" style="text-align:center">仅显示最近 6 条，完整记录见预警中心。</p>` : ''}</div>` : '<p class="empty-hint">还没有血压记录，点右上角「录入读数」添加一条。</p>';
+    }).join('')}</div>` : `<p class="empty-hint">${esc(member?.name || '该成员')}还没有血压记录，可到预警中心录入或导入体检单。</p>`;
   }
   const trendHost = document.getElementById('healthTrend');
   if (trendHost) {
@@ -168,12 +276,137 @@ function renderHealth() {
     const sys = avg(week.map(r => r.systolic)); const dia = avg(week.map(r => r.diastolic));
     const highs = week.filter(r => r.systolic >= 140 || r.diastolic >= 90).length;
     trendHost.innerHTML = `<div class="trend-card">
-      <div class="trend-row"><span class="field-label">近 7 天平均血压</span><strong>${sys ? `${sys}/${dia} mmHg` : '暂无数据'}</strong></div>
+      <div class="trend-row"><span class="field-label">${esc(member?.name || '')} 近 7 天平均血压</span><strong>${sys ? `${sys}/${dia} mmHg` : '暂无数据'}</strong></div>
       <div class="trend-row"><span class="field-label">超标次数（≥140/90）</span><strong class="${highs ? 'trend-warn' : 'trend-ok'}">${highs} 次</strong></div>
       <div class="trend-row"><span class="field-label">本周记录</span><strong>${week.length} 条</strong></div>
       <p class="privacy-small">演示版为固定统计；正式版的周报 / 月报由 AI 管理助手生成子女可读摘要。</p>
     </div>`;
   }
+}
+
+function showMemberEdit(memberId) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  if (!member) return;
+  openModal(`${modalHead('健康档案 · 家庭可编辑', `编辑 ${esc(member.name)} 的档案`, '家庭成员间信息互通（家庭无隐私原则），修改保存后所有家人可见。')}
+    <form class="member-edit-form" id="memberEditForm" data-member-id="${member.id}">
+      <label><span class="field-label-block">慢病情况</span><input class="input-field" name="conditions" value="${esc(member.conditions)}" /></label>
+      <label><span class="field-label-block">过敏史</span><input class="input-field" name="allergies" value="${esc(member.allergies)}" /></label>
+      <label><span class="field-label-block">长期用药</span><input class="input-field" name="medications" value="${esc(member.medications)}" /></label>
+      <label><span class="field-label-block">手术史</span><input class="input-field" name="surgeries" value="${esc(member.surgeries)}" /></label>
+      <button class="primary-button" type="submit">保存档案</button>
+    </form><p class="privacy-small">演示版保存在本机浏览器；正式版每次修改都会记录「谁 · 何时 · 改了什么」。</p>`);
+  document.getElementById('memberEditForm')?.addEventListener('submit', event => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    Object.assign(member, {
+      conditions: String(data.get('conditions') || '').trim(),
+      allergies: String(data.get('allergies') || '').trim(),
+      medications: String(data.get('medications') || '').trim(),
+      surgeries: String(data.get('surgeries') || '').trim()
+    });
+    state.shares.push({ who: `${member.name} 档案由家人更新`, when: nowLabel() });
+    saveState(); renderHealth(); closeModal();
+    toast(`${member.name} 的档案已更新，家人端同步可见`);
+  });
+}
+
+function trendSvg(entries, metric) {
+  if (entries.length < 2) return `<div class="trend-empty">「${esc(metric)}」记录两次后显示趋势图</div>`;
+  const vals = entries.map(entry => entry.value);
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max - min) || 1;
+  const w = 264, h = 100, padX = 16, top = 18, bottom = 28;
+  const pts = entries.map((entry, i) => [padX + i * (w - padX * 2) / (entries.length - 1), h - bottom - ((entry.value - min) / span) * (h - top - bottom)]);
+  const line = pts.map(point => point.map(n => n.toFixed(1)).join(',')).join(' ');
+  const dots = pts.map((point, i) => `<circle cx="${point[0].toFixed(1)}" cy="${point[1].toFixed(1)}" r="3" fill="#6d8f78" /><text x="${point[0].toFixed(1)}" y="${(point[1] - 8).toFixed(1)}" text-anchor="middle" class="trend-val">${entries[i].value}</text>`).join('');
+  const unit = METRIC_DEFS[metric]?.unit ? ` ${METRIC_DEFS[metric].unit}` : '';
+  return `<svg class="trend-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(metric)}趋势图">
+    <polyline points="${line}" fill="none" stroke="#6d8f78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    ${dots}
+    <text x="${padX}" y="${h - 8}" class="trend-date">${formatDate(entries[0].date)}</text>
+    <text x="${w - padX}" y="${h - 8}" text-anchor="end" class="trend-date">${formatDate(entries[entries.length - 1].date)}</text>
+  </svg><p class="privacy-small">${esc(metric)}：最低 ${min} · 最高 ${max}${unit}</p>`;
+}
+
+function showMemberDashboard(memberId, metric = '') {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  if (!member) return;
+  const entries = memberMetricEntries(memberId).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const metrics = [...new Set(entries.map(entry => entry.metric))];
+  const active = metric && metrics.includes(metric) ? metric : (dashboardMetric[memberId] && metrics.includes(dashboardMetric[memberId]) ? dashboardMetric[memberId] : metrics[0]);
+  if (active) dashboardMetric[memberId] = active;
+  const weightEntries = entries.filter(entry => entry.metric === '体重');
+  const lastWeight = weightEntries[weightEntries.length - 1];
+  const prevWeight = weightEntries[weightEntries.length - 2];
+  const change = lastWeight && prevWeight ? Number((lastWeight.value - prevWeight.value).toFixed(1)) : null;
+  const lastEntry = entries[entries.length - 1];
+  const tracking = latestAbnormal(memberId);
+  openModal(`${modalHead('体检看板 · 模拟数据', `${esc(member.name)} · ${esc(member.role)} ${member.age}岁`, '身体指标统计、趋势与异常跟踪。点右上角可切换指标，底部可导入模拟体检单。')}
+    <div class="board-stats">
+      <div><span>最近体重</span><strong>${lastWeight ? `${lastWeight.value} kg` : '—'}</strong><small>最近一次</small></div>
+      <div><span>体重变化</span><strong>${change === null ? '—' : `${change > 0 ? '↑' : change < 0 ? '↓' : '—'}${Math.abs(change)} kg`}</strong><small>记录两次后显示</small></div>
+      <div><span>记录次数</span><strong>${entries.length} 次</strong><small>身体指标跟踪</small></div>
+      <div><span>最近记录</span><strong>${lastEntry ? formatDate(lastEntry.date) : '—'}</strong><small>时间线共 ${entries.length} 条</small></div>
+    </div>
+    <div class="board-block">
+      <div class="board-block-head"><strong>📈 趋势图</strong></div>
+      <div class="metric-chips">${metrics.map(item => `<button class="metric-chip ${item === active ? 'selected' : ''}" data-metric-chip="${esc(item)}" data-member-id="${member.id}">${esc(item)}</button>`).join('')}</div>
+      ${active ? trendSvg(entries.filter(entry => entry.metric === active), active) : '<p class="empty-hint">还没有指标记录，先导入体检单。</p>'}
+    </div>
+    <div class="board-block">
+      <div class="board-block-head"><strong>🚨 异常指标 · 跟踪</strong></div>
+      ${tracking.length ? tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${refText(entry.metric)} · ${formatDate(entry.date)} 录入</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)} · 跟踪中</span></div>`).join('') : '<p class="empty-hint">当前没有异常指标，继续保持。</p>'}
+    </div>
+    <div class="board-block">
+      <div class="board-block-head"><strong>🗂 历史记录</strong><small>时间线 · 最近 8 条</small></div>
+      <div class="board-history">${entries.length ? entries.slice(-8).reverse().map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span></div>`).join('') : '<p class="empty-hint">还没有指标记录。</p>'}</div>
+    </div>
+    <button class="primary-button" data-checkup-import="${member.id}">＋ 导入体检单（模拟 OCR）</button>
+    <p class="privacy-small">演示版：体检单为模拟识别，数值可修改后入库；不做真实医疗判断。</p>`);
+}
+
+const CHECKUP_MOCKS = {
+  m1: [
+    { metric: '体重', value: 60.2, unit: 'kg' },
+    { metric: 'BMI', value: 23.9, unit: '' },
+    { metric: '空腹血糖', value: 6.8, unit: 'mmol/L' },
+    { metric: '总胆固醇', value: 5.6, unit: 'mmol/L' },
+    { metric: '尿酸', value: 452, unit: 'μmol/L' }
+  ]
+};
+function showCheckupImport(memberId) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  if (!member) return;
+  openModal(`${modalHead('导入体检单 · 模拟 OCR', `${esc(member.name)} 的体检报告`, '演示识别流程：识别体检单为结构化指标，人工核对后入库。正式版支持拍照 / PDF 上传。')}
+    <div class="checkup-photo">📋 体检报告影像件（模拟）<small>市第一人民医院健康体检中心 · 年度体检</small></div>
+    <button class="primary-button" id="checkupScan" data-member-id="${member.id}">开始识别（模拟 OCR）</button>
+    <p class="privacy-small">医生手写内容不保证识别率，识别结果必须人工核对后才会入库。</p>`);
+}
+function showCheckupConfirm(memberId) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  if (!member) return;
+  const rows = CHECKUP_MOCKS[memberId] || [
+    { metric: '体重', value: 65.0, unit: 'kg' },
+    { metric: 'BMI', value: 22.5, unit: '' },
+    { metric: '收缩压', value: 126, unit: 'mmHg' },
+    { metric: '舒张压', value: 78, unit: 'mmHg' }
+  ];
+  openModal(`${modalHead('导入体检单 · 核对入库', `识别到 ${rows.length} 项指标`, '已按参考范围自动标记状态。数值可直接修改，确认后入库并进入跟踪。')}
+    <div class="checkup-list">${rows.map((row, index) => `<label class="checkup-row"><span class="checkup-name">${esc(row.metric)}</span><input type="number" step="0.1" value="${row.value}" data-checkup-value="${index}" /><small>${esc(row.unit || '')} · ${refText(row.metric)}</small><span class="reading-tag ${statusTagOf(row.value, row.metric)}">${statusLabelOf(row.value, row.metric)}</span></label>`).join('')}</div>
+    <button class="primary-button" id="checkupConfirm" data-member-id="${member.id}">确认入库</button>
+    <p class="privacy-small">入库后异常指标自动进入「异常指标跟踪」，可在体检看板查看变化。</p>`);
+  document.getElementById('checkupConfirm')?.addEventListener('click', () => {
+    const edited = rows.map((row, index) => ({ ...row, value: Number(document.querySelector(`[data-checkup-value="${index}"]`)?.value) || row.value }));
+    edited.forEach(row => {
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0) });
+    });
+    saveState(); renderHealth(); closeModal();
+    const abnormal = edited.filter(row => metricStatus(row.metric, row.value) !== 'normal');
+    toast(`已导入 ${edited.length} 项指标${abnormal.length ? `，${abnormal.length} 项异常进入跟踪` : '，全部正常'}`);
+    if (abnormal.length) {
+      createAlert('blue', '体检指标异常已入库', `${member.name}本次体检 ${abnormal.map(row => `${row.metric} ${row.value}${row.unit || ''}（${statusLabelOf(row.value, row.metric)}）`).join('、')}，超出参考范围，已进入异常指标跟踪，建议下次复查关注。`, '体检导入');
+    }
+    showMemberDashboard(memberId);
+  });
 }
 
 function showInsuranceHub(channel) {
@@ -296,10 +529,13 @@ function renderCompanionViews() {
 
 function renderRole() {
   const isEscort = state.currentRole === 'escort';
-  document.getElementById('roleAvatar').textContent = isEscort ? state.companionProfile.name.slice(0, 1) : '林';
-  document.getElementById('roleLabel').textContent = isEscort ? `陪诊员端 · ${state.companionProfile.name}` : '家庭端 · 小林';
+  const member = currentMember();
+  document.getElementById('roleAvatar').textContent = isEscort ? state.companionProfile.name.slice(0, 1) : (member?.name.slice(0, 1) || '家');
+  document.getElementById('roleLabel').textContent = isEscort ? `陪诊员端 · ${state.companionProfile.name}` : `家庭端 · ${member?.name || '家人'}`;
   document.getElementById('familyTabs').hidden = isEscort;
   document.getElementById('escortTabs').hidden = !isEscort;
+  const greetName = document.querySelector('#view-home .greeting-row h1 span');
+  if (greetName && member) greetName.textContent = member.name;
   renderCompanionViews();
 }
 
@@ -772,11 +1008,14 @@ function showOrderSuccess(order) {
   openModal(`<div class="order-success"><div class="success-mark">✓</div><p class="eyebrow">预约申请已提交</p><h2 id="modalTitle">等待陪诊员确认</h2><p>${esc(order.service)} · ${esc(order.hospital)}<br>${esc(order.date)}<br>${esc(order.providerName)}<br><br>切换到陪诊员端即可体验接受或暂不接单。</p><button class="primary-button" id="orderDone">完成</button></div>`);
 }
 function showRoleSwitcher() {
-  openModal(`${modalHead('演示角色登录', '选择进入哪一端', '这是同一台设备上的角色演示，不是真实账号登录。预约记录会在两个角色间共享。')}
+  openModal(`${modalHead('模拟账号 · 演示登录', '选择进入哪个视角', '这是同一台设备上的模拟账号演示，不是真实账号登录。四位家庭成员共用一个家庭面板，健康档案数据互通。')}
     <div class="role-choice-list">
-      <button class="role-choice" data-role="family"><span class="role-choice-avatar">林</span><span><strong>家庭端 · 小林</strong><small>整理资料、发起陪诊预约、完成评价</small></span><b>${state.currentRole === 'family' ? '当前' : '进入 →'}</b></button>
+      ${state.familyMembers.map(member => {
+        const isCurrent = state.currentRole === 'family' && state.currentMemberId === member.id;
+        return `<button class="role-choice" data-member="${member.id}"><span class="role-choice-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span><span><strong>家庭端 · ${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age}岁 · ${esc(member.conditions)}</small></span><b>${isCurrent ? '当前' : '进入 →'}</b></button>`;
+      }).join('')}
       <button class="role-choice" data-role="escort"><span class="role-choice-avatar escort-choice-avatar">${esc(state.companionProfile.name.slice(0,1))}</span><span><strong>陪诊员端 · ${esc(state.companionProfile.name)}</strong><small>编辑介绍、回应预约、完成陪诊、评价家庭</small></span><b>${state.currentRole === 'escort' ? '当前' : '进入 →'}</b></button>
-    </div><p class="privacy-small">预约数据保存在这台设备的浏览器中。跨设备真实登录、消息通知和线上派单需要服务端。</p>`);
+    </div><p class="privacy-small">家庭端内切换成员只改变操作视角（操作留痕显示当前成员）；数据仍全体家人共享。预约数据保存在这台设备的浏览器中。</p>`);
 }
 function showReviewForm(orderId, role) {
   const order = state.companionOrders.find(item => item.id === orderId);
@@ -939,6 +1178,31 @@ document.addEventListener('click', async event => {
   if (event.target.closest('#revokeShare')) { state.shares.push({ who: '演示分享已撤销', when: `${new Date().getMonth()+1}月${new Date().getDate()}日 ${new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` }); saveState(); closeModal(); toast('已撤销演示分享'); }
   const service = event.target.closest('[data-service]')?.dataset.service;
   if (service) showCompanionForm(service);
+  const memberChoice = event.target.closest('[data-member]');
+  if (memberChoice) {
+    state.currentMemberId = memberChoice.dataset.member;
+    state.currentRole = 'family';
+    saveState(); renderRole(); navigate('home'); closeModal();
+    toast(`已切换到 ${currentMember().name} 的视角（操作留痕将显示当前成员）`);
+    return;
+  }
+  const memberToggle = event.target.closest('[data-member-toggle]');
+  if (memberToggle) {
+    const id = memberToggle.dataset.memberToggle;
+    if (expandedMembers.has(id)) expandedMembers.delete(id); else expandedMembers.add(id);
+    renderHealth();
+    return;
+  }
+  const memberEditButton = event.target.closest('[data-member-edit]');
+  if (memberEditButton) { showMemberEdit(memberEditButton.dataset.memberEdit); return; }
+  const dashboardButton = event.target.closest('[data-member-dashboard]');
+  if (dashboardButton) { showMemberDashboard(dashboardButton.dataset.memberDashboard); return; }
+  const metricChip = event.target.closest('[data-metric-chip]');
+  if (metricChip) { showMemberDashboard(metricChip.dataset.memberId, metricChip.dataset.metricChip); return; }
+  const checkupImportButton = event.target.closest('[data-checkup-import]');
+  if (checkupImportButton) { showCheckupImport(checkupImportButton.dataset.checkupImport); return; }
+  const checkupScan = event.target.closest('#checkupScan');
+  if (checkupScan) { showCheckupConfirm(checkupScan.dataset.memberId); return; }
   const roleChoice = event.target.closest('[data-role]');
   if (roleChoice) setRole(roleChoice.dataset.role);
   const orderAction = event.target.closest('[data-order-action]');
