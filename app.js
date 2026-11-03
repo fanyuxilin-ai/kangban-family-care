@@ -322,12 +322,14 @@ function renderHealth() {
             <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
           </div>
           ${trackingHtml}
+          <div class="member-archive-actions">
+            <button class="primary-button member-dashboard-button" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单）</button>
+          </div>
           <div class="member-archive-actions member-archive-actions-3">
             <button class="secondary-button" data-member-edit="${member.id}">编辑档案</button>
             <button class="secondary-button" data-member-daily="${member.id}">日常记录</button>
             <button class="primary-button" data-checkup-import="${member.id}">导入体检单</button>
           </div>
-          <button class="text-button member-board-link" data-member-dashboard="${member.id}">数据看板（日常记录 + 体检单） →</button>
         </div>` : ''}
       </article>`;
     }).join('');
@@ -405,8 +407,7 @@ function showMemberDashboard(memberId, metric = '') {
       ${active ? trendSvg(entries.filter(entry => entry.metric === active), active) : '<p class="empty-hint">还没有指标记录，先导入体检单。</p>'}`)}
     ${renderBoardLab(member, entries, filter, abnormalCount)}
     ${renderBoardHistory(member, entries)}
-    <button class="primary-button" data-checkup-import="${member.id}">＋ 导入体检单（模拟 OCR）</button>
-    <p class="privacy-small">演示版：体检单为模拟识别，数值可修改后入库；不做真实医疗判断。</p>`);
+    <p class="privacy-small">演示版：数值可修改后入库；异常仅为范围提示，不做真实医疗判断。导入体检单请回成员卡点「导入体检单」。</p>`);
 }
 
 /* 历史记录区（按指标分组 + 组内时间线 + 筛选与搜索定位） */

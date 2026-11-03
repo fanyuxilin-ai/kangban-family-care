@@ -110,10 +110,10 @@ nav[hidden]{display:none!important}
 .member-chevron{font-size:14px;color:#9aa49c}
 .member-archive-body{padding:2px 14px 13px;border-top:1px solid #f0efe9}
 .member-archive-body .info-grid{margin-top:11px}
-.member-archive-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:11px}
+.member-archive-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
 .member-archive-actions.member-archive-actions-3{grid-template-columns:1fr 1fr 1fr}
 .member-archive-actions .primary-button,.member-archive-actions .secondary-button{margin:0;height:42px;font-size:10px}
-.member-board-link{display:block;width:100%;text-align:right;margin-top:7px;font-size:9px;color:#5c7663;cursor:pointer}
+.member-archive-actions .member-dashboard-button{grid-column:1/-1}
 /* 手动录入 · 一句话 + AI 识别 + 可编辑指标行 */
 .ai-parse-block{margin-bottom:11px}
 .ai-parse-block>strong{display:block;font-size:11px;color:#445449;margin-bottom:9px}
