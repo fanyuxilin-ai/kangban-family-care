@@ -46,6 +46,7 @@ const seed = {
   ],
   currentMemberId: 'm1',
   nextMetricId: 22,
+  metricDefs: {},
   bodyMetrics: [
     { id: 'bm-1', memberId: 'm1', metric: '体重', value: 58.4, unit: 'kg', date: dateOffset(-20) },
     { id: 'bm-2', memberId: 'm1', metric: 'BMI', value: 23.1, unit: '', date: dateOffset(-20) },
@@ -98,6 +99,7 @@ function loadState() {
       reviews: order.reviews || { family: null, escort: null }
     }));
     loaded.healthReadings = saved.healthReadings || structuredClone(seed.healthReadings);
+    loaded.metricDefs = saved.metricDefs || {};
     loaded.familyMembers = saved.familyMembers || structuredClone(seed.familyMembers);
     loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
     loaded.currentMemberId = saved.currentMemberId || 'm1';
@@ -199,15 +201,20 @@ const METRIC_DEFS = {
 function currentMember() {
   return (state.familyMembers || []).find(member => member.id === state.currentMemberId) || (state.familyMembers || [])[0];
 }
+/* 指标定义：静态基础表 + 体检报告导入时学到的扩展表（state.metricDefs，持久化）。
+   报单上出现的新指标会带参考范围入库，系统随之扩展，无需改代码。 */
+function metricDef(metric) {
+  return METRIC_DEFS[metric] || state.metricDefs?.[metric] || null;
+}
 function metricStatus(metric, value) {
-  const def = METRIC_DEFS[metric];
+  const def = metricDef(metric);
   if (!def || (def.low == null && def.high == null)) return 'normal';
   if (def.high != null && value > def.high) return 'high';
   if (def.low != null && value < def.low) return 'low';
   return 'normal';
 }
 function refText(metric) {
-  const def = METRIC_DEFS[metric] || {};
+  const def = metricDef(metric) || {};
   if (def.low != null && def.high != null) return `参考 ${def.low} – ${def.high} ${def.unit || ''}`.trim();
   if (def.high != null) return `参考 < ${def.high} ${def.unit || ''}`.trim();
   return '无固定参考范围';
@@ -397,8 +404,9 @@ function renderBoardLab(member, entries, filter, abnormalCount, tracking) {
       });
     } else {
       entries.slice().reverse().forEach(entry => {
-        if (!groups.has(entry.metric)) groups.set(entry.metric, []);
-        groups.get(entry.metric).push(entry);
+        const key = entry.category || entry.metric;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(entry);
       });
     }
     if (filter === 'day' && boardOpenDays.size === 0) {
@@ -425,7 +433,7 @@ function renderBoardLab(member, entries, filter, abnormalCount, tracking) {
 function showHistEdit(entryId) {
   const entry = (state.bodyMetrics || []).find(item => item.id === entryId);
   if (!entry) return;
-  const def = METRIC_DEFS[entry.metric] || {};
+  const def = metricDef(entry.metric) || {};
   openModal(`${modalHead('编辑指标记录', `${esc(entry.metric)} · ${formatDate(entry.date)}`, '修正录入错误的数值。修改后保存，异常状态会按参考范围自动重新判定。')}
     <form class="member-edit-form" id="histEditForm">
       <label><span class="field-label-block">${esc(entry.metric)} 数值${def.unit ? `（${def.unit}）` : ''}</span><input class="input-field" name="value" type="number" step="0.1" value="${entry.value}" /></label>
@@ -445,46 +453,93 @@ function showHistEdit(entryId) {
   });
 }
 
-const CHECKUP_MOCKS = {
-  m1: [
-    { metric: '体重', value: 60.2, unit: 'kg' },
-    { metric: 'BMI', value: 23.9, unit: '' },
-    { metric: '空腹血糖', value: 6.8, unit: 'mmol/L' },
-    { metric: '总胆固醇', value: 5.6, unit: 'mmol/L' },
-    { metric: '尿酸', value: 452, unit: 'μmol/L' }
-  ]
-};
+/* 模拟体检单：一份完整大单（按检查类别分组）。
+   指标允许超出基础表 METRIC_DEFS——报告自带参考范围（low/high），
+   核对入库时系统把新指标「学会」进 state.metricDefs，之后判定/跟踪都用它。 */
+const CHECKUP_MOCKS = [
+  { category: '血糖', metric: '空腹血糖', value: 6.8, unit: 'mmol/L', low: 3.9, high: 6.1 },
+  { category: '血脂四项', metric: '总胆固醇', value: 5.6, unit: 'mmol/L', low: null, high: 5.2 },
+  { category: '血脂四项', metric: '甘油三酯', value: 2.35, unit: 'mmol/L', low: null, high: 1.7 },
+  { category: '血脂四项', metric: '高密度脂蛋白', value: 1.02, unit: 'mmol/L', low: 1.04, high: 1.55 },
+  { category: '血脂四项', metric: '低密度脂蛋白', value: 3.9, unit: 'mmol/L', low: null, high: 3.4 },
+  { category: '肝功能', metric: '谷丙转氨酶', value: 58, unit: 'U/L', low: 9, high: 50 },
+  { category: '肝功能', metric: '总胆红素', value: 14.2, unit: 'μmol/L', low: 3.4, high: 20.5 },
+  { category: '肾功能', metric: '肌酐', value: 78, unit: 'μmol/L', low: 57, high: 97 },
+  { category: '肾功能', metric: '尿素氮', value: 6.1, unit: 'mmol/L', low: 2.9, high: 8.2 },
+  { category: '肾功能', metric: '尿酸', value: 452, unit: 'μmol/L', low: 208, high: 428 },
+  { category: '血常规', metric: '白细胞计数', value: 6.4, unit: '×10⁹/L', low: 3.5, high: 9.5 },
+  { category: '血常规', metric: '红细胞计数', value: 4.7, unit: '×10¹²/L', low: 4.3, high: 5.8 },
+  { category: '血常规', metric: '血红蛋白', value: 141, unit: 'g/L', low: 130, high: 175 },
+  { category: '血常规', metric: '血小板计数', value: 226, unit: '×10⁹/L', low: 125, high: 350 },
+  { category: '一般检查', metric: '体重', value: 60.2, unit: 'kg' },
+  { category: '一般检查', metric: 'BMI', value: 23.9, unit: '', low: 18.5, high: 24 },
+  { category: '一般检查', metric: '收缩压', value: 132, unit: 'mmHg', low: 90, high: 139 }
+];
+/* 核对阶段的状态判定：报告印的参考范围优先于系统基础表 */
+function checkupRowStatus(row, value) {
+  const def = metricDef(row.metric) || {};
+  const low = row.low != null ? row.low : def.low;
+  const high = row.high != null ? row.high : def.high;
+  if (low == null && high == null) return 'normal';
+  if (high != null && value > high) return 'high';
+  if (low != null && value < low) return 'low';
+  return 'normal';
+}
 function showCheckupImport(memberId) {
   const member = state.familyMembers.find(item => item.id === memberId);
   if (!member) return;
-  openModal(`${modalHead('导入体检单 · 模拟 OCR', `${esc(member.name)} 的体检报告`, '演示识别流程：识别体检单为结构化指标，人工核对后入库。正式版支持拍照 / PDF 上传。')}
-    <div class="checkup-photo">📋 体检报告影像件（模拟）<small>市第一人民医院健康体检中心 · 年度体检</small></div>
+  openModal(`${modalHead('导入体检单 · 模拟 OCR', `${esc(member.name)} 的体检报告`, '演示识别流程：识别体检单为结构化指标（17 项 · 6 个检查类别），人工核对后入库。报告上基础表之外的新指标，会连同参考范围自动登记进系统。')}
+    <div class="checkup-photo">📋 体检报告影像件（模拟）<small>市第一人民医院健康体检中心 · 年度体检 · 含血常规 / 血脂四项 / 肝肾功能等</small></div>
     <button class="primary-button" id="checkupScan" data-member-id="${member.id}">开始识别（模拟 OCR）</button>
     <p class="privacy-small">医生手写内容不保证识别率，识别结果必须人工核对后才会入库。</p>`);
 }
 function showCheckupConfirm(memberId) {
   const member = state.familyMembers.find(item => item.id === memberId);
   if (!member) return;
-  const rows = CHECKUP_MOCKS[memberId] || [
-    { metric: '体重', value: 65.0, unit: 'kg' },
-    { metric: 'BMI', value: 22.5, unit: '' },
-    { metric: '收缩压', value: 126, unit: 'mmHg' },
-    { metric: '舒张压', value: 78, unit: 'mmHg' }
-  ];
-  openModal(`${modalHead('导入体检单 · 核对入库', `识别到 ${rows.length} 项指标`, '已按参考范围自动标记状态。数值可直接修改，确认后入库并进入跟踪。')}
-    <div class="checkup-list">${rows.map((row, index) => `<label class="checkup-row"><span class="checkup-name">${esc(row.metric)}</span><input type="number" step="0.1" value="${row.value}" data-checkup-value="${index}" /><small>${esc(row.unit || '')} · ${refText(row.metric)}</small><span class="reading-tag ${statusTagOf(row.value, row.metric)}">${statusLabelOf(row.value, row.metric)}</span></label>`).join('')}</div>
+  const rows = CHECKUP_MOCKS;
+  const tagClass = status => status === 'normal' ? 'reading-tag-ok' : status === 'high' ? 'reading-tag-red' : 'reading-tag-yellow';
+  const tagLabel = status => ({ normal: '正常', high: '偏高', low: '偏低' })[status];
+  const categories = [...new Set(rows.map(row => row.category))];
+  const rowHtml = row => {
+    const index = rows.indexOf(row);
+    const ref = row.low != null && row.high != null ? `${row.low} – ${row.high}` : row.high != null ? `< ${row.high}` : '—';
+    return `<label class="checkup-row"><span class="checkup-name">${esc(row.metric)}</span><input type="number" step="0.1" value="${row.value}" data-checkup-value="${index}" /><small>${esc(row.unit || '')} · 参考 ${ref}</small><span class="reading-tag ${tagClass(checkupRowStatus(row, row.value))}" data-checkup-tag="${index}">${tagLabel(checkupRowStatus(row, row.value))}</span></label>`;
+  };
+  const grouped = categories.map(category => `<p class="checkup-category">${esc(category)}</p>${rows.filter(row => row.category === category).map(rowHtml).join('')}`).join('');
+  openModal(`${modalHead('导入体检单 · 核对入库', `识别到 ${rows.length} 项指标 · ${categories.length} 个检查类别`, '已按报告参考范围自动标记状态，数值可直接修改（状态实时重判）。新指标会随报告自动登记参考范围。')}
+    <div class="checkup-list">${grouped}</div>
     <button class="primary-button" id="checkupConfirm" data-member-id="${member.id}">确认入库</button>
     <p class="privacy-small">入库后异常指标自动进入「异常指标跟踪」，可在体检看板查看变化。</p>`);
+  document.querySelectorAll('[data-checkup-value]').forEach(input => {
+    input.addEventListener('input', () => {
+      const index = Number(input.dataset.checkupValue);
+      const tag = document.querySelector(`[data-checkup-tag="${index}"]`);
+      const value = Number(input.value);
+      if (!tag || !Number.isFinite(value)) return;
+      const status = checkupRowStatus(rows[index], value);
+      tag.className = `reading-tag ${tagClass(status)}`;
+      tag.textContent = tagLabel(status);
+    });
+  });
   document.getElementById('checkupConfirm')?.addEventListener('click', () => {
     const edited = rows.map((row, index) => ({ ...row, value: Number(document.querySelector(`[data-checkup-value="${index}"]`)?.value) || row.value }));
+    // 新指标登记：报告带来的、基础表没有的指标，把参考范围学进 state.metricDefs（持久化）
+    let learned = 0;
     edited.forEach(row => {
-      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0), source: '体检导入' });
+      if (!metricDef(row.metric) && (row.low != null || row.high != null)) {
+        state.metricDefs = state.metricDefs || {};
+        state.metricDefs[row.metric] = { unit: row.unit, low: row.low, high: row.high, category: row.category };
+        learned += 1;
+      }
+    });
+    edited.forEach(row => {
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0), source: '体检导入', category: row.category });
     });
     saveState(); renderHealth(); closeModal();
-    const abnormal = edited.filter(row => metricStatus(row.metric, row.value) !== 'normal');
-    toast(`已导入 ${edited.length} 项指标${abnormal.length ? `，${abnormal.length} 项异常进入跟踪` : '，全部正常'}`);
+    const abnormal = edited.filter(row => checkupRowStatus(row, row.value) !== 'normal');
+    toast(`已导入 ${edited.length} 项指标${learned ? `（新登记 ${learned} 项指标范围）` : ''}${abnormal.length ? `，${abnormal.length} 项异常进入跟踪` : '，全部正常'}`);
     if (abnormal.length) {
-      createAlert('blue', '体检指标异常已入库', `${member.name}本次体检 ${abnormal.map(row => `${row.metric} ${row.value}${row.unit || ''}（${statusLabelOf(row.value, row.metric)}）`).join('、')}，超出参考范围，已进入异常指标跟踪，建议下次复查关注。`, '体检导入');
+      createAlert('blue', '体检指标异常已入库', `${member.name}本次体检 ${abnormal.map(row => `${row.metric} ${row.value}${row.unit || ''}（${tagLabel(checkupRowStatus(row, row.value))}）`).join('、')}，超出参考范围，已进入异常指标跟踪，建议下次复查关注。`, '体检导入');
     }
     showMemberDashboard(memberId);
   });

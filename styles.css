@@ -167,3 +167,5 @@ nav[hidden]{display:none!important}
 .track-btn{font-size:9px;padding:5px 4px}
 .track-btn-del{color:#b06a55}
 .tracking-card .track-row:first-child{border-top:0}
+.checkup-category{font-size:9px;font-weight:700;color:#6d8272;background:#eef2ea;border-radius:8px;padding:5px 9px;margin:10px 0 2px}
+.checkup-category:first-child{margin-top:0}
