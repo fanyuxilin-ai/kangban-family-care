@@ -218,7 +218,7 @@ function statusLabelOf(value, metric) {
 }
 function statusTagOf(value, metric) {
   const status = metricStatus(metric, value);
-  return status === 'normal' ? 'reading-tag-ok' : status === 'high' ? 'reading-tag-yellow' : 'reading-tag-blue';
+  return status === 'normal' ? 'reading-tag-ok' : status === 'high' ? 'reading-tag-red' : 'reading-tag-yellow';
 }
 function memberMetricEntries(memberId) {
   return (state.bodyMetrics || []).filter(entry => entry.memberId === memberId);
@@ -230,6 +230,8 @@ function latestAbnormal(memberId) {
 }
 const expandedMembers = new Set(['m1']);
 let dashboardMetric = {};
+const dashboardFilter = {};   // 看板筛选：day / category / all / abnormal
+const boardOpenDays = new Set(); // 化验报告展开的日期分组
 
 function renderHealth() {
   const host = document.getElementById('memberArchiveList');
@@ -340,28 +342,103 @@ function showMemberDashboard(memberId, metric = '') {
   const change = lastWeight && prevWeight ? Number((lastWeight.value - prevWeight.value).toFixed(1)) : null;
   const lastEntry = entries[entries.length - 1];
   const tracking = latestAbnormal(memberId);
-  openModal(`${modalHead('体检看板 · 模拟数据', `${esc(member.name)} · ${esc(member.role)} ${member.age}岁`, '身体指标统计、趋势与异常跟踪。点右上角可切换指标，底部可导入模拟体检单。')}
+  const abnormalCount = entries.filter(entry => metricStatus(entry.metric, entry.value) !== 'normal').length;
+  const filter = dashboardFilter[memberId] || 'day';
+  openModal(`${modalHead('体检看板 · 模拟数据', `${esc(member.name)} · ${esc(member.role)} ${member.age}岁`, '身体指标统计、趋势、化验报告整理与跟踪。点右上角可切换指标，底部可导入模拟体检单。')}
     <div class="board-stats">
       <div><span>最近体重</span><strong>${lastWeight ? `${lastWeight.value} kg` : '—'}</strong><small>最近一次</small></div>
       <div><span>体重变化</span><strong>${change === null ? '—' : `${change > 0 ? '↑' : change < 0 ? '↓' : '—'}${Math.abs(change)} kg`}</strong><small>记录两次后显示</small></div>
       <div><span>记录次数</span><strong>${entries.length} 次</strong><small>身体指标跟踪</small></div>
-      <div><span>最近记录</span><strong>${lastEntry ? formatDate(lastEntry.date) : '—'}</strong><small>时间线共 ${entries.length} 条</small></div>
+      <div><span>异常待随访</span><strong class="${abnormalCount ? 'trend-warn' : 'trend-ok'}">${abnormalCount} 项</strong><small>异常指标跟踪</small></div>
     </div>
     <div class="board-block">
       <div class="board-block-head"><strong>📈 趋势图</strong></div>
       <div class="metric-chips">${metrics.map(item => `<button class="metric-chip ${item === active ? 'selected' : ''}" data-metric-chip="${esc(item)}" data-member-id="${member.id}">${esc(item)}</button>`).join('')}</div>
       ${active ? trendSvg(entries.filter(entry => entry.metric === active), active) : '<p class="empty-hint">还没有指标记录，先导入体检单。</p>'}
     </div>
+    ${renderBoardLab(member, entries, filter, abnormalCount, tracking)}
     <div class="board-block">
-      <div class="board-block-head"><strong>🚨 异常指标 · 跟踪</strong></div>
-      ${tracking.length ? tracking.map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${refText(entry.metric)} · ${formatDate(entry.date)} 录入</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)} · 跟踪中</span></div>`).join('') : '<p class="empty-hint">当前没有异常指标，继续保持。</p>'}
-    </div>
-    <div class="board-block">
-      <div class="board-block-head"><strong>🗂 历史记录</strong><small>时间线 · 最近 8 条</small></div>
-      <div class="board-history">${entries.length ? entries.slice(-8).reverse().map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span></div>`).join('') : '<p class="empty-hint">还没有指标记录。</p>'}</div>
+      <div class="board-block-head"><strong>🗂 历史记录</strong><small>时间线 · 可编辑 / 删除</small></div>
+      <div class="board-history">${entries.length ? entries.slice().reverse().map(entry => `<div class="track-row track-row-actions"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入${entry.source ? ` · ${esc(entry.source)}` : ''}</small></div><div class="track-ops"><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span><button class="text-button track-btn" data-hist-edit="${esc(entry.id)}">编辑</button><button class="text-button track-btn track-btn-del" data-hist-del="${esc(entry.id)}">删除</button></div></div>`).join('') : '<p class="empty-hint">还没有指标记录。</p>'}</div>
     </div>
     <button class="primary-button" data-checkup-import="${member.id}">＋ 导入体检单（模拟 OCR）</button>
     <p class="privacy-small">演示版：体检单为模拟识别，数值可修改后入库；不做真实医疗判断。</p>`);
+}
+
+/* 化验报告区（参考产品稿：按天/按类别分组、筛选芯片、异常标色） */
+function boardRow(entry) {
+  return `<div class="track-row board-lab-row"><div><strong>${esc(entry.metric)}</strong><small>${entry.value} ${esc(entry.unit || '')} · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">${statusLabelOf(entry.value, entry.metric)}</span></div>`;
+}
+function renderBoardLab(member, entries, filter, abnormalCount, tracking) {
+  const chips = [
+    ['day', '按天'],
+    ['category', '按检查类别'],
+    ['all', '全部'],
+    ['abnormal', abnormalCount ? `只看异常 · ${abnormalCount}` : '只看异常']
+  ].map(([key, label]) => `<button class="metric-chip ${filter === key ? 'selected' : ''}" data-board-filter="${key}" data-member-id="${member.id}">${esc(label)}</button>`).join('');
+  const legend = '<p class="board-legend">异常标红（偏高）/ 标黄（偏低），仅作整理，具体诊断请遵医嘱。</p>';
+  let body = '';
+  if (!entries.length) body = '<p class="empty-hint">还没有化验数据，先导入体检单。</p>';
+  else if (filter === 'all') body = entries.slice().reverse().map(boardRow).join('');
+  else if (filter === 'abnormal') {
+    const rows = entries.slice().reverse().filter(entry => metricStatus(entry.metric, entry.value) !== 'normal');
+    body = rows.length ? rows.map(boardRow).join('') : '<p class="empty-hint">当前没有异常指标，继续保持。</p>';
+  } else {
+    const groups = new Map();
+    if (filter === 'day') {
+      entries.slice().reverse().forEach(entry => {
+        if (!groups.has(entry.date)) groups.set(entry.date, []);
+        groups.get(entry.date).push(entry);
+      });
+    } else {
+      entries.slice().reverse().forEach(entry => {
+        if (!groups.has(entry.metric)) groups.set(entry.metric, []);
+        groups.get(entry.metric).push(entry);
+      });
+    }
+    if (filter === 'day' && boardOpenDays.size === 0) {
+      const first = [...groups.keys()][0];
+      if (first) boardOpenDays.add(first);
+    }
+    body = [...groups.entries()].map(([key, rows]) => {
+      const abnormal = rows.filter(entry => metricStatus(entry.metric, entry.value) !== 'normal').length;
+      const open = boardOpenDays.has(key);
+      return `<div class="board-day ${open ? 'open' : ''}">
+        <button class="board-day-head" data-board-day="${esc(key)}"><strong>${esc(key)}</strong><span>${rows.length} 项${abnormal ? ` · <b class="${abnormal ? 'board-abn' : 'board-ok'}">${abnormal} 项异常</b>` : ' · <b class="board-ok">全部正常</b>'}</span><i class="member-chevron">${open ? '▴' : '▾'}</i></button>
+        ${open ? `<div class="board-day-body">${rows.map(boardRow).join('')}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  const followUp = tracking.length ? `<div class="board-follow">${tracking.slice(0, 3).map(entry => `<div class="track-row"><div><strong>${esc(entry.metric)} ${entry.value} ${esc(entry.unit || '')}</strong><small>${formatDate(entry.date)} 录入 · ${refText(entry.metric)}</small></div><span class="reading-tag ${statusTagOf(entry.value, entry.metric)}">跟踪中</span></div>`).join('')}</div>` : '';
+  return `<div class="board-block">
+    <div class="board-block-head"><strong>🧪 化验报告</strong><small>${abnormalCount ? `${abnormalCount} 项异常待随访` : '暂无异常'}</small></div>
+    <div class="metric-chips board-filter-chips">${chips}</div>
+    ${legend}${body}${followUp}
+  </div>`;
+}
+
+/* 历史记录 · 编辑单条指标 */
+function showHistEdit(entryId) {
+  const entry = (state.bodyMetrics || []).find(item => item.id === entryId);
+  if (!entry) return;
+  const def = METRIC_DEFS[entry.metric] || {};
+  openModal(`${modalHead('编辑指标记录', `${esc(entry.metric)} · ${formatDate(entry.date)}`, '修正录入错误的数值。修改后保存，异常状态会按参考范围自动重新判定。')}
+    <form class="member-edit-form" id="histEditForm">
+      <label><span class="field-label-block">${esc(entry.metric)} 数值${def.unit ? `（${def.unit}）` : ''}</span><input class="input-field" name="value" type="number" step="0.1" value="${entry.value}" /></label>
+      <label><span class="field-label-block">记录日期</span><input class="input-field" name="date" type="date" value="${entry.date}" /></label>
+      <p class="privacy-small">${refText(entry.metric)}</p>
+      <button class="primary-button" type="submit">保存修改</button>
+    </form>`);
+  document.getElementById('histEditForm')?.addEventListener('submit', ev => {
+    ev.preventDefault();
+    const data = new FormData(ev.target);
+    const value = Number(data.get('value'));
+    const date = String(data.get('date') || entry.date);
+    if (!Number.isFinite(value) || value <= 0) { toast('请输入有效数值'); return; }
+    entry.value = value; entry.date = date;
+    saveState(); renderHealth(); showMemberDashboard(entry.memberId);
+    toast(`${entry.metric} 已更新为 ${value}${def.unit ? ` ${def.unit}` : ''}（${statusLabelOf(value, entry.metric)}）`);
+  });
 }
 
 const CHECKUP_MOCKS = {
@@ -397,7 +474,7 @@ function showCheckupConfirm(memberId) {
   document.getElementById('checkupConfirm')?.addEventListener('click', () => {
     const edited = rows.map((row, index) => ({ ...row, value: Number(document.querySelector(`[data-checkup-value="${index}"]`)?.value) || row.value }));
     edited.forEach(row => {
-      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0) });
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit, date: dateOffset(0), source: '体检导入' });
     });
     saveState(); renderHealth(); closeModal();
     const abnormal = edited.filter(row => metricStatus(row.metric, row.value) !== 'normal');
@@ -1199,6 +1276,27 @@ document.addEventListener('click', async event => {
   if (dashboardButton) { showMemberDashboard(dashboardButton.dataset.memberDashboard); return; }
   const metricChip = event.target.closest('[data-metric-chip]');
   if (metricChip) { showMemberDashboard(metricChip.dataset.memberId, metricChip.dataset.metricChip); return; }
+  const boardFilterChip = event.target.closest('[data-board-filter]');
+  if (boardFilterChip) { dashboardFilter[boardFilterChip.dataset.memberId] = boardFilterChip.dataset.boardFilter; showMemberDashboard(boardFilterChip.dataset.memberId); return; }
+  const boardDay = event.target.closest('[data-board-day]');
+  if (boardDay) {
+    const key = boardDay.dataset.boardDay;
+    if (boardOpenDays.has(key)) boardOpenDays.delete(key); else boardOpenDays.add(key);
+    showMemberDashboard(currentMember()?.id || 'm1');
+    return;
+  }
+  const histEdit = event.target.closest('[data-hist-edit]');
+  if (histEdit) { showHistEdit(histEdit.dataset.histEdit); return; }
+  const histDel = event.target.closest('[data-hist-del]');
+  if (histDel) {
+    const entry = (state.bodyMetrics || []).find(item => item.id === histDel.dataset.histDel);
+    if (entry) {
+      state.bodyMetrics = state.bodyMetrics.filter(item => item.id !== entry.id);
+      saveState(); renderHealth(); showMemberDashboard(entry.memberId);
+      toast(`已删除 ${entry.metric} 记录（${formatDate(entry.date)}）；如误删可重新导入体检单`);
+    }
+    return;
+  }
   const checkupImportButton = event.target.closest('[data-checkup-import]');
   if (checkupImportButton) { showCheckupImport(checkupImportButton.dataset.checkupImport); return; }
   const checkupScan = event.target.closest('#checkupScan');

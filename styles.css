@@ -147,3 +147,22 @@ nav[hidden]{display:none!important}
 .checkup-name{font-size:10px;font-weight:700;color:#445449}
 .checkup-row input{border:1px solid #e3e5dd;border-radius:8px;height:34px;padding:0 8px;font-size:11px;color:#3b4c40;background:#fffefa;width:100%}
 .checkup-row small{font-size:8px;color:#9aa49c;line-height:1.5}
+/* 化验报告区（参考产品稿） */
+.board-filter-chips{margin-bottom:8px}
+.board-legend{font-size:9px;color:#9aa49c;margin:0 0 10px;line-height:1.6}
+.board-day{border:1px solid #ecece4;border-radius:12px;margin-bottom:8px;overflow:hidden;background:#fafbf7}
+.board-day.open{background:var(--white)}
+.board-day-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:11px 13px;background:transparent}
+.board-day-head strong{font-size:11px;flex:1}
+.board-day-head span{font-size:9px;color:#8a958c;flex:2}
+.board-day-head b{font-weight:700}
+.board-day-head .board-abn{color:#a1543f}
+.board-day-head .board-ok{color:#55735c}
+.board-day-body{padding:0 13px 8px}
+.board-lab-row small{font-size:9px}
+.board-follow{margin-top:10px;background:#f6efe9;border-radius:11px;padding:4px 12px}
+.board-follow .track-row:first-child{border-top:0}
+.track-row-actions{flex-wrap:wrap}
+.track-ops{display:flex;align-items:center;gap:2px;flex:none}
+.track-btn{font-size:9px;padding:5px 4px}
+.track-btn-del{color:#b06a55}
