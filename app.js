@@ -150,6 +150,7 @@ function renderRecords() {
     return `<article class="family-order-card"><div class="family-order-top"><strong>${esc(o.service)}</strong><span class="record-status">${statusLabel[o.status] || '待确认'}</span></div>
       <p>${esc(o.hospital)} · ${esc(o.date)}<br>${esc(o.providerName || state.companionProfile.name)}</p>
       ${exec}
+      ${o.status === 'completed' && o.serviceReport ? `<section class="service-report-card"><div class="service-report-heading"><strong>陪诊反馈</strong><small>${esc(o.serviceReport.submittedAt || '')} · ${esc(o.providerName || state.companionProfile.name)}</small></div><p><b>服务情况</b>${esc(o.serviceReport.summary)}</p>${o.serviceReport.followUp ? `<p><b>后续待办</b>${esc(o.serviceReport.followUp)}</p>` : ''}<p><b>离院交接</b>${esc(o.serviceReport.handoff)}</p>${o.serviceReport.needsFamily ? '<div class="service-report-alert">陪诊员标记需要家属跟进，请尽快联系患者或陪诊员确认。</div>' : ''}<small class="privacy-small">陪诊过程记录仅供家庭沟通参考；诊疗和用药安排请以医院原始资料为准。</small></section>` : ''}
       ${o.status === 'completed' && !o.reviews?.family ? `<button class="text-button" data-order-review="${esc(o.id)}" data-review-role="family">评价本次陪诊 →</button>` : ''}
       ${o.status === 'completed' && o.reviews?.family ? `<small class="review-complete">你已完成评价${o.reviews?.escort ? ' · 双方已互评' : ' · 等待陪诊员评价'}</small>` : ''}${reviewSummary(o)}
       ${(o.status === 'completed' || o.status === 'declined') ? `<button class="text-button" data-rebook="${esc(o.id)}">再次预约 →</button>` : ''}
@@ -956,6 +957,18 @@ function showReviewForm(orderId, role) {
       <button class="primary-button" type="submit">提交评价</button>
     </form><p class="privacy-small">演示版评价保存在本机，不会公开发布。</p>`);
 }
+function showCompletionReportForm(orderId) {
+  const order = state.companionOrders.find(item => item.id === orderId);
+  if (!order || order.status !== 'accepted' || !executionProgress(order).all) { toast('请先完成全部履约项目'); return; }
+  openModal(`${modalHead('陪诊服务反馈', '提交就诊后反馈', '向家属说明服务经过、后续待办和患者离院交接情况。请只记录亲历事实，不代替医生解释诊疗意见。')}
+    <form class="service-report-form" id="serviceReportForm" data-order-id="${esc(orderId)}">
+      <label><span class="field-label-block">本次服务情况</span><textarea class="input-field" name="summary" maxlength="500" required placeholder="例如：已陪同完成挂号、就诊和检查，医生资料已交给患者。"></textarea></label>
+      <label><span class="field-label-block">需要家属跟进的事项（选填）</span><textarea class="input-field" name="followUp" maxlength="300" placeholder="例如：协助预约复诊、确认是否已安全到家。诊疗建议请按医院原文记录。"></textarea></label>
+      <label><span class="field-label-block">患者离院 / 交接状态</span><select class="input-field" name="handoff" required><option value="">请选择</option><option>已当面交接给家属</option><option>已陪同患者安全到家</option><option>患者选择自行离院，已确认去向</option><option>尚未完成交接，需要家属联系</option></select></label>
+      <label class="consent-row"><input type="checkbox" name="needsFamily" value="yes" /><span>标记为需要家属尽快跟进（如联系不上患者、交接未完成或出现安全顾虑）</span></label>
+      <button class="primary-button" type="submit">提交反馈并完成服务</button>
+    </form><p class="privacy-small">演示版反馈保存在本机浏览器；真实跨设备通知、身份核验与紧急联络需接入服务端。</p>`);
+}
 function showInfo(title, message) {
   openModal(`${modalHead('家庭就医助手', title, message)}<button class="primary-button" id="infoDone">知道了</button>`);
 }
@@ -1135,12 +1148,13 @@ document.addEventListener('click', async event => {
         ensureExecution(order);
         const progress = executionProgress(order);
         if (!progress.all) { toast('还有履约项目未完成，请逐项执行并上传佐证'); return; }
+        showCompletionReportForm(order.id);
+        return;
       }
-      order.status = actionName === 'accept' ? 'accepted' : actionName === 'complete' ? 'completed' : 'declined';
+      order.status = actionName === 'accept' ? 'accepted' : 'declined';
       if (order.status === 'accepted') ensureExecution(order);
-      if (order.status === 'completed') order.completedAt = new Date().toISOString();
       saveState(); renderRecords();
-      toast(order.status === 'accepted' ? '已接受预约，请按履约清单逐项执行' : order.status === 'completed' ? '已完成陪诊，家庭端可查看履约记录' : '已标记暂不接单');
+      toast(order.status === 'accepted' ? '已接受预约，请按履约清单逐项执行' : '已标记暂不接单');
     }
   }
   const reviewButton = event.target.closest('[data-order-review]');
@@ -1247,6 +1261,23 @@ document.addEventListener('submit', event => {
     const role = form.dataset.reviewRole;
     order.reviews = { ...(order.reviews || {}), [role]: { score: Number(data.get('score')), comment: data.get('comment').trim(), createdAt: new Date().toISOString() } };
     saveState(); closeModal(); renderRecords(); toast('评价已保存到本机');
+  }
+  if (event.target.id === 'serviceReportForm') {
+    event.preventDefault();
+    const form = event.target; const data = new FormData(form);
+    const order = state.companionOrders.find(item => item.id === form.dataset.orderId);
+    if (!order || order.status !== 'accepted' || !executionProgress(order).all) { toast('订单状态已变化，请重新确认'); closeModal(); return; }
+    order.serviceReport = {
+      summary: data.get('summary').trim(),
+      followUp: data.get('followUp').trim(),
+      handoff: data.get('handoff'),
+      needsFamily: data.get('needsFamily') === 'yes',
+      submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
+    };
+    order.completedAt = new Date().toISOString();
+    order.status = 'completed';
+    saveState(); closeModal(); renderRecords();
+    toast(order.serviceReport.needsFamily || order.serviceReport.handoff.includes('尚未') ? '反馈已提交，提醒家属尽快跟进' : '反馈已提交，家庭端可查看');
   }
 });
 

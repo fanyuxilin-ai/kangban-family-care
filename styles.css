@@ -127,4 +127,14 @@ nav[hidden]{display:none!important}
 .reminder-inline-actions .med-taken-button{padding:7px 8px}
 .reminder-later,.reminder-skip{border-radius:8px;padding:7px 6px;font-size:8px;white-space:nowrap;background:#f0f1eb;color:#758177}
 .reminder-skip{background:#f6ebe5;color:#9a6a52}
+.service-report-card{margin:10px 0;padding:12px;background:#f2f5ee;border:1px solid #e3eade;border-radius:11px}
+.service-report-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:7px}
+.service-report-heading strong{font-size:11px;color:#526e57}
+.service-report-heading small{font-size:8px;color:#89958b;text-align:right}
+.service-report-card p{margin:7px 0;font-size:10px;line-height:1.65;white-space:pre-wrap}
+.service-report-card p b{display:block;margin-bottom:2px;color:#526357;font-size:9px}
+.service-report-alert{padding:8px 9px;margin:8px 0;background:#f7e9df;border-radius:8px;color:#985f45;font-size:9px;line-height:1.5}
+.service-report-card .privacy-small{display:block;margin:8px 0 0;line-height:1.5}
+.service-report-form{display:flex;flex-direction:column;gap:12px}
+.service-report-form textarea.input-field{width:100%;min-height:78px;border:1px solid #e3e5dd;border-radius:9px;background:#fffefa;padding:11px;font:inherit;font-size:11px;resize:vertical;color:#38493e}
 @media(max-width:370px){.med-reminder-row{flex-wrap:wrap;padding:8px 0}.med-reminder-copy{flex:1}.reminder-inline-actions{margin-left:54px}}
