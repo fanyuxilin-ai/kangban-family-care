@@ -2436,7 +2436,7 @@ document.addEventListener('click', async event => {
   if (previewToggle) {
     const key = previewToggle.dataset.previewToggle;
     if (previewOpen.has(key)) previewOpen.delete(key); else previewOpen.add(key);
-    renderHealth();
+    renderHealth(); renderDocs(); // 展开按钮在健康档案与医疗资料两个 Tab 都可能出现，各自有空容器守卫
     return;
   }
   const memberEditButton = event.target.closest('[data-member-edit]');
