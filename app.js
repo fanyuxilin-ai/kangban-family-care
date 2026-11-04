@@ -974,15 +974,6 @@ function renderDocs() {
         <div class="docs-member-ops single">
           <button class="secondary-button" data-action="appointment" data-appointment-member="${member.id}">就诊准备清单 · 完成后生成分享码</button>
         </div>
-        ${(() => {
-          const previsit = preVisitEntries(member.id);
-          return `<div class="docs-sub-head"><span>诊前自我描述</span><button class="text-button" data-action="previsit" data-previsit-member="${member.id}">${previsit.length ? '查看 / 补充 →' : '添加 →'}</button></div>
-          ${previsit.length ? `<article class="record-item previsit-item" data-action="previsit" data-previsit-member="${member.id}" tabindex="0" role="button" aria-label="查看诊前自我描述">
-            <span class="record-icon">✎</span>
-            <div class="record-body"><strong>${esc((previsit[0].text || '（语音 / 照片记录）').slice(0, 42))}</strong><small>${esc(previsit[0].createdAt)}${previsit.length > 1 ? ` · 共 ${previsit.length} 条` : ''}</small></div>
-            <span class="member-chevron">›</span>
-          </article>` : '<p class="empty-hint" style="margin:2px 0">还没有记录；就诊前把近期症状、饮食睡眠先写下来，见医生时更好描述。</p>'}`;
-        })()}
         <div class="docs-sub-head"><span>就医资料库 · 按就诊日期归档</span><button class="text-button" data-action="upload" data-upload-member="${member.id}">＋ 添加</button></div>
         ${visitRows.length ? `<div class="record-list">${previewRows(visitRows, `docsrec-${member.id}`)}</div>` : '<p class="empty-hint" style="margin:2px 0">暂无就诊资料，点右上「＋ 添加」上传，同一天的资料自动归为一次就诊。</p>'}
         <small class="privacy-small" style="display:block;margin:4px 0 2px">点某次就诊可查看当天全部资料；AI 概括病症仅供整理参考。体检 / 化验报告在「健康档案 · 导入体检单」录入。</small>
@@ -2252,33 +2243,44 @@ function showShare(memberId = '') {
   const recent = (state.shares || []).slice(-3).reverse();
   const allergyAlert = member.allergies && !/无/.test(member.allergies);
   const visits = visitGroups(member.id);
-  /* 就诊资料逐次勾选（默认勾最近一次）；过往就诊折叠 */
-  const visitRow = visit => `<label class="share-toggle share-visit-row"><span><strong>${formatDate(visit.date)} · ${esc(visit.summary.slice(0, 16))}</strong><small>${visit.records.length} 份资料 · 可勾选分享</small></span><input type="checkbox" class="share-visit-check" data-share-visit-label="就诊资料 × " ${visits.indexOf(visit) === 0 ? 'checked' : ''} /><span class="switch"></span></label>`;
-  const firstVisits = visits.slice(0, 1).map(visitRow).join('');
-  const restVisits = visits.slice(1).map(visitRow).join('');
+  /* 三大分享项：就医信息卡 / 当前用药清单 / 历史看诊记录（内含每次就诊小项，可单独勾选，过往折叠） */
   const scopes = [
     { key: 'card', label: '就医信息卡', hint: `慢病摘要${allergyAlert ? ' · 过敏史（红标）' : ' · 过敏史'} · 长期用药`, on: true },
-    { key: 'meds', label: '当前用药清单', hint: '全部在服药物与频次', on: false }
+    { key: 'meds', label: '当前用药清单', hint: '全部在服药物与频次', on: false },
+    { key: 'visits', label: '历史看诊记录', hint: `${visits.length} 次就诊 · 勾选要分享的记录`, on: true }
   ];
-  openModal(`${modalHead('由患者或家属现场发起', `分享${esc(member.name)}的就医资料`, '清单已全部确认。勾选分享范围与就诊资料后出示二维码，访问记录可随时撤销。')}
-    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> ${esc(member.name)}的就医信息卡</span><h3>${visits[0] ? esc(visits[0].summary.slice(0, 16)) : '下次复诊'}</h3><p id="shareScopeSummary">就医信息卡 · 就诊资料 × 1</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
+  const visitRow = (visit, index) => `<label class="share-toggle share-visit-row"><span><strong>${formatDate(visit.date)} · ${esc(visit.summary.slice(0, 16))}</strong><small>${visit.records.length} 份资料</small></span><input type="checkbox" class="share-visit-check" ${index === 0 ? 'checked' : ''} /><span class="switch"></span></label>`;
+  const firstVisits = visits.slice(0, 1).map((visit, index) => visitRow(visit, index)).join('');
+  const restVisits = visits.slice(1).map((visit, index) => visitRow(visit, index + 1)).join('');
+  openModal(`${modalHead('由患者或家属现场发起', `分享${esc(member.name)}的就医资料`, '清单已全部确认。勾选分享范围后出示二维码，历史看诊记录里可单独勾选每一次就诊。')}
+    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> ${esc(member.name)}的就医信息卡</span><h3>${visits[0] ? esc(visits[0].summary.slice(0, 16)) : '下次复诊'}</h3><p id="shareScopeSummary">就医信息卡 · 历史看诊记录 × 1</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
     <div class="share-scope-list">${scopes.map(item => `<label class="share-toggle"><span><strong>${item.label}</strong><small>${item.hint}</small></span><input type="checkbox" data-share-scope="${item.key}" data-share-summary="${item.label}" ${item.on ? 'checked' : ''} /><span class="switch"></span></label>`).join('')}
-      ${firstVisits}
-      <div id="shareVisitRest" hidden>${restVisits}</div>
-      ${visits.length > 1 ? `<button class="text-button preview-toggle" id="shareVisitExpand">展开全部 ${visits.length} 次就诊 ⌄</button>` : ''}
+      <div id="shareVisitSub">
+        ${firstVisits}
+        <div id="shareVisitRest" hidden>${restVisits}</div>
+        ${visits.length > 1 ? `<button class="text-button preview-toggle" id="shareVisitExpand">展开全部 ${visits.length} 次就诊 ⌄</button>` : ''}
+        <p class="privacy-small" style="text-align:left;margin:4px 0 0">关闭「历史看诊记录」即不分享任何就诊资料。</p>
+      </div>
     </div>
     <div class="share-log"><h3>最近访问记录</h3>${recent.length ? recent.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)}</small></div>`).join('') : '<p class="privacy-small">还没有访问记录。</p>'}</div>
     <button class="primary-button" id="revokeShare">撤销此演示分享</button>
     <p class="privacy-small">演示二维码为界面模拟，未连接外部扫码服务；勾选仅改变摘要展示，不发送任何数据。</p>`);
   const updateSummary = () => {
     const labels = [...document.querySelectorAll('[data-share-scope]:checked')].map(item => item.dataset.shareSummary);
-    const visitCount = document.querySelectorAll('.share-visit-check:checked').length;
+    const visitsOn = document.querySelector('[data-share-scope="visits"]')?.checked;
+    const visitCount = visitsOn ? document.querySelectorAll('.share-visit-check:checked').length : 0;
     const parts = [...labels];
-    if (visitCount) parts.push(`就诊资料 × ${visitCount}`);
+    if (visitCount) parts[parts.length - 1] = `历史看诊记录 × ${visitCount}`;
     const summary = document.getElementById('shareScopeSummary');
     if (summary) summary.textContent = parts.length ? parts.join(' · ') : '未选择任何内容（二维码不可用）';
   };
-  document.querySelectorAll('[data-share-scope], .share-visit-check').forEach(input => input.addEventListener('change', updateSummary));
+  document.querySelectorAll('[data-share-scope], .share-visit-check').forEach(input => input.addEventListener('change', event => {
+    if (event.target.dataset.shareScope === 'visits') {
+      const sub = document.getElementById('shareVisitSub');
+      if (sub) sub.hidden = !event.target.checked;
+    }
+    updateSummary();
+  }));
   document.getElementById('shareVisitExpand')?.addEventListener('click', event => {
     const rest = document.getElementById('shareVisitRest');
     if (!rest) return;
