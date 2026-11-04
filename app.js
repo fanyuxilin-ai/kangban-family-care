@@ -261,6 +261,18 @@ function appointmentLabel(member) {
   const visit = new Date(); visit.setHours(12,0,0,0); visit.setDate(visit.getDate()+4);
   return `${visit.getMonth()+1}月${visit.getDate()}日 · ${member ? esc(member.name) : '心内科'}复诊`;
 }
+/* 就诊准备清单公共定义与进度（清单全部勾选后才可生成就诊分享码） */
+const APPOINTMENT_ITEMS = [
+  ['idCard', '医保卡与身份证', '就诊时出示'],
+  ['reports', '近期检查报告', '血常规、心电图等资料'],
+  ['medicines', '当前用药清单', '可带药盒或核对档案'],
+  ['questions', '想问医生的问题', '提前记下最关心的几件事'],
+  ['selfDescription', '诊前自我描述', '记录近期症状、变化、饮食和生活情况']
+];
+function appointmentProgress(member) {
+  const checks = (state.appointmentChecksByMember || {})[member.id] || state.appointmentChecks || {};
+  return APPOINTMENT_ITEMS.filter(([key]) => key === 'selfDescription' ? (checks[key] || preVisitEntries(member.id).length > 0) : checks[key]).length;
+}
 function displayToday() {
   const now = new Date();
   document.getElementById('todayLabel').textContent = `${now.getMonth()+1}月${now.getDate()}日 · 家庭健康档案`;
@@ -959,9 +971,8 @@ function renderDocs() {
           <div><span class="field-label">长期用药</span><strong>${esc(member.medications)}</strong></div>
           <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
         </div>
-        <div class="docs-member-ops">
-          <button class="secondary-button" data-action="appointment" data-appointment-member="${member.id}">就诊准备清单</button>
-          <button class="secondary-button" data-action="share" data-share-member="${member.id}">生成就诊分享码</button>
+        <div class="docs-member-ops single">
+          <button class="secondary-button" data-action="appointment" data-appointment-member="${member.id}">就诊准备清单 · 完成后生成分享码</button>
         </div>
         ${(() => {
           const previsit = preVisitEntries(member.id);
@@ -2130,20 +2141,18 @@ function showAppointment(memberId = '') {
   const memberChecks = (state.appointmentChecksByMember || (state.appointmentChecksByMember = {}))[member.id];
   const checks = memberChecks || state.appointmentChecks || {};
   const hasDescription = preVisitEntries(member.id).length > 0;
-  const items = [
-    ['idCard', '医保卡与身份证', '就诊时出示'],
-    ['reports', '近期检查报告', '血常规、心电图等资料'],
-    ['medicines', '当前用药清单', '可带药盒或核对档案'],
-    ['questions', '想问医生的问题', '提前记下最关心的几件事'],
-    ['selfDescription', '诊前自我描述', '记录近期症状、变化、饮食和生活情况']
-  ];
+  const items = APPOINTMENT_ITEMS;
   const count = items.filter(([key]) => key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]).length;
-  openModal(`${modalHead(appointmentLabel(member), `${esc(member.name)} · 就诊准备清单`, `和${esc(member.name)}一起确认要带的资料。勾选状态按成员保存在这台设备上。`)}
-    <div class="checklist-progress"><strong id="checklistCount">已准备 ${count} / ${items.length} 项</strong><span>${count === items.length ? '准备好了' : '逐项确认'}</span></div>
+  const ready = count === items.length;
+  openModal(`${modalHead(appointmentLabel(member), `${esc(member.name)} · 就诊准备清单`, `和${esc(member.name)}一起确认要带的资料。全部确认后即可生成就诊分享码。`)}
+    <div class="checklist-progress"><strong id="checklistCount">已准备 ${count} / ${items.length} 项</strong><span>${ready ? '已就绪 · 可生成分享码' : '逐项确认'}</span></div>
     <div class="appointment-checklist">${items.map(([key, title, hint]) => `<label class="checklist-row"><input type="checkbox" data-checklist="${key}" data-appointment-member="${member.id}" ${(key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]) ? 'checked' : ''} ${key === 'selfDescription' && hasDescription ? 'disabled' : ''}><span class="checkmark"></span><span class="checklist-copy"><strong>${title}</strong><small>${hint}</small></span></label>`).join('')}</div>
     <button class="secondary-button" id="openPreVisitDescription">${hasDescription ? '查看 / 补充诊前描述' : '添加诊前自我描述'}</button>
-    <div class="health-highlight">就医信息卡可由${esc(member.name)}主动向医生展示。清单仅帮助准备资料，不替代医生问诊。</div>
-    <button class="primary-button" id="appointmentCard" data-card-member="${member.id}">打开${esc(member.name)}的就医信息卡</button>`);
+    <div class="health-highlight">${ready ? '清单已全部确认，可以生成就诊分享码了。' : `还差 ${items.length - count} 项：全部勾选后解锁「生成就诊分享码」。`}</div>
+    ${ready
+      ? `<button class="primary-button" data-action="share" data-share-member="${member.id}">生成就诊分享码</button>`
+      : `<button class="secondary-button" data-action="share" data-share-member="${member.id}" style="opacity:.6">🔒 生成就诊分享码（完成清单后解锁）</button>`}
+    <button class="secondary-button" id="appointmentCard" data-card-member="${member.id}">打开${esc(member.name)}的就医信息卡</button>`);
 }
 /* 诊前描述按成员隔离；早期演示数据未带成员标记，归到首位长辈名下 */
 function preVisitEntries(memberId) {
@@ -2231,28 +2240,52 @@ async function showRecord(recordId) {
 }
 function showShare(memberId = '') {
   const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
-  const visits = visitGroups(member.id);
-  const latest = visits[0];
+  const done = appointmentProgress(member);
+  /* 闸门：就诊准备清单全部勾选后才可生成就诊分享码 */
+  if (done < APPOINTMENT_ITEMS.length) {
+    openModal(`${modalHead(`还差 ${APPOINTMENT_ITEMS.length - done} 项 · ${esc(member.name)}`, '先完成就诊准备清单', `生成就诊分享码前，请先和${esc(member.name)}逐项确认要带的资料；全部勾选后即可生成。`)}
+      <div class="checklist-progress"><strong>已准备 ${done} / ${APPOINTMENT_ITEMS.length} 项</strong><span>逐项确认</span></div>
+      <button class="primary-button" data-action="appointment" data-appointment-member="${member.id}">回到就诊准备清单</button>
+      <p class="privacy-small">清单包含医保卡证件、检查报告、用药清单、想问医生的问题和诊前自我描述。</p>`);
+    return;
+  }
   const recent = (state.shares || []).slice(-3).reverse();
   const allergyAlert = member.allergies && !/无/.test(member.allergies);
-  /* 分享范围默认：就医信息卡 + 最近一次就诊资料必带（医生现场最需要），用药清单可选 */
+  const visits = visitGroups(member.id);
+  /* 就诊资料逐次勾选（默认勾最近一次）；过往就诊折叠 */
+  const visitRow = visit => `<label class="share-toggle share-visit-row"><span><strong>${formatDate(visit.date)} · ${esc(visit.summary.slice(0, 16))}</strong><small>${visit.records.length} 份资料 · 可勾选分享</small></span><input type="checkbox" class="share-visit-check" data-share-visit-label="就诊资料 × " ${visits.indexOf(visit) === 0 ? 'checked' : ''} /><span class="switch"></span></label>`;
+  const firstVisits = visits.slice(0, 1).map(visitRow).join('');
+  const restVisits = visits.slice(1).map(visitRow).join('');
   const scopes = [
     { key: 'card', label: '就医信息卡', hint: `慢病摘要${allergyAlert ? ' · 过敏史（红标）' : ' · 过敏史'} · 长期用药`, on: true },
-    { key: 'visit', label: '最近一次就诊资料', hint: latest ? `${formatDate(latest.date)} · ${esc(latest.summary.slice(0, 20))} · ${latest.records.length} 份` : '暂无就诊资料', on: true },
     { key: 'meds', label: '当前用药清单', hint: '全部在服药物与频次', on: false }
   ];
-  openModal(`${modalHead('由患者或家属现场发起', `分享${esc(member.name)}的就医资料`, '勾选分享范围后出示二维码。访问记录会显示在家庭档案中，可随时撤销。')}
-    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> ${esc(member.name)}的就医信息卡</span><h3>${latest ? esc(latest.summary.slice(0, 16)) : '下次复诊'}</h3><p id="shareScopeSummary">${scopes.filter(item => item.on).map(item => item.label).join(' · ')}</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
-    <div class="share-scope-list">${scopes.map(item => `<label class="share-toggle"><span><strong>${item.label}</strong><small>${item.hint}</small></span><input type="checkbox" data-share-scope="${item.key}" data-share-summary="${item.label}" ${item.on ? 'checked' : ''} /><span class="switch"></span></label>`).join('')}</div>
+  openModal(`${modalHead('由患者或家属现场发起', `分享${esc(member.name)}的就医资料`, '清单已全部确认。勾选分享范围与就诊资料后出示二维码，访问记录可随时撤销。')}
+    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> ${esc(member.name)}的就医信息卡</span><h3>${visits[0] ? esc(visits[0].summary.slice(0, 16)) : '下次复诊'}</h3><p id="shareScopeSummary">就医信息卡 · 就诊资料 × 1</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
+    <div class="share-scope-list">${scopes.map(item => `<label class="share-toggle"><span><strong>${item.label}</strong><small>${item.hint}</small></span><input type="checkbox" data-share-scope="${item.key}" data-share-summary="${item.label}" ${item.on ? 'checked' : ''} /><span class="switch"></span></label>`).join('')}
+      ${firstVisits}
+      <div id="shareVisitRest" hidden>${restVisits}</div>
+      ${visits.length > 1 ? `<button class="text-button preview-toggle" id="shareVisitExpand">展开全部 ${visits.length} 次就诊 ⌄</button>` : ''}
+    </div>
     <div class="share-log"><h3>最近访问记录</h3>${recent.length ? recent.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)}</small></div>`).join('') : '<p class="privacy-small">还没有访问记录。</p>'}</div>
     <button class="primary-button" id="revokeShare">撤销此演示分享</button>
     <p class="privacy-small">演示二维码为界面模拟，未连接外部扫码服务；勾选仅改变摘要展示，不发送任何数据。</p>`);
-  document.querySelectorAll('[data-share-scope]').forEach(input => input.addEventListener('change', () => {
+  const updateSummary = () => {
     const labels = [...document.querySelectorAll('[data-share-scope]:checked')].map(item => item.dataset.shareSummary);
+    const visitCount = document.querySelectorAll('.share-visit-check:checked').length;
+    const parts = [...labels];
+    if (visitCount) parts.push(`就诊资料 × ${visitCount}`);
     const summary = document.getElementById('shareScopeSummary');
-    if (summary) summary.textContent = labels.length ? labels.join(' · ') : '未选择任何内容（二维码不可用）';
-    toast(`分享范围已更新：${labels.length ? labels.join('、') : '已清空'}`);
-  }));
+    if (summary) summary.textContent = parts.length ? parts.join(' · ') : '未选择任何内容（二维码不可用）';
+  };
+  document.querySelectorAll('[data-share-scope], .share-visit-check').forEach(input => input.addEventListener('change', updateSummary));
+  document.getElementById('shareVisitExpand')?.addEventListener('click', event => {
+    const rest = document.getElementById('shareVisitRest');
+    if (!rest) return;
+    const open = !rest.hidden;
+    rest.hidden = open;
+    event.currentTarget.textContent = open ? `展开全部 ${visits.length} 次就诊 ⌄` : '收起 ⌃';
+  });
 }
 function showCompanionForm(service, sourceOrder = null) {
   if (!state.companionProfile.available) { showInfo('暂不可预约', `${state.companionProfile.name}目前暂停接单。你可以稍后再查看。`); return; }
