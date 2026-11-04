@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'kangban-demo-v6';
+const STORAGE_KEY = 'kangban-demo-v7';
 function dateOffset(days) {
   const date = new Date(); date.setHours(12,0,0,0); date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -9,6 +9,13 @@ const seed = {
     { id: 'r2', memberId: 'm2', type: '用药记录', title: '日常用药清单', hospital: '家属补充 · 最近核对', date: dateOffset(-5), state: '已核对', icon: '＋' },
     { id: 'r3', memberId: 'm1', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市第一人民医院 · 收费处', date: dateOffset(-8), state: '已核对', icon: '▤' },
     { id: 'r4', memberId: 'm2', type: '费用明细', title: '住院费用明细清单', hospital: '市第一人民医院 · 住院部', date: dateOffset(-25), state: '已核对', icon: '≣' },
+    { id: 'r5', memberId: 'm1', type: '出院小结', title: '心内科出院小结', hospital: '市第一人民医院 · 心内科住院部', date: dateOffset(-26), state: '已核对', icon: '⌂' },
+    { id: 'r6', memberId: 'm2', type: '门诊病历', title: '内分泌科门诊病历（糖尿病随访）', hospital: '市中医院 · 内分泌科', date: dateOffset(-6), state: '已核对', icon: '⌂' },
+    { id: 'r7', memberId: 'm2', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市中医院 · 收费处', date: dateOffset(-6), state: '已核对', icon: '▤' },
+    { id: 'r8', memberId: 'm3', type: '疾病诊断证明书', title: '甲状腺结节疾病诊断证明书', hospital: '市第一人民医院 · 甲状腺外科', date: dateOffset(-12), state: '已核对', icon: '⌂' },
+    { id: 'r9', memberId: 'm4', type: '外伤门诊病历', title: '外伤门诊病历（左踝扭伤）', hospital: '区人民医院 · 急诊外科', date: dateOffset(-4), state: '已核对', icon: '⌂' },
+    { id: 'r10', memberId: 'm4', type: '医疗费用发票', title: '急诊医疗费用发票', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '▤' },
+    { id: 'r11', memberId: 'm4', type: '费用明细', title: '急诊费用明细清单', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '≣' },
   ],
   companionOrders: [],
   currentRole: 'family',
@@ -86,13 +93,62 @@ const seed = {
     { id: 'bm-36', memberId: 'm2', metric: '血糖', value: 7.9, unit: 'mmol/L', date: dateOffset(0), time: '08:00', source: '血糖仪', channel: 'daily' }
   ],
   insurancePolicies: [
-    { id: 'pol-1', memberId: 'm1', type: 'social', name: '深圳市职工医保', company: '深圳市医保局', policyNo: 'DEMO-4403-0001', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31', terms: '医保目录内门诊 / 住院费用按规定比例结算，个人账户或统筹支付（演示条款）' },
-    { id: 'pol-2', memberId: 'm1', type: 'commercial', name: '百万医疗险', company: '演示人寿', policyNo: 'DEMO-COM-2001', coverage: '200 万', start: '2025-03-15', end: '2027-03-14', terms: '住院及特殊门诊医疗费用，经社保结算后 100% 报销，免赔额 1 万；纯体检 / 检查不属于赔付范围（演示条款）' },
-    { id: 'pol-3', memberId: 'm2', type: 'social', name: '广州市城乡居民医保', company: '广州市医保局', policyNo: 'DEMO-4401-0002', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31' },
-    { id: 'pol-4', memberId: 'm2', type: 'commercial', name: '防癌医疗险', company: '演示财险', policyNo: 'DEMO-COM-2002', coverage: '100 万', start: '2025-06-01', end: '2026-12-20', terms: '恶性肿瘤确诊后的住院 / 门诊医疗费用，0 免赔 100% 报销（演示条款）' },
-    { id: 'pol-5', memberId: 'm3', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0003', coverage: '按医保目录', start: '2023-07-01', end: '2026-12-31' },
-    { id: 'pol-6', memberId: 'm4', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0004', coverage: '按医保目录', start: '2022-04-01', end: '2026-12-31' },
-    { id: 'pol-7', memberId: 'm4', type: 'commercial', name: '综合意外险', company: '演示财险', policyNo: 'DEMO-COM-2003', coverage: '50 万', start: '2025-01-01', end: '2027-01-01' }
+    { id: 'pol-1', memberId: 'm1', type: 'social', name: '深圳市职工医保', company: '深圳市医保局', policyNo: 'DEMO-4403-0001', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31',
+      terms: '医保目录内门诊 / 住院费用按规定比例结算，个人账户或统筹支付。',
+      duties: ['普通门诊统筹：社区首诊，年度限额内按比例报销', '住院医疗：目录内费用统筹基金按比例支付，退休人员比例更高', '门诊特定病种：高血压、糖尿病等慢病可申请门特待遇'],
+      exclusions: ['非医保目录药品与诊疗项目（自费部分）', '第三方责任、工伤、生育保险支付的情形'],
+      hospital: '深圳市医保定点医疗机构', renewal: '按年缴费持续参保即可享受待遇' },
+    { id: 'pol-2', memberId: 'm1', type: 'commercial', category: 'medical', name: '好医保·终身防癌医疗险', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2001', coverage: '400 万', start: '2025-03-15', end: '2099-12-31',
+      terms: '恶性肿瘤医疗费用 0 免赔、经社保结算后 100% 报销；三高、糖尿病人群可投保。纯体检 / 一般检查不在赔付范围。',
+      deductible: '0 免赔', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '90 天', hospital: '二级及以上公立医院普通部',
+      duties: ['恶性肿瘤住院医疗费用（床位费、药品费、手术费等）', '恶性肿瘤特殊门诊：放化疗、靶向、免疫治疗等', '质子重离子医疗费用（100% 报销）', '恶性肿瘤院外特定药品费用（清单内，直付）'],
+      exclusions: ['非恶性肿瘤原因的住院与门诊费用', '投保前已有疾病及其并发症', '纯体检 / 一般健康检查、司法鉴定类检查', '未在约定医院范围就诊的费用'],
+      renewal: '保证续保终身，费率可调整，产品停售不影响已续保期间' },
+    { id: 'pol-3', memberId: 'm2', type: 'social', name: '广州市城乡居民医保', company: '广州市医保局', policyNo: 'DEMO-4401-0002', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31',
+      terms: '城乡居民医保住院与门诊待遇按广州医保规定结算。',
+      duties: ['住院医疗：目录内费用按医院等级比例支付', '普通门诊统筹：基层首诊按比例报销', '门诊特定病种：糖尿病、高血压等病种限额报销'],
+      exclusions: ['非医保目录内项目', '境外就医费用'],
+      hospital: '广州市医保定点医疗机构', renewal: '每年 9–12 月集中参保缴费，次年享受待遇' },
+    { id: 'pol-4', memberId: 'm2', type: 'commercial', category: 'medical', name: '好医保·终身防癌医疗险', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2002', coverage: '400 万', start: '2025-06-01', end: '2099-12-31',
+      terms: '恶性肿瘤医疗费用 0 免赔、经社保结算后 100% 报销；三高、糖尿病人群可投保。',
+      deductible: '0 免赔', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '90 天', hospital: '二级及以上公立医院普通部',
+      duties: ['恶性肿瘤住院医疗费用', '恶性肿瘤特殊门诊：放化疗、靶向治疗等', '质子重离子医疗费用', '恶性肿瘤院外特定药品费用（清单内）'],
+      exclusions: ['非恶性肿瘤原因的医疗费用', '投保前已有疾病及其并发症', '纯体检 / 一般健康检查'],
+      renewal: '保证续保终身，费率可调整' },
+    { id: 'pol-5', memberId: 'm3', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0003', coverage: '按医保目录', start: '2023-07-01', end: '2026-12-31',
+      terms: '职工医保门诊 / 住院按规定比例结算，个人账户支付门诊费用。',
+      duties: ['普通门诊：选点就医按比例报销', '住院医疗：目录内费用统筹支付', '门诊特定病种待遇'],
+      exclusions: ['非医保目录内项目'],
+      hospital: '广州市医保定点医疗机构', renewal: '随单位按月缴费' },
+    { id: 'pol-6', memberId: 'm3', type: 'commercial', category: 'medical', name: '好医保·长期医疗险（20年版）', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2004', coverage: '一般医疗 200 万 · 重疾医疗 400 万', start: '2025-01-10', end: '2045-01-09',
+      terms: '一般医疗及重疾医疗费用，经社保结算后 100% 报销，免赔额 1 万（重疾 0 免赔）；20 年保证续保。',
+      deductible: '一般医疗 1 万/年；重疾医疗 0 免赔', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '90 天', hospital: '二级及以上公立医院普通部',
+      duties: ['一般住院医疗费用（200 万）', '121 种重大疾病住院医疗费用（400 万）', '特殊门诊：门诊肾透析、门诊恶性肿瘤治疗等', '住院前 7 天后 30 天门急诊费用', '质子重离子医疗（100% 报销）'],
+      exclusions: ['投保前已有疾病及其并发症', '牙科、视力矫正等非疾病治疗项目', '疗养、康复、体检类费用', '同一张发票不可在社保与商业险重复报销原件'],
+      renewal: '20 年保证续保，期满经保险公司审核后续保新版产品' },
+    { id: 'pol-7', memberId: 'm3', type: 'commercial', category: 'critical', name: '健康福·重疾险1号（一年期）', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2005', coverage: '重疾给付 30 万', start: '2025-01-01', end: '2026-12-31',
+      terms: '确诊 120 种重大疾病中的一种即一次性给付保额；给付型，与医疗费报销不冲突。',
+      waiting: '90 天',
+      duties: ['120 种重大疾病：确诊即一次性给付基本保额', '40 种轻症：给付 30% 基本保额', '重疾赔付后轻症责任继续有效'],
+      exclusions: ['等待期内确诊的重大疾病', '投保前已患疾病及其并发症', '遗传性疾病、先天性畸形、变形或染色体异常'],
+      renewal: '一年期产品，续保需重新健康告知与核保' },
+    { id: 'pol-8', memberId: 'm4', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0004', coverage: '按医保目录', start: '2022-04-01', end: '2026-12-31',
+      terms: '职工医保门诊 / 住院按规定比例结算。',
+      duties: ['普通门诊：选点就医按比例报销', '住院医疗：目录内费用统筹支付'],
+      exclusions: ['非医保目录内项目'],
+      hospital: '广州市医保定点医疗机构', renewal: '随单位按月缴费' },
+    { id: 'pol-9', memberId: 'm4', type: 'commercial', category: 'medical', name: '好医保·住院医疗（2020版）', company: '众安保险（支付宝投保）', policyNo: 'DEMO-COM-2006', coverage: '300 万', start: '2025-02-01', end: '2027-01-31',
+      terms: '疾病或意外住院医疗费用，经社保结算后 100% 报销，免赔额 1 万。',
+      deductible: '1 万/年', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '30 天', hospital: '二级及以上公立医院普通部',
+      duties: ['住院医疗费用（疾病或意外）', '特殊门诊医疗费用', '住院前后门急诊费用', '恶性肿瘤院外特定药品费用'],
+      exclusions: ['投保前已有疾病及其并发症', '非处方自行购药费用', '整形美容、不孕不育治疗'],
+      renewal: '6 年保证续保，期满经审核续保' },
+    { id: 'pol-10', memberId: 'm4', type: 'commercial', category: 'accident', name: '无忧保·综合意外险', company: '众安保险（支付宝投保）', policyNo: 'DEMO-COM-2007', coverage: '意外身故/伤残 50 万 · 意外医疗 2 万', start: '2025-01-01', end: '2027-01-01',
+      terms: '意外身故 / 伤残一次性给付 + 意外门急诊、住院医疗费用报销（0 免赔，社保内 100%）。猝死不属于意外。',
+      deductible: '意外医疗 0 免赔', ratio: '意外医疗：社保内 100%；未经社保 80%', waiting: '无（投保次日生效）', hospital: '二级及以上公立医院',
+      duties: ['意外身故：一次性给付 50 万', '意外伤残：按 1–10 级伤残比例给付', '意外门急诊与住院医疗费用报销', '意外住院津贴 50 元/天（单次限 90 天）'],
+      exclusions: ['猝死（不属于意外伤害）', '高风险运动：潜水、攀岩、赛车等', '酒驾、无证驾驶', '既往疾病导致的伤害'],
+      renewal: '一年期，到期自动续保扣费（可关闭）' }
   ],
   reimbursements: [
     { id: 'claim-1', memberId: 'm1', policyId: 'pol-2', recordId: 'r1', scene: '门诊治疗', createdAt: dateOffset(-2), status: '整理中', materials: [
@@ -102,10 +158,18 @@ const seed = {
       { label: '病历及检查报告（门诊病历已入库）', done: true },
       { label: '被保险人身份证复印件', done: false },
       { label: '受益人银行账户信息', done: false }
+    ] },
+    { id: 'claim-2', memberId: 'm4', policyId: 'pol-10', recordId: 'r9', scene: '意外伤害治疗', createdAt: dateOffset(-3), status: '整理中', materials: [
+      { label: '理赔申请书（保险公司模板）', done: false },
+      { label: '意外事故经过说明', done: false },
+      { label: '门诊病历及X光 / 检查报告（外伤病历已入库）', done: true },
+      { label: '医疗费用发票原件', done: false },
+      { label: '费用明细清单', done: false },
+      { label: '被保险人身份证复印件', done: false }
     ] }
   ],
-  nextClaimId: 2,
-  nextPolicyId: 8
+  nextClaimId: 3,
+  nextPolicyId: 11
 };
 let state = loadState();
 let currentTab = 'home';
@@ -664,21 +728,40 @@ function showCheckupConfirm(memberId) {
 
 /* ============ 保险报销 · 家庭成员保险档案（成员B负责模块） ============ */
 const POLICY_TYPE_LABEL = { social: '社保医保', commercial: '商业保险' };
+/* 险种分类标签（商业险细分） */
+const POLICY_CATEGORY_LABEL = { social: '社保医保', medical: '医疗险', critical: '重疾险', accident: '意外险' };
 /* ============ 报销联动引擎：医疗资料 → 自动匹配保单 + 材料清单（FR-07 演示） ============ */
 const CLAIM_MATERIALS = {
   social: ['医疗费用发票原件', '费用明细清单', '门诊病历或诊断证明', '社保卡 / 身份证复印件', '本人银行账户信息'],
-  commercial: ['理赔申请书（保险公司模板）', '医疗费用发票原件', '费用明细清单', '病历及检查报告', '被保险人身份证复印件', '受益人银行账户信息']
+  medical: ['理赔申请书（保险公司模板）', '医疗费用发票原件', '费用明细清单', '病历及检查报告', '被保险人身份证复印件', '受益人银行账户信息'],
+  critical: ['理赔申请书（保险公司模板）', '疾病诊断证明书原件', '病理检查 / 化验报告', '被保险人身份证复印件', '受益人银行账户信息'],
+  accident: ['理赔申请书（保险公司模板）', '意外事故经过说明', '门诊病历及X光 / 检查报告', '医疗费用发票原件', '费用明细清单', '被保险人身份证复印件']
 };
 const RECORD_SCENE = {
   '门诊病历': '门诊治疗',
   '就诊资料': '门诊就诊',
   '检查报告': '门诊检查 / 化验',
   '用药记录': '门诊用药',
+  '出院小结': '住院治疗',
+  '疾病诊断证明书': '重大疾病确诊',
+  '外伤门诊病历': '意外伤害治疗',
   '医疗费用发票': '医疗费用结算',
   '费用明细': '医疗费用结算'
 };
-/* 商业险触发范围：纯检查 / 体检报告无费用票据，一般不属于商业医疗险赔付范围，仅走医保 */
-const RECORD_CHANNELS = { '检查报告': ['social'] };
+/* 各资料类型可触发的报销通道：纯检查 / 体检报告无费用票据，仅走医保；
+   重疾险按「疾病诊断证明书」触发（确诊给付型）；意外险按「外伤门诊病历」触发 */
+const RECORD_CHANNELS = {
+  '检查报告': ['social'],
+  '疾病诊断证明书': ['critical'],
+  '外伤门诊病历': ['accident']
+};
+function policyChannel(policy) {
+  return policy.type === 'social' ? 'social' : (policy.category || 'medical');
+}
+function policyChip(policy) {
+  const cat = policyChannel(policy);
+  return `<span class="policy-type policy-type-${cat}">${POLICY_CATEGORY_LABEL[cat] || POLICY_TYPE_LABEL[policy.type] || '保险'}</span>`;
+}
 /* 某成员在某日期可用（生效中）的保单 */
 function activePoliciesAt(memberId, date) {
   const today = dateOffset(0);
@@ -686,61 +769,60 @@ function activePoliciesAt(memberId, date) {
     && (!policy.start || policy.start <= (date || today))
     && (!policy.end || policy.end >= (date || today)));
 }
-/* 资料录入后自动检索：符合什么报销条件 → 可用保单 + 对应材料清单（按保单条款范围过滤） */
+/* 资料录入后自动检索：符合什么报销条件 → 可用保单 + 对应材料清单（按险种通道过滤） */
 function matchReimbursements(record) {
   const scene = RECORD_SCENE[record.type] || '门诊就诊';
-  const channels = RECORD_CHANNELS[record.type] || ['social', 'commercial'];
+  const channels = RECORD_CHANNELS[record.type] || ['social', 'medical'];
   return activePoliciesAt(record.memberId, record.date)
-    .filter(policy => channels.includes(policy.type))
+    .filter(policy => channels.includes(policyChannel(policy)))
     .map(policy => ({
       policy,
       scene,
-      materials: CLAIM_MATERIALS[policy.type] || CLAIM_MATERIALS.social
+      materials: CLAIM_MATERIALS[policyChannel(policy)] || CLAIM_MATERIALS.social
     }));
 }
-/* 报销提醒弹窗：录入资料后自动触发 */
+/* 报销提醒：录入资料后自动检索 → 命中即自动开启提醒（同一资料 + 同一保单只开一次） */
 function showReimbursementMatches(record) {
   const member = state.familyMembers.find(item => item.id === record.memberId);
   const matches = matchReimbursements(record);
   if (!matches.length) {
-    toast(`${member?.name || '该成员'}名下没有在此日期生效的保单，暂无报销匹配`);
+    toast(`${member?.name || '该成员'}名下没有在此日期生效、且覆盖该资料类型的保单，暂无报销匹配`);
     return;
   }
+  matches.forEach(({ policy, scene, materials }) => {
+    const exists = (state.reimbursements || []).some(claim => claim.recordId === record.id && claim.policyId === policy.id);
+    if (exists) return;
+    state.reimbursements.push({
+      id: `claim-${state.nextClaimId++}`,
+      memberId: record.memberId,
+      policyId: policy.id,
+      recordId: record.id,
+      scene,
+      createdAt: dateOffset(0),
+      status: '整理中',
+      materials: materials.map(label => ({ label, done: /病历|诊断证明|检查报告/.test(label) && ['门诊病历', '出院小结', '疾病诊断证明书', '外伤门诊病历'].includes(record.type) }))
+    });
+  });
+  saveState(); renderDocs();
   const blocks = matches.map(({ policy, scene, materials }, index) => {
-    const typeLabel = POLICY_TYPE_LABEL[policy.type] || '保险';
     const st = policyStateOf(policy);
     return `<div class="claim-match-block">
-      <div class="claim-match-head"><span class="policy-type policy-type-${policy.type}">${typeLabel}</span><strong>${esc(policy.name)}</strong><span class="reading-tag ${st.tag}">${st.label}</span></div>
+      <div class="claim-match-head">${policyChip(policy)}<strong>${esc(policy.name)}</strong><span class="reading-tag ${st.tag}">${st.label}</span></div>
       <small class="claim-match-scene">报销条件匹配：${esc(scene)} · ${esc(member?.name || '')} · ${formatDate(record.date)}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small>
-      ${policy.terms ? `<p class="claim-terms">条款摘要：${esc(policy.terms)}</p>` : ''}
+      ${policy.terms ? `<p class="claim-terms">条款要点：${esc(policy.terms)}</p>` : ''}
       <p class="claim-materials-title">需要准备的资料</p>
       <ul class="claim-materials">${materials.map(item => `<li>□ ${esc(item)}</li>`).join('')}</ul>
-      ${policy.type === 'commercial' && record.type === '检查报告' ? '<small class="privacy-small">注意：纯检查 / 体检报告通常不满足商业医疗险赔付条件（无费用票据），一般仅可用医保个人账户或门诊统筹。</small>' : ''}
-      ${index === 0 ? '<small class="privacy-small">社保与商业险通常不可用同一张发票原件重复报销，可用发票复印件 + 理赔分割单向商业险申请。</small>' : ''}
+      <button class="text-button" data-policy-detail="${policy.id}">查看该保险全部条款 →</button>
+      ${index === 0 ? '<small class="privacy-small" style="display:block;margin-top:4px">已自动开启报销提醒，材料清单可在医疗资料 · 保险报销区逐项勾选。</small>' : ''}
+      ${policy.type === 'commercial' && record.type === '检查报告' ? '<small class="privacy-small" style="display:block">注意：纯检查 / 体检报告通常不满足商业医疗险赔付条件（无费用票据），一般仅可用医保个人账户或门诊统筹。</small>' : ''}
+      ${index === 0 ? '<small class="privacy-small" style="display:block">社保与商业险通常不可用同一张发票原件重复报销，可用发票复印件 + 理赔分割单向商业险申请。</small>' : ''}
     </div>`;
   }).join('');
-  openModal(`${modalHead('报销提醒 · 自动检索', '这份资料可能可以报销', `${esc(record.title)} 已存入 ${esc(member?.name || '')} 的档案。系统按保单的生效时段自动匹配到 ${matches.length} 份可用保单，请核对材料清单。`)}
+  openModal(`${modalHead('报销提醒 · 自动检索', `已自动开启 ${matches.length} 条报销提醒`, `${esc(record.title)} 已存入 ${esc(member?.name || '')} 的档案。系统按保单生效时段与条款范围自动检索，以下保险的报销条件命中，材料清单已记入保险档案。`)}
     <div class="claim-match-list">${blocks}</div>
-    <button class="primary-button" id="saveClaimReminders">记入报销提醒（保险档案）</button>
-    <button class="secondary-button" id="skipClaim">暂不处理</button>
+    <button class="primary-button" id="closeClaimAuto">我知道了，去准备材料</button>
     <p class="privacy-small">材料清单为演示口径，实际以参保地医保局和保险公司要求为准；演示版不做报销金额计算。</p>`);
-  document.getElementById('saveClaimReminders')?.addEventListener('click', () => {
-    matches.forEach(({ policy, scene, materials }) => {
-      state.reimbursements.push({
-        id: `claim-${state.nextClaimId++}`,
-        memberId: record.memberId,
-        policyId: policy.id,
-        recordId: record.id,
-        scene,
-        createdAt: dateOffset(0),
-        status: '整理中',
-        materials: materials.map((label, i) => ({ label, done: record.type === '检查报告' && i === 3 }))
-      });
-    });
-    saveState(); renderDocs(); closeModal();
-    toast(`已记入 ${matches.length} 条报销提醒，到保险档案查看材料清单`);
-  });
-  document.getElementById('skipClaim')?.addEventListener('click', closeModal);
+  document.getElementById('closeClaimAuto')?.addEventListener('click', closeModal);
 }
 function policyStateOf(policy) {
   const today = dateOffset(0);
@@ -764,8 +846,8 @@ function claimRowHtml(claim, showMember = true) {
 function policyRowHtml(policy) {
   const st = policyStateOf(policy);
   return `<button class="policy-row" data-policy-detail="${policy.id}">
-    <span class="policy-type policy-type-${policy.type}">${POLICY_TYPE_LABEL[policy.type] || '保险'}</span>
-    <span class="policy-copy"><strong>${esc(policy.name)}</strong><small>${esc(policy.company || '')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''} · ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')}</small></span>
+    ${policyChip(policy)}
+    <span class="policy-copy"><strong>${esc(policy.name)}</strong><small>${esc(policy.company || '')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''} · ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')} · 点看条款</small></span>
     <span class="reading-tag ${st.tag}">${st.label}</span>
   </button>`;
 }
@@ -822,8 +904,10 @@ function showClaimDetail(claimId) {
   const record = state.records.find(item => item.id === claim.recordId);
   const done = claim.materials.filter(item => item.done).length;
   const ready = done === claim.materials.length;
-  openModal(`${modalHead(`报销提醒 · ${esc(member?.name || '')}`, `${POLICY_TYPE_LABEL[policy?.type] || '保险'} · ${esc(policy?.name || '保单已删除')}`, '勾选已准备好的材料，全部齐备后即可提交报销 / 理赔申请。材料清单为演示口径，以实际参保地与承保机构要求为准。')}
-    <div class="insurance-channel-card"><strong>来源资料：${esc(record?.title || '已删除')}（${formatDate(record?.date || claim.createdAt)}）</strong><small>${esc(claim.scene)} · 记录于 ${formatDate(claim.createdAt)}${policy?.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small></div>
+  openModal(`${modalHead(`报销提醒 · ${esc(member?.name || '')}`, `${esc(policy?.name || '保单已删除')}`, '勾选已准备好的材料，全部齐备后即可提交报销 / 理赔申请。材料清单为演示口径，以实际参保地与承保机构要求为准。')}
+    <div class="insurance-channel-card">${policy ? policyChip(policy) : ''}<strong>来源资料：${esc(record?.title || '已删除')}（${formatDate(record?.date || claim.createdAt)}）</strong><small>${esc(claim.scene)} · 记录于 ${formatDate(claim.createdAt)}${policy?.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small></div>
+    ${policy?.terms ? `<p class="claim-terms">条款要点：${esc(policy.terms)}</p>` : ''}
+    ${policy ? `<button class="text-button" data-policy-detail="${policy.id}" style="margin-bottom:6px">查看该保险全部条款 →</button>` : ''}
     <p class="claim-materials-title">材料清单（勾选 ${done}/${claim.materials.length}）</p>
     <div class="claim-check-list">${claim.materials.map((item, index) => `<button class="claim-check-row ${item.done ? 'is-done' : ''}" data-claim-toggle="${index}" data-claim-id="${claim.id}"><span class="claim-check-mark">${item.done ? '✓' : '□'}</span>${esc(item.label)}</button>`).join('')}</div>
     ${ready && claim.status !== '已提交' ? '<div class="health-highlight">材料已齐备，可以提交报销 / 理赔申请了。</div>' : ''}
@@ -844,13 +928,19 @@ function showPolicyEntry(memberId = '', policyId = '') {
       <label><span class="field-label-block">所属成员</span><select class="input-field" name="memberId">${memberOptions}</select></label>
       <label><span class="field-label-block">类型</span><select class="input-field" name="type">
         <option value="social" ${current.type === 'social' ? 'selected' : ''}>社保医疗保险</option>
-        <option value="commercial" ${current.type === 'commercial' ? 'selected' : ''}>商业医疗保险</option>
+        <option value="commercial" ${current.type === 'commercial' ? 'selected' : ''}>商业保险</option>
       </select></label>
-      <label><span class="field-label-block">保险名称</span><input class="input-field" name="name" required placeholder="例：百万医疗险" value="${esc(current.name)}" /></label>
-      <label><span class="field-label-block">承保机构</span><input class="input-field" name="company" placeholder="例：保险公司 / 医保局" value="${esc(current.company)}" /></label>
+      <label><span class="field-label-block">商业险种（商业保险适用）</span><select class="input-field" name="category">
+        <option value="medical" ${(current.category || 'medical') === 'medical' ? 'selected' : ''}>医疗险（费用报销型）</option>
+        <option value="critical" ${current.category === 'critical' ? 'selected' : ''}>重疾险（确诊给付型）</option>
+        <option value="accident" ${current.category === 'accident' ? 'selected' : ''}>意外险</option>
+      </select></label>
+      <label><span class="field-label-block">保险名称</span><input class="input-field" name="name" required placeholder="例：好医保·长期医疗险" value="${esc(current.name)}" /></label>
+      <label><span class="field-label-block">承保机构</span><input class="input-field" name="company" placeholder="例：人保健康（支付宝投保）" value="${esc(current.company)}" /></label>
       <label><span class="field-label-block">保单号（选填）</span><input class="input-field" name="policyNo" placeholder="演示数据请勿输入真实号码" value="${esc(current.policyNo)}" /></label>
       <label><span class="field-label-block">保额（选填）</span><input class="input-field" name="coverage" placeholder="例：200 万 / 按医保目录" value="${esc(current.coverage)}" /></label>
-      <label><span class="field-label-block">报销范围 / 条款摘要（选填）</span><input class="input-field" name="terms" placeholder="例：住院及门诊医疗，免赔额 1 万" value="${esc(current.terms || '')}" /></label>
+      <label><span class="field-label-block">条款摘要（选填）</span><input class="input-field" name="terms" placeholder="例：住院医疗费用经社保结算后 100% 报销" value="${esc(current.terms || '')}" /></label>
+      <label><span class="field-label-block">条款明细（选填，每行一条：标题｜内容）</span><textarea class="input-field" name="termsExtra" rows="3" placeholder="免赔额｜1 万/年${'\n'}等待期｜90 天${'\n'}除外责任｜投保前已有疾病"></textarea></label>
       <label><span class="field-label-block">生效日期</span><input class="input-field" name="start" type="date" value="${esc(current.start)}" /></label>
       <label><span class="field-label-block">到期日期</span><input class="input-field" name="end" type="date" value="${esc(current.end)}" /></label>
       <button class="primary-button" type="submit">${editing ? '保存修改' : '保存保单'}</button>
@@ -862,15 +952,18 @@ function showPolicyEntry(memberId = '', policyId = '') {
     const record = {
       memberId: data.get('memberId'),
       type: data.get('type'),
+      category: data.get('category') || 'medical',
       name: String(data.get('name') || '').trim(),
       company: String(data.get('company') || '').trim(),
       policyNo: String(data.get('policyNo') || '').trim(),
       coverage: String(data.get('coverage') || '').trim(),
       terms: String(data.get('terms') || '').trim(),
+      termsList: parseTermsLines(data.get('termsExtra')),
       start: String(data.get('start') || ''),
       end: String(data.get('end') || '')
     };
     if (!record.name) { toast('请填写保险名称'); return; }
+    if (editing && !record.termsList.length) record.termsList = policy.termsList || []; // 编辑时未填则保留原条款明细
     if (editing) {
       Object.assign(policy, record);
     } else {
@@ -881,26 +974,47 @@ function showPolicyEntry(memberId = '', policyId = '') {
     toast(`${member?.name || '成员'} 的「${record.name}」已${editing ? '更新' : '录入'}`);
   });
 }
-/* 保单详情：信息 + 报销/理赔材料包演示 + 编辑删除 */
+/* 条款明细 textarea（每行「标题｜内容」）→ 结构化条款列表 */
+function parseTermsLines(text) {
+  return String(text || '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const parts = line.split(/｜|\||：|:/);
+    return { title: (parts[0] || '').trim(), text: parts.slice(1).join('：').trim() };
+  }).filter(item => item.title && item.text);
+}
+/* 保单详情：全部条款信息 + 关联报销提醒 + 编辑删除 */
 function showPolicyDetail(policyId) {
   const policy = (state.insurancePolicies || []).find(item => item.id === policyId);
   if (!policy) return;
   const member = state.familyMembers.find(item => item.id === policy.memberId);
   const st = policyStateOf(policy);
-  const isSocial = policy.type === 'social';
-  openModal(`${modalHead(`保险档案 · ${esc(member?.name || '')}`, `${POLICY_TYPE_LABEL[policy.type] || '保险'} · ${esc(policy.name)}`, '报销与理赔从这份保单发起；材料包只保存一份，各渠道分别维护材料清单和办理进度。')}
-    <div class="insurance-channel-card"><strong>${esc(policy.name)} · ${esc(member?.name || '')}</strong><small>${esc(policy.company || '承保机构未填')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''} · ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')} · ${st.label}</small></div>
+  const claims = (state.reimbursements || []).filter(item => item.policyId === policy.id);
+  const termsRows = [
+    ['免赔额', policy.deductible],
+    ['报销比例', policy.ratio],
+    ['等待期', policy.waiting],
+    ['医院范围', policy.hospital],
+    ['续保条件', policy.renewal],
+    ...parseTermsLines((policy.termsList || []).map(item => `${item.title}｜${item.text}`).join('\n')).map(item => [item.title, item.text])
+  ].filter(([, value]) => value);
+  const hasDetail = termsRows.length || policy.duties?.length || policy.exclusions?.length;
+  openModal(`${modalHead(`保险档案 · ${esc(member?.name || '')}`, `${esc(policy.name)}`, '点击保单即可查看这份保险的全部条款信息；报销与理赔从这份保单发起。')}
+    <div class="insurance-channel-card">${policyChip(policy)}<strong>${esc(policy.name)} · ${esc(member?.name || '')}</strong><small>保单号 ${esc(policy.policyNo || '未填写')} · ${esc(policy.company || '承保机构未填')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small><small>保障期间 ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')} · ${st.label}</small></div>
     ${policy.terms ? `<p class="claim-terms">条款摘要：${esc(policy.terms)}</p>` : ''}
-    <div class="share-log"><h3>材料包与办理进度（演示）</h3>
-      <div class="log-row"><span>10月22日 市一院门诊 · 材料包</span><small>已提交</small></div>
-      <div class="log-row"><span>${isSocial ? '医保零星报销' : '商业险理赔申请'}</span><small>待补件</small></div>
+    ${hasDetail ? `<div class="policy-terms">
+      <h3>条款信息</h3>
+      ${termsRows.map(([label, value]) => `<div class="terms-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('')}
+      ${policy.duties?.length ? `<p class="claim-materials-title">保险责任（保什么）</p><ul class="terms-list">${policy.duties.map(item => `<li>● ${esc(item)}</li>`).join('')}</ul>` : ''}
+      ${policy.exclusions?.length ? `<p class="claim-materials-title">除外责任（不保什么）</p><ul class="terms-list terms-list-ex">${policy.exclusions.map(item => `<li>✕ ${esc(item)}</li>`).join('')}</ul>` : ''}
+    </div>` : '<p class="empty-hint" style="margin:4px 0">暂无结构化条款，可通过「编辑保单」补充条款明细。</p>'}
+    <div class="share-log"><h3>关联报销提醒（${claims.length}）</h3>
+      ${claims.length ? claims.map(claim => claimRowHtml(claim, false)).join('') : '<p class="empty-hint" style="margin:2px 0">暂无报销提醒；上传对应病历资料后会自动检索这份保单并开启提醒。</p>'}
     </div>
-    <div class="health-highlight">进度状态：待整理 → 已提交 → 待补件 → 处理中 → 已办结。演示版不做保险销售、不自动判断承保或赔付金额。</div>
+    <div class="health-highlight">报销从对应成员的保单发起：上传病历 → 自动检索条款 → 命中即开启提醒 → 勾材料 → 提交。演示版不做承保与赔付金额判断。</div>
     <div class="policy-detail-ops">
       <button class="secondary-button" data-policy-edit="${policy.id}">编辑保单</button>
       <button class="secondary-button policy-del-button" data-policy-del="${policy.id}">删除</button>
     </div>
-    <p class="privacy-small">演示版：材料包功能开发中，当前展示入口与信息架构。</p>`);
+    <p class="privacy-small">演示版：条款为模拟内容（支付宝在售产品风格），实际以保单合同条款为准。</p>`);
 }
 
 function renderHomeCompanionModule() {
@@ -2071,7 +2185,7 @@ document.addEventListener('click', async event => {
     const hospital = document.getElementById('extractHospital')?.value.trim() || '家属补充';
     const memberId = document.getElementById('extractMember')?.value || state.currentMemberId || 'm1';
     const recordId = `r${state.nextRecordId++}`;
-    const inferType = title.includes('药') ? ['用药记录', '＋'] : title.includes('发票') ? ['医疗费用发票', '▤'] : title.includes('明细') ? ['费用明细', '≣'] : title.includes('病历') ? ['门诊病历', '⌂'] : (title.includes('报告') || title.includes('检查') || title.includes('体检')) ? ['检查报告', '▤'] : ['就诊资料', '⌂'];
+    const inferType = title.includes('诊断证明') ? ['疾病诊断证明书', '⌂'] : (title.includes('意外') || title.includes('外伤')) ? ['外伤门诊病历', '⌂'] : (title.includes('出院') || title.includes('住院')) ? ['出院小结', '⌂'] : title.includes('药') ? ['用药记录', '＋'] : title.includes('发票') ? ['医疗费用发票', '▤'] : title.includes('明细') ? ['费用明细', '≣'] : title.includes('病历') ? ['门诊病历', '⌂'] : (title.includes('报告') || title.includes('检查') || title.includes('体检')) ? ['检查报告', '▤'] : ['就诊资料', '⌂'];
     const record = { id: recordId, memberId, type: inferType[0], title, hospital, date, state: '已核对', icon: inferType[1], ocrText: document.getElementById('extractText')?.value || '' };
     state.records.unshift(record);
     state.voiceNote = document.getElementById('extractNote')?.value || ''; saveState(); renderRecords(); closeModal();

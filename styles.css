@@ -87,7 +87,19 @@ nav[hidden]{display:none!important}
 .policy-copy small{font-size:9px;color:#8a958c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .policy-type{flex:none;font-size:8.5px;font-weight:600;padding:3px 7px;border-radius:20px}
 .policy-type-social{background:#e8f0f7;color:#3d6a8f}
-.policy-type-commercial{background:#e9f2e9;color:#4a7350}
+.policy-type-commercial,.policy-type-medical{background:#e9f2e9;color:#4a7350}
+.policy-type-critical{background:#f3e9f5;color:#7a4a8f}
+.policy-type-accident{background:#f7efe0;color:#8f6a3d}
+/* 保单详情 · 条款信息 */
+.policy-terms{background:#fafaf6;border:1px solid rgba(223,225,215,.7);border-radius:12px;padding:11px 12px;margin:8px 0}
+.policy-terms h3{font-size:10.5px;color:#445449;margin:0 0 6px}
+.terms-row{display:flex;gap:8px;font-size:9.5px;line-height:1.7;padding:3px 0}
+.terms-row + .terms-row{border-top:1px dashed rgba(223,225,215,.8)}
+.terms-row span{flex:none;width:56px;color:#8a958c}
+.terms-row strong{flex:1;color:#4c6452;font-weight:500}
+.terms-list{list-style:none;margin:0;padding:0}
+.terms-list li{font-size:9.5px;color:#5a6a5e;line-height:1.85}
+.terms-list-ex li{color:#a05b52}
 .policy-detail-ops{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 .policy-detail-ops .secondary-button{margin:0}
 .policy-del-button{color:#a1543f}
