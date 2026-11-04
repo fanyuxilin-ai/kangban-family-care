@@ -122,6 +122,17 @@ nav[hidden]{display:none!important}
 /* 资料库：可报销标签 + 录入弹窗成员选择 */
 .record-status.claimable{background:#e9f2e9;color:#4a7350}
 .extraction-select{flex:1;border:none;background:transparent;font-size:10px;color:#5a6a5e;text-align:right;font-family:inherit;outline:none}
+/* 医疗资料 Tab · 按成员展开（信息卡 + 资料库 + 保险报销） */
+.docs-member-list{display:flex;flex-direction:column}
+.docs-member-head{cursor:pointer;width:100%;background:none;border:none;text-align:left;padding:0;font-family:inherit}
+.docs-member-head .member-chevron{margin-left:auto;font-size:11px;color:#8a958c;flex:none}
+.docs-member-body{margin-top:4px;border-top:1px solid #f0efe9;padding-top:8px}
+.docs-sub-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:9px 0 7px}
+.docs-sub-head:first-child{margin-top:2px}
+.docs-sub-head span{font-size:10px;font-weight:700;color:#5c7663;letter-spacing:.02em}
+.docs-sub-head .text-button{font-size:9px;flex:none}
+.docs-member .record-item{background:#fafaf6;border:1px solid rgba(223,225,215,.6);border-radius:11px;margin-top:5px}
+.claim-terms{font-size:9px;color:#75827a;background:#f4f6f0;border-radius:8px;padding:7px 9px;line-height:1.6;margin:0 0 7px}
 .reading-list{display:flex;flex-direction:column}
 .reading-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #efeEE6}
 .reading-row:last-of-type{border-bottom:0}
