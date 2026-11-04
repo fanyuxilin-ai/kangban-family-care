@@ -73,11 +73,25 @@ nav[hidden]{display:none!important}
 .docs-quick-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 4px}
 .docs-quick-row .secondary-button{margin:0;height:46px;font-size:10px}
 .docs-library-heading{margin-top:26px}
-.insurance-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.insurance-card{display:flex;flex-direction:column;gap:6px;text-align:left;background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;padding:13px;box-shadow:0 4px 18px rgba(52,64,55,.045)}
-.insurance-card strong{font-size:11px;color:#445449}
-.insurance-card small{font-size:9px;line-height:1.6;color:#8a958c}
-.insurance-card:active{background:#f0f3ec}
+/* 保险报销 · 成员保险档案 */
+.insurance-member{background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;padding:12px 13px;margin-bottom:9px;box-shadow:0 4px 18px rgba(52,64,55,.045)}
+.insurance-member-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.insurance-member-head .text-button{margin-left:auto;font-size:9px;flex:none}
+.insurance-member-title{display:flex;flex-direction:column;gap:1px}
+.insurance-member-title strong{font-size:11px;color:#445449}
+.insurance-member-title small{font-size:9px;color:#8a958c}
+.policy-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#fafaf6;border:1px solid rgba(223,225,215,.6);border-radius:11px;padding:9px 10px;margin-top:6px;cursor:pointer}
+.policy-row:active{background:#f0f3ec}
+.policy-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.policy-copy strong{font-size:10.5px;color:#445449;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.policy-copy small{font-size:9px;color:#8a958c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.policy-type{flex:none;font-size:8.5px;font-weight:600;padding:3px 7px;border-radius:20px}
+.policy-type-social{background:#e8f0f7;color:#3d6a8f}
+.policy-type-commercial{background:#e9f2e9;color:#4a7350}
+.policy-detail-ops{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.policy-detail-ops .secondary-button{margin:0}
+.policy-del-button{color:#a1543f}
+.reading-tag-muted{background:#efefeb;color:#8a958c}
 .insurance-channel-card{display:flex;flex-direction:column;gap:6px;background:#eef2ea;border-radius:12px;padding:12px 13px;margin-top:2px}
 .insurance-channel-card strong{font-size:11px;color:#4c6452}
 .insurance-channel-card small{font-size:9px;color:#75827a;line-height:1.5}

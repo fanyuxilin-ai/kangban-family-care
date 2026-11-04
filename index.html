@@ -86,21 +86,19 @@
           <button class="secondary-button" data-action="appointment">就诊准备清单</button>
           <button class="secondary-button" data-action="share">生成就诊分享码</button>
         </div>
-        <section class="section-block collapsible" data-panel="docs-insurance">
-          <div class="section-heading"><div><p class="eyebrow">保单优先 · 成员B负责模块</p><h2>保险报销</h2></div><button class="section-collapse" data-panel-toggle="docs-insurance" aria-label="折叠或展开">▾</button></div>
-          <div class="section-body">
-          <div class="insurance-grid">
-            <button class="insurance-card" data-action="insurance-social"><strong>社保医疗保险</strong><small>参保档案 · 就医材料包 · 零星报销</small></button>
-            <button class="insurance-card" data-action="insurance-commercial"><strong>商业医疗保险</strong><small>保单管理 · 材料清单 · 理赔进度</small></button>
-          </div>
-          </div>
-        </section>
         <section class="section-block collapsible docs-library-block" data-panel="docs-library">
           <div class="section-heading"><div><p class="eyebrow">拍照上传 · OCR 识别入库</p><h2>资料库</h2></div><button class="section-collapse" data-panel-toggle="docs-library" aria-label="折叠或展开">▾</button></div>
           <div class="section-body">
           <div class="record-summary"><div><strong id="recordCount">0</strong><span>份资料</span></div><div class="summary-divider"></div><div><strong>已核对</strong><span>关键病史</span></div><button class="add-record" data-action="upload">＋ 添加</button></div>
           <div class="filter-row"><button class="filter-chip selected">全部</button><button class="filter-chip">检查报告</button><button class="filter-chip">用药记录</button></div>
           <div id="recordList" class="record-list"></div>
+          </div>
+        </section>
+        <section class="section-block collapsible" data-panel="docs-insurance">
+          <div class="section-heading"><div><p class="eyebrow">保单优先 · 成员B负责模块</p><h2>保险报销</h2></div><button class="text-button" data-action="insurance-entry">＋ 录入保单 <span>→</span></button><button class="section-collapse" data-panel-toggle="docs-insurance" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body">
+          <p class="subtle" style="margin:0 0 10px">每位家庭成员的社保医保与商业保险档案，报销与理赔都从对应成员的保单发起。</p>
+          <div id="insuranceArchiveList"></div>
           </div>
         </section>
       </section>

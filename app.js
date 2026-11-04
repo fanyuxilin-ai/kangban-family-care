@@ -84,7 +84,17 @@ const seed = {
     { id: 'bm-34', memberId: 'm1', metric: '体重', value: 58.6, unit: 'kg', date: dateOffset(0), time: '07:30', source: '体重秤', channel: 'daily' },
     { id: 'bm-35', memberId: 'm2', metric: '心率', value: 102, unit: '次/分', date: dateOffset(-1), time: '09:15', source: '模拟手表', channel: 'daily' },
     { id: 'bm-36', memberId: 'm2', metric: '血糖', value: 7.9, unit: 'mmol/L', date: dateOffset(0), time: '08:00', source: '血糖仪', channel: 'daily' }
-  ]
+  ],
+  insurancePolicies: [
+    { id: 'pol-1', memberId: 'm1', type: 'social', name: '深圳市职工医保', company: '深圳市医保局', policyNo: 'DEMO-4403-0001', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31' },
+    { id: 'pol-2', memberId: 'm1', type: 'commercial', name: '百万医疗险', company: '演示人寿', policyNo: 'DEMO-COM-2001', coverage: '200 万', start: '2025-03-15', end: '2027-03-14' },
+    { id: 'pol-3', memberId: 'm2', type: 'social', name: '广州市城乡居民医保', company: '广州市医保局', policyNo: 'DEMO-4401-0002', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31' },
+    { id: 'pol-4', memberId: 'm2', type: 'commercial', name: '防癌医疗险', company: '演示财险', policyNo: 'DEMO-COM-2002', coverage: '100 万', start: '2025-06-01', end: '2026-12-20' },
+    { id: 'pol-5', memberId: 'm3', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0003', coverage: '按医保目录', start: '2023-07-01', end: '2026-12-31' },
+    { id: 'pol-6', memberId: 'm4', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0004', coverage: '按医保目录', start: '2022-04-01', end: '2026-12-31' },
+    { id: 'pol-7', memberId: 'm4', type: 'commercial', name: '综合意外险', company: '演示财险', policyNo: 'DEMO-COM-2003', coverage: '50 万', start: '2025-01-01', end: '2027-01-01' }
+  ],
+  nextPolicyId: 8
 };
 let state = loadState();
 let currentTab = 'home';
@@ -125,6 +135,8 @@ function loadState() {
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
+    loaded.insurancePolicies = saved.insurancePolicies || structuredClone(seed.insurancePolicies);
+    loaded.nextPolicyId = saved.nextPolicyId || 8;
     return loaded;
   } catch { return structuredClone(seed); }
 }
@@ -642,18 +654,105 @@ function showCheckupConfirm(memberId) {
   });
 }
 
-function showInsuranceHub(channel) {
-  const isSocial = channel === 'social';
-  openModal(`${modalHead('保险报销 · 保单优先', isSocial ? '社保医疗保险' : '商业医疗保险', '从参保档案或保单进入，创建或关联一次就诊的材料包；材料包只保存一份，各渠道分别维护材料清单和办理进度。')}
-    <div class="insurance-channel-card"><strong>${isSocial ? '医保参保档案' : '演示保单'}：陈兰英</strong><small>${isSocial ? '深圳市职工医保（演示） · 异地就医备案未办理' : '百万医疗险（演示保单） · 保额 200 万 · 生效中'}</small></div>
+/* ============ 保险报销 · 家庭成员保险档案（成员B负责模块） ============ */
+const POLICY_TYPE_LABEL = { social: '社保医保', commercial: '商业保险' };
+function policyStateOf(policy) {
+  const today = dateOffset(0);
+  if (policy.end && policy.end < today) return { label: '已失效', tag: 'reading-tag-muted' };
+  const days = policy.end ? Math.round((new Date(policy.end) - new Date(today)) / 86400000) : Infinity;
+  if (days <= 60) return { label: '即将到期', tag: 'reading-tag-yellow' };
+  return { label: '生效中', tag: 'reading-tag-ok' };
+}
+/* 医疗资料 Tab · 保险报销区：按成员分组的保险档案 */
+function renderInsurance() {
+  const host = document.getElementById('insuranceArchiveList');
+  if (!host) return;
+  const policies = state.insurancePolicies || [];
+  host.innerHTML = state.familyMembers.map(member => {
+    const list = policies.filter(policy => policy.memberId === member.id);
+    const rows = list.map(policy => {
+      const st = policyStateOf(policy);
+      return `<button class="policy-row" data-policy-detail="${policy.id}">
+        <span class="policy-type policy-type-${policy.type}">${POLICY_TYPE_LABEL[policy.type] || '保险'}</span>
+        <span class="policy-copy"><strong>${esc(policy.name)}</strong><small>${esc(policy.company || '')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''} · ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')}</small></span>
+        <span class="reading-tag ${st.tag}">${st.label}</span>
+      </button>`;
+    }).join('');
+    return `<div class="insurance-member">
+      <div class="insurance-member-head">
+        <span class="mini-avatar ${member.avatarClass || ''}">${esc(member.name.slice(0, 1))}</span>
+        <div class="insurance-member-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${list.length} 份保单${list.some(p => policyStateOf(p).label === '即将到期') ? ' · <b class="member-alert-count">有保单即将到期</b>' : ''}</small></div>
+        <button class="text-button" data-member-policy-add="${member.id}">＋ 录入保单</button>
+      </div>
+      ${rows || '<p class="empty-hint" style="margin:4px 0">暂无保单，点右上「录入保单」添加。</p>'}
+    </div>`;
+  }).join('');
+}
+/* 录入 / 编辑保单（模拟） */
+function showPolicyEntry(memberId = '', policyId = '') {
+  const policy = policyId ? (state.insurancePolicies || []).find(item => item.id === policyId) : null;
+  const editing = !!policy;
+  const current = editing ? policy : { memberId: memberId || state.currentMemberId, type: 'social', name: '', company: '', policyNo: '', coverage: '', start: dateOffset(0), end: '' };
+  const memberOptions = state.familyMembers.map(member => `<option value="${member.id}" ${member.id === current.memberId ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('');
+  openModal(`${modalHead('保险档案 · 家庭成员', editing ? `编辑保单 · ${esc(policy.name)}` : '录入保单（模拟）', '每位成员的社保医保与商业保险都归到本人名下；报销时从对应成员的保单发起，材料包与理赔进度单独记录。')}
+    <form class="member-edit-form" id="policyForm">
+      <label><span class="field-label-block">所属成员</span><select class="input-field" name="memberId">${memberOptions}</select></label>
+      <label><span class="field-label-block">类型</span><select class="input-field" name="type">
+        <option value="social" ${current.type === 'social' ? 'selected' : ''}>社保医疗保险</option>
+        <option value="commercial" ${current.type === 'commercial' ? 'selected' : ''}>商业医疗保险</option>
+      </select></label>
+      <label><span class="field-label-block">保险名称</span><input class="input-field" name="name" required placeholder="例：百万医疗险" value="${esc(current.name)}" /></label>
+      <label><span class="field-label-block">承保机构</span><input class="input-field" name="company" placeholder="例：保险公司 / 医保局" value="${esc(current.company)}" /></label>
+      <label><span class="field-label-block">保单号（选填）</span><input class="input-field" name="policyNo" placeholder="演示数据请勿输入真实号码" value="${esc(current.policyNo)}" /></label>
+      <label><span class="field-label-block">保额（选填）</span><input class="input-field" name="coverage" placeholder="例：200 万 / 按医保目录" value="${esc(current.coverage)}" /></label>
+      <label><span class="field-label-block">生效日期</span><input class="input-field" name="start" type="date" value="${esc(current.start)}" /></label>
+      <label><span class="field-label-block">到期日期</span><input class="input-field" name="end" type="date" value="${esc(current.end)}" /></label>
+      <button class="primary-button" type="submit">${editing ? '保存修改' : '保存保单'}</button>
+    </form>
+    <p class="privacy-small">演示版仅在本机保存模拟数据，请勿录入真实保单号与个人信息；不做保险销售与承保判断。</p>`);
+  document.getElementById('policyForm')?.addEventListener('submit', ev => {
+    ev.preventDefault();
+    const data = new FormData(ev.target);
+    const record = {
+      memberId: data.get('memberId'),
+      type: data.get('type'),
+      name: String(data.get('name') || '').trim(),
+      company: String(data.get('company') || '').trim(),
+      policyNo: String(data.get('policyNo') || '').trim(),
+      coverage: String(data.get('coverage') || '').trim(),
+      start: String(data.get('start') || ''),
+      end: String(data.get('end') || '')
+    };
+    if (!record.name) { toast('请填写保险名称'); return; }
+    if (editing) {
+      Object.assign(policy, record);
+    } else {
+      state.insurancePolicies.push({ id: `pol-${state.nextPolicyId++}`, ...record });
+    }
+    const member = state.familyMembers.find(item => item.id === record.memberId);
+    saveState(); renderInsurance(); closeModal();
+    toast(`${member?.name || '成员'} 的「${record.name}」已${editing ? '更新' : '录入'}`);
+  });
+}
+/* 保单详情：信息 + 报销/理赔材料包演示 + 编辑删除 */
+function showPolicyDetail(policyId) {
+  const policy = (state.insurancePolicies || []).find(item => item.id === policyId);
+  if (!policy) return;
+  const member = state.familyMembers.find(item => item.id === policy.memberId);
+  const st = policyStateOf(policy);
+  const isSocial = policy.type === 'social';
+  openModal(`${modalHead(`保险档案 · ${esc(member?.name || '')}`, `${POLICY_TYPE_LABEL[policy.type] || '保险'} · ${esc(policy.name)}`, '报销与理赔从这份保单发起；材料包只保存一份，各渠道分别维护材料清单和办理进度。')}
+    <div class="insurance-channel-card"><strong>${esc(policy.name)} · ${esc(member?.name || '')}</strong><small>${esc(policy.company || '承保机构未填')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''} · ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')} · ${st.label}</small></div>
     <div class="share-log"><h3>材料包与办理进度（演示）</h3>
       <div class="log-row"><span>10月22日 市一院门诊 · 材料包</span><small>已提交</small></div>
       <div class="log-row"><span>${isSocial ? '医保零星报销' : '商业险理赔申请'}</span><small>待补件</small></div>
     </div>
     <div class="health-highlight">进度状态：待整理 → 已提交 → 待补件 → 处理中 → 已办结。演示版不做保险销售、不自动判断承保或赔付金额。</div>
-    <button class="primary-button" id="insuranceTodo">创建 / 关联就诊材料包</button>
-    <p class="privacy-small">完整模块由成员B按需求文档 FR-07 开发，当前为医疗资料分区下的入口演示。</p>`);
-  document.getElementById('insuranceTodo')?.addEventListener('click', () => { closeModal(); toast('演示版：材料包功能开发中，入口与信息架构已就位'); });
+    <div class="policy-detail-ops">
+      <button class="secondary-button" data-policy-edit="${policy.id}">编辑保单</button>
+      <button class="secondary-button policy-del-button" data-policy-del="${policy.id}">删除</button>
+    </div>
+    <p class="privacy-small">演示版：材料包功能开发中，当前展示入口与信息架构。</p>`);
 }
 
 function renderHomeCompanionModule() {
@@ -1706,8 +1805,8 @@ document.addEventListener('click', async event => {
   if (action === 'share') showShare();
   if (action === 'alerts') showAlertCenter();
   if (action === 'add-reading') showReadingEntry();
-  if (action === 'insurance-social') showInsuranceHub('social');
-  if (action === 'insurance-commercial') showInsuranceHub('commercial');
+  if (action === 'insurance-entry') showPolicyEntry();
+  if (action === 'insurance-social' || action === 'insurance-commercial') showPolicyEntry();
   if (action === 'ai-assistant') showInfo('AI 管理助手（规划中）', '规划能力：自动总结父母健康周报、回答健康咨询、生成就医准备清单，并支持「小康，今天该吃什么药」式语音交互。当前演示版可在「我的 · 健康趋势」查看固定统计。');
   if (action === 'devices') showInfo('设备管理（规划中）', '计划预留华为运动健康、小米运动健康等智能手表接入入口，同步睡眠、运动与跌倒监测数据。当前演示版可在预警中心「模拟手表同步」体验。');
   if (action === 'companion') navigate('companion');
@@ -1867,6 +1966,22 @@ document.addEventListener('click', async event => {
   if (memberReadingButton) { showReadingEntry(memberReadingButton.dataset.memberReading); return; }
   const memberDailyButton = event.target.closest('[data-member-daily]');
   if (memberDailyButton) { showDailyLog(memberDailyButton.dataset.memberDaily); return; }
+  const policyDetailButton = event.target.closest('[data-policy-detail]');
+  if (policyDetailButton) { showPolicyDetail(policyDetailButton.dataset.policyDetail); return; }
+  const policyEditButton = event.target.closest('[data-policy-edit]');
+  if (policyEditButton) { showPolicyEntry('', policyEditButton.dataset.policyEdit); return; }
+  const policyDelButton = event.target.closest('[data-policy-del]');
+  if (policyDelButton) {
+    const policy = (state.insurancePolicies || []).find(item => item.id === policyDelButton.dataset.policyDel);
+    if (policy) {
+      state.insurancePolicies = state.insurancePolicies.filter(item => item.id !== policy.id);
+      saveState(); renderInsurance(); closeModal();
+      toast(`已删除保单「${policy.name}」`);
+    }
+    return;
+  }
+  const memberPolicyAddButton = event.target.closest('[data-member-policy-add]');
+  if (memberPolicyAddButton) { showPolicyEntry(memberPolicyAddButton.dataset.memberPolicyAdd); return; }
   const dashboardButton = event.target.closest('[data-member-dashboard]');
   if (dashboardButton) { showMemberDashboard(dashboardButton.dataset.memberDashboard); return; }
   const metricChip = event.target.closest('[data-metric-chip]');
@@ -2137,7 +2252,7 @@ if (!state.alertsSeeded) {
   }
   saveState();
 }
-displayToday(); renderHomeAlerts(); renderRole(); renderRecords(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
+displayToday(); renderHomeAlerts(); renderRole(); renderRecords(); renderInsurance(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
 setInterval(checkMedicationReminders, 60000);
 setTimeout(checkMedicationReminders, 1500);
 setInterval(checkCustomReminders, 60000);
