@@ -370,3 +370,28 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .share-visit-row{margin-top:8px}
 /* 历史看诊记录子项：缩进 + 竖线层级 */
 #shareVisitSub{margin-top:8px;padding-left:12px;border-left:2px solid #e2e8de}
+
+/* ============ 陪诊需求区 / 接单大厅 / 任务分享码 / 收入（Pink：陪诊师端） ============ */
+.demand-post-list{display:flex;flex-direction:column;gap:9px;margin-bottom:12px}
+.demand-post-card{background:#fffefa;border:1px solid #e8e9e1;border-radius:13px;padding:12px 13px;box-shadow:0 4px 14px rgba(52,64,55,.04)}
+.demand-post-card p{font-size:10px;line-height:1.7;color:#647267;margin:7px 0}
+.demand-post-card .order-actions{margin-top:8px}
+.demand-post-card-done{opacity:.66}
+.income-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:#eef2e9;border:1px solid #dfe7da;border-radius:13px;padding:10px 12px;margin:10px 0 12px}
+.income-strip div{display:flex;flex-direction:column;gap:2px}
+.income-strip strong{font-size:14px;color:#4c6452}
+.income-strip span{font-size:9px;color:#8a958c}
+.escort-stat-grid-bio{margin-bottom:16px}
+.task-share-card{background:#fffefa;border:1px solid #e8e9e1;border-radius:13px;padding:12px 13px;margin:0 0 14px;box-shadow:0 4px 14px rgba(52,64,55,.04)}
+.task-share-head strong{font-size:11px;color:#3d4f42;display:block}
+.task-share-head small{display:block;font-size:8.5px;color:#8a958c;line-height:1.6;margin-top:3px}
+.task-share-form{display:flex;gap:8px;margin-top:9px}
+.task-share-form .input-field{flex:1;min-width:0;letter-spacing:4px;text-align:center;font-weight:600}
+.task-share-form .primary-button{flex:none}
+.task-share-result{margin-top:10px;background:#f4f6f0;border-radius:11px;padding:10px 11px}
+.task-share-result p{font-size:10px;line-height:1.7;color:#647267;margin:6px 0}
+.task-share-desc{font-size:10px;line-height:1.7;color:#5c6b60;margin:7px 0;white-space:pre-wrap}
+.task-share-error{color:#b0632f!important}
+.task-share-scope{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px}
+.task-share-code{font-size:30px!important;letter-spacing:10px;text-align:center;color:#3d4f42;margin:10px 0 4px!important}
+.task-share-scope .share-toggle small{font-size:8.5px}

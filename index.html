@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <div class="app-shell">
@@ -78,6 +78,10 @@
           <div class="section-body"><article class="escort-profile-card" id="familyEscortProfile"></article></div>
         </section>
         <div id="companionOrders"></div>
+        <section class="section-block collapsible" data-panel="demand-posts">
+          <div class="section-heading"><div><p class="eyebrow">社区需求区 · 招募陪诊</p><h2>陪诊需求大厅</h2></div><button class="text-button" data-action="demand-form">发布需求 →</button><button class="section-collapse" data-panel-toggle="demand-posts" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="demandPostList"></div></div>
+        </section>
         <section class="section-block collapsible" data-panel="companion-services">
           <div class="section-heading"><div><p class="eyebrow">演示服务</p><h2>选择需要的帮助</h2></div><button class="section-collapse" data-panel-toggle="companion-services" aria-label="折叠或展开">▾</button></div>
           <div class="section-body">
@@ -93,14 +97,26 @@
 
       <section class="view" id="view-escort">
         <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 演示角色</p><h1>预约与服务</h1><p class="subtle">查看预约、回应需求，并记录陪诊完成情况。</p></div>
-        <div class="escort-status-card"><div><span class="eyebrow">当前接单状态</span><strong id="escortAvailabilityLabel">可预约</strong><small id="escortAvailabilityText">家庭可以向你提交预约申请</small></div><button class="secondary-button compact-button" data-action="toggle-availability" id="availabilityButton">暂停接单</button></div>
-        <div class="escort-stat-grid"><div><strong id="escortPendingCount">0</strong><span>待确认</span></div><div><strong id="escortAcceptedCount">0</strong><span>待服务</span></div><div><strong id="escortCompletedCount">0</strong><span>已完成</span></div></div>
+        <div class="escort-status-card"><div><span class="eyebrow">当前接单状态</span><strong id="escortAvailabilityLabel">可预约</strong><small id="escortAvailabilityText">家庭可以向你提交预约申请</small></div><button class="secondary-button compact-button" data-action="toggle-availability" id="availabilityButton">暂停接单</button></div>        <div class="escort-stat-grid"><div><strong id="escortPendingCount">0</strong><span>待确认</span></div><div><strong id="escortAcceptedCount">0</strong><span>待服务</span></div><div><strong id="escortCompletedCount">0</strong><span>已完成</span></div></div>
+        <div class="income-strip" id="escortIncomeStrip"></div>
+        <div class="task-share-card" id="escortTaskShareCard">
+          <div class="task-share-head"><strong>本次任务信息 · 分享码</strong><small>家属生成的短时分享码是唯一数据通道；输入后仅可见本次任务信息，不含健康档案。</small></div>
+          <div class="task-share-form"><input class="input-field" id="taskShareCodeInput" inputmode="numeric" maxlength="6" placeholder="输入 6 位分享码" /><button class="primary-button" id="taskShareLookup">查看任务信息</button></div>
+          <div id="taskShareResult"></div>
+        </div>
         <div id="escortOrders" class="escort-order-list"></div>
         <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。只查看家属明确分享的本次预约信息。</p></div>
       </section>
 
+      <section class="view" id="view-escort-hall">
+        <div class="page-heading"><p class="eyebrow">社区需求区 · 接单大厅</p><h1>需求大厅</h1><p class="subtle">家庭发布的需求会先显示在这里。接单后转入标准陪诊订单，按项目清单履约。</p></div>
+        <div id="escortHallList"></div>
+        <div class="boundary-note"><strong>隐私边界</strong><p>需求帖仅显示医院、时间、服务项与需求描述，不包含任何健康档案、病史或用药信息。接单后如需更多信息，请向家属索取本次任务分享码。</p></div>
+      </section>
+
       <section class="view" id="view-escort-profile">
         <div class="page-heading"><p class="eyebrow">陪诊员个人资料 · 演示角色</p><h1>自我介绍</h1><p class="subtle">让家庭了解你的陪诊经验、服务范围和可预约时间。</p></div>
+        <div class="escort-stat-grid escort-stat-grid-bio"><div><strong id="escortBioCompleted">0</strong><span>已完成订单</span></div><div><strong id="escortBioIncome">¥0</strong><span>累计收入（模拟）</span></div><div><strong id="escortBioRating">新加入</strong><span>家庭评分</span></div></div>
         <form class="escort-profile-form" id="escortProfileForm">
           <label><span class="field-label-block">姓名 / 称呼</span><input class="input-field" name="name" id="escortNameInput" maxlength="24" required /></label>
           <label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" id="escortExperienceInput" maxlength="40" /></label>
@@ -135,6 +151,7 @@
     </nav>
     <nav class="tabbar" aria-label="陪诊员端主导航" id="escortTabs" hidden>
       <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
+      <button class="tab" data-tab="escort-hall"><span class="tab-icon">☁</span><span>需求大厅</span></button>
       <button class="tab" data-tab="escort-profile"><span class="tab-icon">◉</span><span>我的介绍</span></button>
     </nav>
   </div>
@@ -153,6 +170,6 @@
   <input type="file" id="policyFileInput" accept="image/*,.pdf" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="vendor/tesseract.min.js"></script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
