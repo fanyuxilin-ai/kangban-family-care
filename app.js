@@ -257,9 +257,9 @@ function formatDate(value) {
   const [y,m,d] = value.split('-').map(Number);
   return `${m}月${d}日`;
 }
-function appointmentLabel() {
+function appointmentLabel(member) {
   const visit = new Date(); visit.setHours(12,0,0,0); visit.setDate(visit.getDate()+4);
-  return `${visit.getMonth()+1}月${visit.getDate()}日 · 心内科复诊`;
+  return `${visit.getMonth()+1}月${visit.getDate()}日 · ${member ? esc(member.name) : '心内科'}复诊`;
 }
 function displayToday() {
   const now = new Date();
@@ -932,12 +932,16 @@ function renderDocs() {
         <span class="member-chevron">${open ? '⌃' : '⌄'}</span>
       </button>
       ${open ? `<div class="docs-member-body">
-        <div class="docs-sub-head"><span>就医信息卡</span><button class="text-button" data-action="health-card">查看全部 →</button></div>
+        <div class="docs-sub-head"><span>就医信息卡</span><button class="text-button" data-action="health-card" data-card-member="${member.id}">查看全部 →</button></div>
         <div class="info-grid">
           <div><span class="field-label">慢病</span><strong>${esc(member.conditions)}</strong></div>
           <div><span class="field-label">过敏史</span><strong class="${/无/.test(member.allergies) ? '' : 'alert-text'}">${esc(member.allergies)}</strong></div>
           <div><span class="field-label">长期用药</span><strong>${esc(member.medications)}</strong></div>
           <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
+        </div>
+        <div class="docs-member-ops">
+          <button class="secondary-button" data-action="appointment" data-appointment-member="${member.id}">就诊准备清单</button>
+          <button class="secondary-button" data-action="share" data-share-member="${member.id}">生成就诊分享码</button>
         </div>
         <div class="docs-sub-head"><span>就医资料库 · 按就诊日期归档</span><button class="text-button" data-action="upload" data-upload-member="${member.id}">＋ 添加</button></div>
         ${visitRows.length ? `<div class="record-list">${previewRows(visitRows, `docsrec-${member.id}`)}</div>` : '<p class="empty-hint" style="margin:2px 0">暂无就诊资料，点右上「＋ 添加」上传，同一天的资料自动归为一次就诊。</p>'}
@@ -1609,6 +1613,7 @@ function showAlertCenter() {
 /* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件，读数按成员归属） ============ */
 let readingMemberId = 'm1';   // 当前录入读数的目标成员（设备数据各归各人）
 let uploadMemberId = '';      // 「＋ 添加资料」预选的成员（医疗资料成员块内触发时传入）
+let appointmentMemberId = ''; // 当前就诊准备清单对应的成员（弹窗间跳转保持上下文）
 let histEditContext = 'dashboard'; // 编辑/删除后的返回上下文：dashboard / daily
 const previewOpen = new Set();   // 成员卡内长列表预览展开状态（track-m1 / daily-m1 ...）
 const READING_METHODS = [
@@ -2070,21 +2075,29 @@ function showExtraction(file) {
   runButton?.addEventListener('click', () => runLocalOcr(file, iso));
   runLocalOcr(file, iso);
 }
-function showHealthCard() {
-  openModal(`${modalHead('妈妈 · 68岁 · 最近核对 10月22日', '就医信息卡', '由家人协助整理，供就诊时主动展示。医生可按需查看原始报告。')}
+function showHealthCard(memberId = '') {
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  const visits = visitGroups(member.id);
+  const latest = visits[0];
+  const contact = state.familyMembers.find(item => item.id !== member.id);
+  const allergyAlert = member.allergies && !/无/.test(member.allergies);
+  openModal(`${modalHead(`${esc(member.name)} · ${member.age}岁 · 最近核对`, '就医信息卡', '由家人协助整理，供就诊时主动展示。医生可按需查看原始报告。')}
     <div class="health-list">
-      <div class="health-row"><span>过敏史</span><strong style="color:#a15d4c">青霉素</strong></div>
-      <div class="health-row"><span>重要病史</span><strong>高血压 · 2018年发现</strong></div>
-      <div class="health-row"><span>长期用药</span><strong>氨氯地平片 · 每日一次</strong></div>
-      <div class="health-row"><span>近期用药</span><strong>阿托伐他汀钙片 · 每晚一次</strong></div>
-      <div class="health-row"><span>紧急联系人</span><strong>小林 · 女儿</strong></div>
-      <div class="health-row"><span>近期就诊</span><strong>10月22日 · 心内科</strong></div>
+      <div class="health-row"><span>过敏史</span><strong ${allergyAlert ? 'style="color:#a15d4c"' : ''}>${esc(member.allergies || '无')}</strong></div>
+      <div class="health-row"><span>重要病史</span><strong>${esc(member.conditions || '无')}</strong></div>
+      <div class="health-row"><span>长期用药</span><strong>${esc(member.medications || '无')}</strong></div>
+      <div class="health-row"><span>手术史</span><strong>${esc(member.surgeries || '无')}</strong></div>
+      <div class="health-row"><span>紧急联系人</span><strong>${esc(contact ? `${contact.name} · ${contact.role}` : '未填写')}</strong></div>
+      <div class="health-row"><span>近期就诊</span><strong>${latest ? `${formatDate(latest.date)} · ${esc(latest.summary.slice(0, 18))}` : '暂无记录'}</strong></div>
     </div>
-    <div class="health-highlight">过敏史已由家属核对。就诊时请以医生问诊和原始病历为准；本信息卡不替代医疗判断。</div>
-    <button class="primary-button" id="openShareFromCard">生成就诊分享码</button>`);
+    <div class="health-highlight">${allergyAlert ? '过敏史已由家属核对，请主动告知医生。' : '信息已由家属核对。'}就诊时请以医生问诊和原始病历为准；本信息卡不替代医疗判断。</div>
+    <button class="primary-button" id="openShareFromCard" data-share-member="${member.id}">生成就诊分享码</button>`);
 }
-function showAppointment() {
-  const checks = state.appointmentChecks || {};
+function showAppointment(memberId = '') {
+  appointmentMemberId = memberId;
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  const memberChecks = (state.appointmentChecksByMember || (state.appointmentChecksByMember = {}))[member.id];
+  const checks = memberChecks || state.appointmentChecks || {};
   const hasDescription = (state.preVisitDescriptions || []).length > 0;
   const items = [
     ['idCard', '医保卡与身份证', '就诊时出示'],
@@ -2094,12 +2107,12 @@ function showAppointment() {
     ['selfDescription', '诊前自我描述', '记录近期症状、变化、饮食和生活情况']
   ];
   const count = items.filter(([key]) => key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]).length;
-  openModal(`${modalHead(appointmentLabel(), '就诊准备清单', '和妈妈一起确认要带的资料。勾选状态会保存在这台设备上。')}
+  openModal(`${modalHead(appointmentLabel(member), `${esc(member.name)} · 就诊准备清单`, `和${esc(member.name)}一起确认要带的资料。勾选状态按成员保存在这台设备上。`)}
     <div class="checklist-progress"><strong id="checklistCount">已准备 ${count} / ${items.length} 项</strong><span>${count === items.length ? '准备好了' : '逐项确认'}</span></div>
-    <div class="appointment-checklist">${items.map(([key, title, hint]) => `<label class="checklist-row"><input type="checkbox" data-checklist="${key}" ${(key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]) ? 'checked' : ''} ${key === 'selfDescription' && hasDescription ? 'disabled' : ''}><span class="checkmark"></span><span class="checklist-copy"><strong>${title}</strong><small>${hint}</small></span></label>`).join('')}</div>
+    <div class="appointment-checklist">${items.map(([key, title, hint]) => `<label class="checklist-row"><input type="checkbox" data-checklist="${key}" data-appointment-member="${member.id}" ${(key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]) ? 'checked' : ''} ${key === 'selfDescription' && hasDescription ? 'disabled' : ''}><span class="checkmark"></span><span class="checklist-copy"><strong>${title}</strong><small>${hint}</small></span></label>`).join('')}</div>
     <button class="secondary-button" id="openPreVisitDescription">${hasDescription ? '查看 / 补充诊前描述' : '添加诊前自我描述'}</button>
-    <div class="health-highlight">就诊信息卡可由妈妈主动向医生展示。清单仅帮助准备资料，不替代医生问诊。</div>
-    <button class="primary-button" id="appointmentCard">打开就医信息卡</button>`);
+    <div class="health-highlight">就医信息卡可由${esc(member.name)}主动向医生展示。清单仅帮助准备资料，不替代医生问诊。</div>
+    <button class="primary-button" id="appointmentCard" data-card-member="${member.id}">打开${esc(member.name)}的就医信息卡</button>`);
 }
 function showPreVisitDescription() {
   preVisitFiles = [];
@@ -2146,6 +2159,10 @@ async function savePreVisitDescription() {
     }
     state.preVisitDescriptions = [{ id: entryId, text, createdAt: new Date().toLocaleString('zh-CN'), attachments }, ...(state.preVisitDescriptions || [])];
     state.appointmentChecks = { ...(state.appointmentChecks || {}), selfDescription: true };
+    if (appointmentMemberId) {
+      const byMember = state.appointmentChecksByMember || (state.appointmentChecksByMember = {});
+      byMember[appointmentMemberId] = { ...(byMember[appointmentMemberId] || {}), selfDescription: true };
+    }
     saveState(); preVisitFiles = []; closeModal(); showAppointment(); toast('诊前描述和附件已保存在本机');
   } catch (error) { if (saveButton) saveButton.disabled = false; toast('保存失败，请检查本机存储空间后重试'); }
 }
@@ -2166,14 +2183,30 @@ async function showRecord(recordId) {
   const recognized = record.ocrText ? `<section class="saved-ocr"><strong>本机识别文字</strong><p>${esc(record.ocrText)}</p></section>` : '';
   openModal(`${modalHead(esc(record.type), esc(record.title), `${esc(record.hospital)} · ${formatDate(record.date)}`)}${fileLine}${preview}${recognized}<div class="health-highlight">资料为家庭自行整理的信息。文字识别仅作录入辅助，不构成诊断意见。</div><button class="primary-button" id="recordDone">返回家庭档案</button>`);
 }
-function showShare() {
-  const recent = state.shares.slice(-3).reverse();
-  openModal(`${modalHead('由患者或家属现场发起', '分享就医资料', '选择分享内容并生成演示二维码。访问记录会显示在家庭档案中，可随时撤销。')}
-    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> 妈妈的就医信息卡</span><h3>市第一人民医院 · 复诊</h3><p>摘要信息 · 过敏史 · 当前用药</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
-    <div class="share-toggle"><span>允许查看摘要信息和关键病史</span><span class="switch"></span></div>
-    <div class="share-log"><h3>最近访问记录</h3>${recent.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)}</small></div>`).join('')}</div>
+function showShare(memberId = '') {
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  const visits = visitGroups(member.id);
+  const latest = visits[0];
+  const recent = (state.shares || []).slice(-3).reverse();
+  const allergyAlert = member.allergies && !/无/.test(member.allergies);
+  /* 分享范围默认：就医信息卡 + 最近一次就诊资料必带（医生现场最需要），用药清单可选 */
+  const scopes = [
+    { key: 'card', label: '就医信息卡', hint: `慢病摘要${allergyAlert ? ' · 过敏史（红标）' : ' · 过敏史'} · 长期用药`, on: true },
+    { key: 'visit', label: '最近一次就诊资料', hint: latest ? `${formatDate(latest.date)} · ${esc(latest.summary.slice(0, 20))} · ${latest.records.length} 份` : '暂无就诊资料', on: true },
+    { key: 'meds', label: '当前用药清单', hint: '全部在服药物与频次', on: false }
+  ];
+  openModal(`${modalHead('由患者或家属现场发起', `分享${esc(member.name)}的就医资料`, '勾选分享范围后出示二维码。访问记录会显示在家庭档案中，可随时撤销。')}
+    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> ${esc(member.name)}的就医信息卡</span><h3>${latest ? esc(latest.summary.slice(0, 16)) : '下次复诊'}</h3><p id="shareScopeSummary">${scopes.filter(item => item.on).map(item => item.label).join(' · ')}</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
+    <div class="share-scope-list">${scopes.map(item => `<label class="share-toggle"><span><strong>${item.label}</strong><small>${item.hint}</small></span><input type="checkbox" data-share-scope="${item.key}" data-share-summary="${item.label}" ${item.on ? 'checked' : ''} /><span class="switch"></span></label>`).join('')}</div>
+    <div class="share-log"><h3>最近访问记录</h3>${recent.length ? recent.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)}</small></div>`).join('') : '<p class="privacy-small">还没有访问记录。</p>'}</div>
     <button class="primary-button" id="revokeShare">撤销此演示分享</button>
-    <p class="privacy-small">演示二维码为界面模拟，未连接外部扫码服务。</p>`);
+    <p class="privacy-small">演示二维码为界面模拟，未连接外部扫码服务；勾选仅改变摘要展示，不发送任何数据。</p>`);
+  document.querySelectorAll('[data-share-scope]').forEach(input => input.addEventListener('change', () => {
+    const labels = [...document.querySelectorAll('[data-share-scope]:checked')].map(item => item.dataset.shareSummary);
+    const summary = document.getElementById('shareScopeSummary');
+    if (summary) summary.textContent = labels.length ? labels.join(' · ') : '未选择任何内容（二维码不可用）';
+    toast(`分享范围已更新：${labels.length ? labels.join('、') : '已清空'}`);
+  }));
 }
 function showCompanionForm(service, sourceOrder = null) {
   if (!state.companionProfile.available) { showInfo('暂不可预约', `${state.companionProfile.name}目前暂停接单。你可以稍后再查看。`); return; }
@@ -2272,8 +2305,8 @@ document.addEventListener('click', async event => {
   if (action === 'reminders') showReminderManager();
   if (action === 'add-reminder') showReminderForm();
   if (action === 'add-medication') showUpload();
-  if (action === 'health-card') showHealthCard();
-  if (action === 'share') showShare();
+  if (action === 'health-card') showHealthCard(event.target.closest('[data-card-member]')?.dataset.cardMember || '');
+  if (action === 'share') showShare(event.target.closest('[data-share-member]')?.dataset.shareMember || '');
   if (action === 'alerts') showAlertCenter();
   if (action === 'add-reading') showReadingEntry();
   if (action === 'insurance-entry') showPolicyEntry();
@@ -2287,16 +2320,16 @@ document.addEventListener('click', async event => {
     saveState(); renderRole(); renderRecords();
     toast(state.companionProfile.available ? '已恢复接受预约' : '已暂停接受新预约');
   }
-  if (action === 'appointment') showAppointment();
+  if (action === 'appointment') showAppointment(event.target.closest('[data-appointment-member]')?.dataset.appointmentMember || '');
   if (action === 'privacy') showInfo('隐私与资料管理', '本原型将演示资料保存在当前设备浏览器中。分享流程仅作交互展示，不会发送到网络。\n\n真实产品需提供资料导出、更正、删除和授权撤回功能。');
   if (action === 'help') showInfo('服务说明', '康伴帮助家庭整理就医资料和协同就诊准备。资料提取仅辅助整理，不替代医生判断。陪诊服务仅提供就诊流程协助。');
   if (event.target.closest('[data-upload-source="camera"]')) openFilePicker('camera');
   if (event.target.closest('[data-upload-source="library"]')) openFilePicker('library');
   if (event.target.closest('#loadSampleReport')) loadSampleReport();
   if (event.target.closest('#startVoice')) startListening();
-  if (event.target.closest('#appointmentCard')) showHealthCard();
+  if (event.target.closest('#appointmentCard')) showHealthCard(event.target.closest('[data-card-member]')?.dataset.cardMember || appointmentMemberId);
   if (event.target.closest('#openPreVisitDescription')) showPreVisitDescription();
-  if (event.target.closest('#backToAppointment')) showAppointment();
+  if (event.target.closest('#backToAppointment')) showAppointment(appointmentMemberId);
   if (event.target.closest('#preVisitPhoto')) document.getElementById('preVisitPhotoInput').click();
   if (event.target.closest('#preVisitAudioFile')) document.getElementById('preVisitAudioInput').click();
   if (event.target.closest('#preVisitRecord')) {
@@ -2402,10 +2435,16 @@ document.addEventListener('click', async event => {
     selectedFile = null;
   }
   if (event.target.closest('#backToUpload')) showUpload();
-  if (event.target.closest('#openShareFromCard')) showShare();
+  if (event.target.closest('#openShareFromCard')) showShare(event.target.closest('[data-share-member]')?.dataset.shareMember || appointmentMemberId);
   const checklistInput = event.target.closest('[data-checklist]');
   if (checklistInput) {
-    state.appointmentChecks = { ...(state.appointmentChecks || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
+    const checklistMember = checklistInput.dataset.appointmentMember;
+    if (checklistMember) {
+      const byMember = state.appointmentChecksByMember || (state.appointmentChecksByMember = {});
+      byMember[checklistMember] = { ...(byMember[checklistMember] || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
+    } else {
+      state.appointmentChecks = { ...(state.appointmentChecks || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
+    }
     saveState();
     const total = document.querySelectorAll('[data-checklist]').length;
     const done = document.querySelectorAll('[data-checklist]:checked').length;

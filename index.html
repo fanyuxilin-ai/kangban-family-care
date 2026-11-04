@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <div class="app-shell">
@@ -67,10 +67,6 @@
 
       <section class="view" id="view-docs">
         <div class="page-heading"><p class="eyebrow">就医凭证，按人归档</p><h1>医疗资料</h1><p class="subtle">点开任意家庭成员，查看 TA 的就医信息卡、资料库和保险报销；资料录入后自动匹配保单提醒报销。</p></div>
-        <div class="docs-quick-row">
-          <button class="secondary-button" data-action="appointment">就诊准备清单</button>
-          <button class="secondary-button" data-action="share">生成就诊分享码</button>
-        </div>
         <div id="docsMemberList" class="docs-member-list"></div>
       </section>
 
@@ -157,6 +153,6 @@
   <input type="file" id="policyFileInput" accept="image/*,.pdf" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="vendor/tesseract.min.js"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
