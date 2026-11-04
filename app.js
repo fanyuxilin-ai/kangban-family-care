@@ -881,7 +881,8 @@ function visitGroups(memberId) {
   return [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, items]) => {
     items.sort((a, b) => RECORD_SUMMARY_PRIORITY.indexOf(a.type) - RECORD_SUMMARY_PRIORITY.indexOf(b.type));
     const main = items.find(record => record.summary) || items[0];
-    return { date, records: items, summary: main?.summary || autoSummary(main?.type, main?.title) };
+    const override = (state.visitSummaries || {})[`${memberId}|${date}`]; // 家属修改过的概括优先于 AI 生成
+    return { date, records: items, summary: override || main?.summary || autoSummary(main?.type, main?.title) };
   });
 }
 /* 某次就诊详情：AI 概括 + 当天全部资料（病历 / 发票 / 明细等都能传） */
@@ -898,11 +899,30 @@ function showVisitDetail(memberId, date) {
       <span class="member-chevron">›</span>
     </button>`;
   }).join('');
-  openModal(`${modalHead(`${esc(member?.name || '')} · 就诊记录`, formatDate(date), `AI 概括：${esc(visit.summary)}（演示版按资料类型规则生成，实际以资料内容为准）`)}
+  openModal(`${modalHead(`${esc(member?.name || '')} · 就诊记录`, formatDate(date), `当天共 ${visit.records.length} 份资料；AI 概括仅供整理参考，可编辑修正。`)}
+    <div class="visit-summary-card" id="visitSummaryBlock">
+      <div class="visit-summary-head"><span class="ai-chip">AI 概括</span><button class="text-button" id="editVisitSummary">编辑</button></div>
+      <p id="visitSummaryText">${esc(visit.summary)}</p>
+    </div>
     <p class="claim-materials-title">本次就诊资料（${visit.records.length}）</p>
     <div class="visit-material-list">${rows}</div>
     <button class="secondary-button" data-action="upload" data-upload-member="${esc(memberId)}" style="margin-top:8px">＋ 补传本次就诊资料</button>
     <p class="privacy-small">病历、发票、费用明细、用药记录等都可以上传；同一天上传的资料自动归到同一次就诊，并生成 AI 病症概括。</p>`);
+  document.getElementById('editVisitSummary')?.addEventListener('click', () => {
+    const block = document.getElementById('visitSummaryBlock'); if (!block) return;
+    block.innerHTML = `<div class="visit-summary-head"><span class="ai-chip">AI 概括 · 可修改</span></div>
+      <textarea class="ocr-text-area" id="visitSummaryInput" style="min-height:76px;margin-top:6px">${esc(visit.summary)}</textarea>
+      <div class="visit-summary-ops"><button class="primary-button" id="saveVisitSummary" style="margin-top:8px">保存概括</button></div>`;
+    document.getElementById('saveVisitSummary')?.addEventListener('click', () => {
+      const text = document.getElementById('visitSummaryInput')?.value.trim();
+      if (!text) { toast('概括不能为空，可恢复为原文'); return; }
+      state.visitSummaries = state.visitSummaries || {};
+      state.visitSummaries[`${memberId}|${date}`] = text;
+      saveState(); renderDocs();
+      toast('就诊概括已更新，列表同步生效');
+      showVisitDetail(memberId, date);
+    });
+  });
 }
 function renderDocs() {
   const host = document.getElementById('docsMemberList');
@@ -2180,8 +2200,17 @@ async function showRecord(recordId) {
   try { attachment = await getAttachment(recordId); } catch { /* local attachment storage may be unavailable */ }
   const preview = attachment?.type?.startsWith('image/') ? `<img class="report-preview" src="${URL.createObjectURL(attachment.blob)}" alt="${esc(attachment.name)}" />` : '';
   const fileLine = attachment ? `<div class="file-chip"><b>▤</b><span>${esc(attachment.name)}</span><span style="margin-left:auto;color:#789078">本机附件</span></div>` : '<p class="privacy-small">此演示条目没有原始文件附件。</p>';
-  const recognized = record.ocrText ? `<section class="saved-ocr"><strong>本机识别文字</strong><p>${esc(record.ocrText)}</p></section>` : '';
-  openModal(`${modalHead(esc(record.type), esc(record.title), `${esc(record.hospital)} · ${formatDate(record.date)}`)}${fileLine}${preview}${recognized}<div class="health-highlight">资料为家庭自行整理的信息。文字识别仅作录入辅助，不构成诊断意见。</div><button class="primary-button" id="recordDone">返回家庭档案</button>`);
+  const recognized = record.ocrText ? `<section class="saved-ocr" id="savedOcrBlock"><div class="saved-ocr-head"><strong>本机识别文字</strong><button class="text-button" id="editOcrText">编辑</button></div><p id="savedOcrText">${esc(record.ocrText)}</p></section>` : '';
+  openModal(`${modalHead(esc(record.type), esc(record.title), `${esc(record.hospital)} · ${formatDate(record.date)}`)}${fileLine}${preview}${recognized}<div class="health-highlight">资料为家庭自行整理的信息。文字识别仅作录入辅助，不构成诊断意见；识别文字可编辑修正。</div><button class="primary-button" id="recordDone">返回家庭档案</button>`);
+  document.getElementById('editOcrText')?.addEventListener('click', () => {
+    const block = document.getElementById('savedOcrBlock'); if (!block) return;
+    block.innerHTML = `<strong>本机识别文字（可修改）</strong><textarea class="ocr-text-area" id="savedOcrInput" style="min-height:96px;margin-top:7px">${esc(record.ocrText)}</textarea><button class="primary-button" id="saveOcrText" style="margin-top:8px">保存修改</button>`;
+    document.getElementById('saveOcrText')?.addEventListener('click', () => {
+      record.ocrText = document.getElementById('savedOcrInput')?.value.trim() || '';
+      saveState(); toast('识别文字已更新');
+      showRecord(recordId);
+    });
+  });
 }
 function showShare(memberId = '') {
   const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];

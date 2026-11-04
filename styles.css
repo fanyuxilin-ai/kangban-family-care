@@ -354,3 +354,11 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .share-toggle small{font-size:8.5px;color:#8d978e}
 .share-toggle input{display:none}
 .share-toggle input:not(:checked)+.switch{background:#c7d0c6}
+/* AI 概括可编辑：就诊详情概括卡片 + 识别文字编辑头 */
+.visit-summary-card{background:#eef3ec;border-radius:12px;padding:11px 13px;margin-bottom:4px}
+.visit-summary-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.visit-summary-head .ai-chip{margin-left:0}
+.visit-summary-card p{margin:7px 0 0;font-size:11px;line-height:1.65;color:#41553f}
+.visit-summary-ops{display:flex}
+.saved-ocr-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.saved-ocr-head .text-button{padding:0}
