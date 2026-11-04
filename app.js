@@ -5,15 +5,23 @@ function dateOffset(days) {
 }
 const seed = {
   records: [
-    { id: 'r1', memberId: 'm1', type: '门诊病历', title: '心内科门诊病历', hospital: '市第一人民医院 · 心内科', date: dateOffset(-3), state: '已核对', icon: '⌂' },
-    { id: 'r2', memberId: 'm2', type: '用药记录', title: '日常用药清单', hospital: '家属补充 · 最近核对', date: dateOffset(-5), state: '已核对', icon: '＋' },
-    { id: 'r3', memberId: 'm1', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市第一人民医院 · 收费处', date: dateOffset(-8), state: '已核对', icon: '▤' },
-    { id: 'r4', memberId: 'm2', type: '费用明细', title: '住院费用明细清单', hospital: '市第一人民医院 · 住院部', date: dateOffset(-25), state: '已核对', icon: '≣' },
-    { id: 'r5', memberId: 'm1', type: '出院小结', title: '心内科出院小结', hospital: '市第一人民医院 · 心内科住院部', date: dateOffset(-26), state: '已核对', icon: '⌂' },
-    { id: 'r6', memberId: 'm2', type: '门诊病历', title: '内分泌科门诊病历（糖尿病随访）', hospital: '市中医院 · 内分泌科', date: dateOffset(-6), state: '已核对', icon: '⌂' },
+    { id: 'r1', memberId: 'm1', type: '门诊病历', title: '心内科门诊病历', hospital: '市第一人民医院 · 心内科', date: dateOffset(-3), state: '已核对', icon: '⌂',
+      summary: '高血压复诊：近期晨间血压偏高（166/102），调整氨氯地平方案，一周后复测' },
+    { id: 'r2', memberId: 'm2', type: '用药记录', title: '日常用药清单', hospital: '家属补充 · 最近核对', date: dateOffset(-5), state: '已核对', icon: '＋',
+      summary: '日常用药整理：降压 + 降糖方案核对，二甲双胍随餐服用' },
+    { id: 'r3', memberId: 'm1', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市第一人民医院 · 收费处', date: dateOffset(-3), state: '已核对', icon: '▤' },
+    { id: 'r4', memberId: 'm2', type: '费用明细', title: '住院费用明细清单', hospital: '市第一人民医院 · 住院部', date: dateOffset(-25), state: '已核对', icon: '≣',
+      summary: '住院费用结算资料：医保统筹 + 个人账户分段支付' },
+    { id: 'r5', memberId: 'm1', type: '出院小结', title: '心内科出院小结', hospital: '市第一人民医院 · 心内科住院部', date: dateOffset(-26), state: '已核对', icon: '⌂',
+      summary: '不稳定型心绞痛住院 5 天，出院带药阿司匹林 + 他汀，建议心内科门诊随访' },
+    { id: 'r6', memberId: 'm2', type: '门诊病历', title: '内分泌科门诊病历（糖尿病随访）', hospital: '市中医院 · 内分泌科', date: dateOffset(-6), state: '已核对', icon: '⌂',
+      summary: '2 型糖尿病随访：空腹血糖 8.2 偏高，二甲双胍加量，控制主食并复查糖化血红蛋白' },
     { id: 'r7', memberId: 'm2', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市中医院 · 收费处', date: dateOffset(-6), state: '已核对', icon: '▤' },
-    { id: 'r8', memberId: 'm3', type: '疾病诊断证明书', title: '甲状腺结节疾病诊断证明书', hospital: '市第一人民医院 · 甲状腺外科', date: dateOffset(-12), state: '已核对', icon: '⌂' },
-    { id: 'r9', memberId: 'm4', type: '外伤门诊病历', title: '外伤门诊病历（左踝扭伤）', hospital: '区人民医院 · 急诊外科', date: dateOffset(-4), state: '已核对', icon: '⌂' },
+    { id: 'r8', memberId: 'm3', type: '疾病诊断证明书', title: '甲状腺结节疾病诊断证明书', hospital: '市第一人民医院 · 甲状腺外科', date: dateOffset(-12), state: '已核对', icon: '⌂',
+      summary: '甲状腺结节随访：细针穿刺倾向良性，建议 6 个月后超声复查' },
+    { id: 'r9', memberId: 'm4', type: '外伤门诊病历', title: '外伤门诊病历（左踝扭伤）', hospital: '区人民医院 · 急诊外科', date: dateOffset(-4), state: '已核对', icon: '⌂',
+      summary: '打篮球致左踝扭伤：X 光未见骨折，软组织损伤，冰敷制动 + 外用止痛药，一周后复诊',
+      ocrText: '患者自述打篮球时左踝扭伤，外踝肿胀、压痛明显，前抽屉试验阴性。X 光：左踝未见明确骨折征象。诊断：左踝软组织损伤。处理：休息冰敷，外用双氯芬酸二乙胺乳胶剂，一周后复诊。' },
     { id: 'r10', memberId: 'm4', type: '医疗费用发票', title: '急诊医疗费用发票', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '▤' },
     { id: 'r11', memberId: 'm4', type: '费用明细', title: '急诊费用明细清单', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '≣' },
   ],
@@ -851,23 +859,70 @@ function policyRowHtml(policy) {
     <span class="reading-tag ${st.tag}">${st.label}</span>
   </button>`;
 }
-/* 医疗资料 Tab：按成员展开 —— 就医信息卡 · 就医资料库 · 保险报销 */
+/* 医疗资料 Tab：按成员展开 —— 就医信息卡 · 就医资料库（按就诊日期归档） · 保险报销 */
 const expandedDocsMembers = new Set();
+/* 就诊资料按日期归组：同一天的资料 = 一次就诊；AI 概括取组内主资料（病历类优先）的 summary */
+const RECORD_SUMMARY_PRIORITY = ['门诊病历', '出院小结', '疾病诊断证明书', '外伤门诊病历', '就诊资料', '用药记录', '检查报告', '医疗费用发票', '费用明细'];
+function autoSummary(type, title) {
+  if (type === '外伤门诊病历') return `意外受伤就诊 · ${title}`;
+  if (type === '出院小结') return `住院治疗结束 · ${title}`;
+  if (type === '疾病诊断证明书') return `疾病诊断确认 · ${title}`;
+  if (type === '医疗费用发票' || type === '费用明细') return `医疗费用结算 · ${title}`;
+  if (type === '用药记录') return `用药方案整理 · ${title}`;
+  if (type === '检查报告') return `检查 / 化验结果 · ${title}`;
+  return `门诊就诊 · ${title}`;
+}
+function visitGroups(memberId) {
+  const byDate = new Map();
+  state.records.filter(record => record.memberId === memberId).forEach(record => {
+    if (!byDate.has(record.date)) byDate.set(record.date, []);
+    byDate.get(record.date).push(record);
+  });
+  return [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, items]) => {
+    items.sort((a, b) => RECORD_SUMMARY_PRIORITY.indexOf(a.type) - RECORD_SUMMARY_PRIORITY.indexOf(b.type));
+    const main = items.find(record => record.summary) || items[0];
+    return { date, records: items, summary: main?.summary || autoSummary(main?.type, main?.title) };
+  });
+}
+/* 某次就诊详情：AI 概括 + 当天全部资料（病历 / 发票 / 明细等都能传） */
+function showVisitDetail(memberId, date) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  const visit = visitGroups(memberId).find(group => group.date === date);
+  if (!visit) return;
+  const rows = visit.records.map(record => {
+    const claimable = activePoliciesAt(memberId, record.date).length > 0;
+    return `<button class="visit-material-row" data-open-record="${esc(record.id)}">
+      <span class="record-icon ${record.type === '用药记录' ? 'medicine' : ''}">${esc(record.icon || '▤')}</span>
+      <span class="visit-material-copy"><strong>${esc(record.title)}</strong><small>${esc(record.type)} · ${esc(record.hospital)} · ${esc(record.state)}</small></span>
+      ${claimable ? '<span class="record-status claimable">可报销</span>' : ''}
+      <span class="member-chevron">›</span>
+    </button>`;
+  }).join('');
+  openModal(`${modalHead(`${esc(member?.name || '')} · 就诊记录`, formatDate(date), `AI 概括：${esc(visit.summary)}（演示版按资料类型规则生成，实际以资料内容为准）`)}
+    <p class="claim-materials-title">本次就诊资料（${visit.records.length}）</p>
+    <div class="visit-material-list">${rows}</div>
+    <button class="secondary-button" data-action="upload" data-upload-member="${esc(memberId)}" style="margin-top:8px">＋ 补传本次就诊资料</button>
+    <p class="privacy-small">病历、发票、费用明细、用药记录等都可以上传；同一天上传的资料自动归到同一次就诊，并生成 AI 病症概括。</p>`);
+}
 function renderDocs() {
   const host = document.getElementById('docsMemberList');
   if (!host) return;
   host.innerHTML = state.familyMembers.map(member => {
     const open = expandedDocsMembers.has(member.id);
-    const records = state.records.filter(record => record.memberId === member.id).sort((a, b) => b.date.localeCompare(a.date));
+    const records = state.records.filter(record => record.memberId === member.id);
+    const visits = visitGroups(member.id);
     const list = (state.insurancePolicies || []).filter(policy => policy.memberId === member.id);
     const claims = (state.reimbursements || []).filter(claim => claim.memberId === member.id && claim.status !== '已提交');
-    const recordRows = records.map(record => {
-      const claimable = activePoliciesAt(member.id, record.date).length > 0;
-      return `<article class="record-item" data-open-record="${esc(record.id)}" data-record-type="${esc(record.type)}" tabindex="0" role="button" aria-label="查看${esc(record.title)}">
-        <span class="record-icon ${record.type === '用药记录' ? 'medicine' : ''}">${esc(record.icon || '▤')}</span>
-        <div class="record-body"><strong>${esc(record.title)}</strong><small>${esc(record.hospital)} · ${formatDate(record.date)}</small></div>
+    const visitRows = visits.map(visit => {
+      const claimable = visit.records.some(record => activePoliciesAt(member.id, record.date).length > 0);
+      const types = [...new Set(visit.records.map(record => record.type))];
+      return `<article class="record-item visit-item" data-visit-open="${esc(member.id)}|${esc(visit.date)}" tabindex="0" role="button" aria-label="查看${formatDate(visit.date)}就诊记录">
+        <span class="record-icon">▤</span>
+        <div class="record-body">
+          <strong>${esc(visit.summary)}<span class="ai-chip">AI 概括</span></strong>
+          <small>${formatDate(visit.date)} · ${visit.records.length} 份资料（${esc(types.join(' · '))}）</small>
+        </div>
         ${claimable ? '<span class="record-status claimable">可报销</span>' : ''}
-        <span class="record-status">${esc(record.state)}</span>
       </article>`;
     });
     return `<article class="insurance-member docs-member">
@@ -884,9 +939,9 @@ function renderDocs() {
           <div><span class="field-label">长期用药</span><strong>${esc(member.medications)}</strong></div>
           <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
         </div>
-        <div class="docs-sub-head"><span>就医资料库 · 病历 / 发票 / 费用明细</span><button class="text-button" data-action="upload" data-upload-member="${member.id}">＋ 添加</button></div>
-        ${recordRows.length ? `<div class="record-list">${previewRows(recordRows, `docsrec-${member.id}`)}</div>` : '<p class="empty-hint" style="margin:2px 0">暂无就诊资料，点右上「＋ 添加」拍照上传。</p>'}
-        <small class="privacy-small" style="display:block;margin:4px 0 2px">资料库只收就诊资料；体检 / 化验报告在「健康档案 · 导入体检单」录入，自动进数据看板。</small>
+        <div class="docs-sub-head"><span>就医资料库 · 按就诊日期归档</span><button class="text-button" data-action="upload" data-upload-member="${member.id}">＋ 添加</button></div>
+        ${visitRows.length ? `<div class="record-list">${previewRows(visitRows, `docsrec-${member.id}`)}</div>` : '<p class="empty-hint" style="margin:2px 0">暂无就诊资料，点右上「＋ 添加」上传，同一天的资料自动归为一次就诊。</p>'}
+        <small class="privacy-small" style="display:block;margin:4px 0 2px">点某次就诊可查看当天全部资料；AI 概括病症仅供整理参考。体检 / 化验报告在「健康档案 · 导入体检单」录入。</small>
         <div class="docs-sub-head"><span>保险报销</span></div>
         ${claims.length ? claims.map(claim => claimRowHtml(claim, false)).join('') : '<p class="empty-hint" style="margin:2px 0">暂无报销提醒，录入资料后自动匹配保单生成。</p>'}
         ${list.map(policy => policyRowHtml(policy)).join('') || '<p class="empty-hint" style="margin:4px 0">暂无保单，点下方「录入保单」添加。</p>'}
@@ -2141,7 +2196,7 @@ document.addEventListener('click', async event => {
     const recordId = `r${state.nextRecordId++}`;
     state.medications = [...(state.medications || []), ...planned];
     const rxMemberId = document.getElementById('extractMember')?.value || state.currentMemberId || 'm1';
-    const rxRecord = { id: recordId, memberId: rxMemberId, type: '用药记录', title: '处方用药医嘱', hospital: source.hospital, date: source.date, state: '已核对', icon: '＋', ocrText: source.text };
+    const rxRecord = { id: recordId, memberId: rxMemberId, type: '用药记录', title: '处方用药医嘱', hospital: source.hospital, date: source.date, state: '已核对', icon: '＋', summary: autoSummary('用药记录', '处方用药医嘱'), ocrText: source.text };
     state.records.unshift(rxRecord);
     saveState(); renderRecords(); closeModal();
     if (source.file) putAttachment(recordId, source.file).then(() => toast('服药提醒与处方原图已保存在本机')).catch(() => toast('服药提醒已保存，处方原图未能存入本机'));
@@ -2186,7 +2241,7 @@ document.addEventListener('click', async event => {
     const memberId = document.getElementById('extractMember')?.value || state.currentMemberId || 'm1';
     const recordId = `r${state.nextRecordId++}`;
     const inferType = title.includes('诊断证明') ? ['疾病诊断证明书', '⌂'] : (title.includes('意外') || title.includes('外伤')) ? ['外伤门诊病历', '⌂'] : (title.includes('出院') || title.includes('住院')) ? ['出院小结', '⌂'] : title.includes('药') ? ['用药记录', '＋'] : title.includes('发票') ? ['医疗费用发票', '▤'] : title.includes('明细') ? ['费用明细', '≣'] : title.includes('病历') ? ['门诊病历', '⌂'] : (title.includes('报告') || title.includes('检查') || title.includes('体检')) ? ['检查报告', '▤'] : ['就诊资料', '⌂'];
-    const record = { id: recordId, memberId, type: inferType[0], title, hospital, date, state: '已核对', icon: inferType[1], ocrText: document.getElementById('extractText')?.value || '' };
+    const record = { id: recordId, memberId, type: inferType[0], title, hospital, date, state: '已核对', icon: inferType[1], summary: autoSummary(inferType[0], title), ocrText: document.getElementById('extractText')?.value || '' };
     state.records.unshift(record);
     state.voiceNote = document.getElementById('extractNote')?.value || ''; saveState(); renderRecords(); closeModal();
     if (selectedFile) putAttachment(recordId, selectedFile).then(() => toast('资料和原始文件已保存在本机')).catch(() => toast('资料已保存，原始文件未能存入本机'));
@@ -2366,6 +2421,12 @@ document.addEventListener('click', async event => {
   if (rebookButton) {
     const previous = state.companionOrders.find(item => item.id === rebookButton.dataset.rebook);
     if (previous) showCompanionForm(previous.service, previous);
+  }
+  const visitOpen = event.target.closest('[data-visit-open]');
+  if (visitOpen) {
+    const [visitMemberId, visitDate] = visitOpen.dataset.visitOpen.split('|');
+    showVisitDetail(visitMemberId, visitDate);
+    return;
   }
   const recordId = event.target.closest('[data-open-record]')?.dataset.openRecord;
   if (recordId) showRecord(recordId);

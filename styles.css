@@ -100,6 +100,14 @@ nav[hidden]{display:none!important}
 .terms-list{list-style:none;margin:0;padding:0}
 .terms-list li{font-size:9.5px;color:#5a6a5e;line-height:1.85}
 .terms-list-ex li{color:#a05b52}
+/* 就医资料库 · 按就诊日期归档 */
+.ai-chip{display:inline-block;font-size:7.5px;font-weight:600;color:#4a7350;background:#e9f2e9;border-radius:8px;padding:1.5px 6px;margin-left:5px;vertical-align:1px}
+.visit-item .record-body strong{white-space:normal;line-height:1.5}
+.visit-material-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#fafaf6;border:1px solid rgba(223,225,215,.6);border-radius:11px;padding:9px 10px;margin-top:6px;cursor:pointer}
+.visit-material-row:active{background:#f0f3ec}
+.visit-material-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.visit-material-copy strong{font-size:10.5px;color:#445449}
+.visit-material-copy small{font-size:9px;color:#8a958c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .policy-detail-ops{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
 .policy-detail-ops .secondary-button{margin:0}
 .policy-del-button{color:#a1543f}
