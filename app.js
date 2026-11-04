@@ -1,14 +1,29 @@
-const STORAGE_KEY = 'kangban-demo-v5';
+const STORAGE_KEY = 'kangban-demo-v7';
 function dateOffset(days) {
   const date = new Date(); date.setHours(12,0,0,0); date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 const seed = {
   records: [
-    { id: 'r1', type: '检查报告', title: '血常规检查报告', hospital: '市第一人民医院 · 心内科', date: dateOffset(-3), state: '已核对', icon: '▤' },
-    { id: 'r2', type: '用药记录', title: '日常用药清单', hospital: '家属补充 · 最近核对', date: dateOffset(-5), state: '已核对', icon: '＋' },
-    { id: 'r3', type: '检查报告', title: '心电图检查结果', hospital: '市第一人民医院 · 检查科', date: dateOffset(-8), state: '待确认', icon: '⌁' },
-    { id: 'r4', type: '门诊记录', title: '心内科复诊记录', hospital: '市第一人民医院 · 心内科', date: dateOffset(-25), state: '已核对', icon: '⌂' },
+    { id: 'r1', memberId: 'm1', type: '门诊病历', title: '心内科门诊病历', hospital: '市第一人民医院 · 心内科', date: dateOffset(-3), state: '已核对', icon: '⌂',
+      summary: '高血压复诊：近期晨间血压偏高（166/102），调整氨氯地平方案，一周后复测' },
+    { id: 'r2', memberId: 'm2', type: '用药记录', title: '日常用药清单', hospital: '家属补充 · 最近核对', date: dateOffset(-5), state: '已核对', icon: '＋',
+      summary: '日常用药整理：降压 + 降糖方案核对，二甲双胍随餐服用' },
+    { id: 'r3', memberId: 'm1', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市第一人民医院 · 收费处', date: dateOffset(-3), state: '已核对', icon: '▤' },
+    { id: 'r4', memberId: 'm2', type: '费用明细', title: '住院费用明细清单', hospital: '市第一人民医院 · 住院部', date: dateOffset(-25), state: '已核对', icon: '≣',
+      summary: '住院费用结算资料：医保统筹 + 个人账户分段支付' },
+    { id: 'r5', memberId: 'm1', type: '出院小结', title: '心内科出院小结', hospital: '市第一人民医院 · 心内科住院部', date: dateOffset(-26), state: '已核对', icon: '⌂',
+      summary: '不稳定型心绞痛住院 5 天，出院带药阿司匹林 + 他汀，建议心内科门诊随访' },
+    { id: 'r6', memberId: 'm2', type: '门诊病历', title: '内分泌科门诊病历（糖尿病随访）', hospital: '市中医院 · 内分泌科', date: dateOffset(-6), state: '已核对', icon: '⌂',
+      summary: '2 型糖尿病随访：空腹血糖 8.2 偏高，二甲双胍加量，控制主食并复查糖化血红蛋白' },
+    { id: 'r7', memberId: 'm2', type: '医疗费用发票', title: '门诊医疗费用发票', hospital: '市中医院 · 收费处', date: dateOffset(-6), state: '已核对', icon: '▤' },
+    { id: 'r8', memberId: 'm3', type: '疾病诊断证明书', title: '甲状腺结节疾病诊断证明书', hospital: '市第一人民医院 · 甲状腺外科', date: dateOffset(-12), state: '已核对', icon: '⌂',
+      summary: '甲状腺结节随访：细针穿刺倾向良性，建议 6 个月后超声复查' },
+    { id: 'r9', memberId: 'm4', type: '外伤门诊病历', title: '外伤门诊病历（左踝扭伤）', hospital: '区人民医院 · 急诊外科', date: dateOffset(-4), state: '已核对', icon: '⌂',
+      summary: '打篮球致左踝扭伤：X 光未见骨折，软组织损伤，冰敷制动 + 外用止痛药，一周后复诊',
+      ocrText: '患者自述打篮球时左踝扭伤，外踝肿胀、压痛明显，前抽屉试验阴性。X 光：左踝未见明确骨折征象。诊断：左踝软组织损伤。处理：休息冰敷，外用双氯芬酸二乙胺乳胶剂，一周后复诊。' },
+    { id: 'r10', memberId: 'm4', type: '医疗费用发票', title: '急诊医疗费用发票', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '▤' },
+    { id: 'r11', memberId: 'm4', type: '费用明细', title: '急诊费用明细清单', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '≣' },
   ],
   companionOrders: [],
   currentRole: 'family',
@@ -84,7 +99,85 @@ const seed = {
     { id: 'bm-34', memberId: 'm1', metric: '体重', value: 58.6, unit: 'kg', date: dateOffset(0), time: '07:30', source: '体重秤', channel: 'daily' },
     { id: 'bm-35', memberId: 'm2', metric: '心率', value: 102, unit: '次/分', date: dateOffset(-1), time: '09:15', source: '模拟手表', channel: 'daily' },
     { id: 'bm-36', memberId: 'm2', metric: '血糖', value: 7.9, unit: 'mmol/L', date: dateOffset(0), time: '08:00', source: '血糖仪', channel: 'daily' }
-  ]
+  ],
+  insurancePolicies: [
+    { id: 'pol-1', memberId: 'm1', type: 'social', name: '深圳市职工医保', company: '深圳市医保局', policyNo: 'DEMO-4403-0001', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31',
+      terms: '医保目录内门诊 / 住院费用按规定比例结算，个人账户或统筹支付。',
+      duties: ['普通门诊统筹：社区首诊，年度限额内按比例报销', '住院医疗：目录内费用统筹基金按比例支付，退休人员比例更高', '门诊特定病种：高血压、糖尿病等慢病可申请门特待遇'],
+      exclusions: ['非医保目录药品与诊疗项目（自费部分）', '第三方责任、工伤、生育保险支付的情形'],
+      hospital: '深圳市医保定点医疗机构', renewal: '按年缴费持续参保即可享受待遇' },
+    { id: 'pol-2', memberId: 'm1', type: 'commercial', category: 'medical', name: '好医保·终身防癌医疗险', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2001', coverage: '400 万', start: '2025-03-15', end: '2099-12-31',
+      terms: '恶性肿瘤医疗费用 0 免赔、经社保结算后 100% 报销；三高、糖尿病人群可投保。纯体检 / 一般检查不在赔付范围。',
+      deductible: '0 免赔', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '90 天', hospital: '二级及以上公立医院普通部',
+      duties: ['恶性肿瘤住院医疗费用（床位费、药品费、手术费等）', '恶性肿瘤特殊门诊：放化疗、靶向、免疫治疗等', '质子重离子医疗费用（100% 报销）', '恶性肿瘤院外特定药品费用（清单内，直付）'],
+      exclusions: ['非恶性肿瘤原因的住院与门诊费用', '投保前已有疾病及其并发症', '纯体检 / 一般健康检查、司法鉴定类检查', '未在约定医院范围就诊的费用'],
+      renewal: '保证续保终身，费率可调整，产品停售不影响已续保期间' },
+    { id: 'pol-3', memberId: 'm2', type: 'social', name: '广州市城乡居民医保', company: '广州市医保局', policyNo: 'DEMO-4401-0002', coverage: '按医保目录', start: '2024-01-01', end: '2026-12-31',
+      terms: '城乡居民医保住院与门诊待遇按广州医保规定结算。',
+      duties: ['住院医疗：目录内费用按医院等级比例支付', '普通门诊统筹：基层首诊按比例报销', '门诊特定病种：糖尿病、高血压等病种限额报销'],
+      exclusions: ['非医保目录内项目', '境外就医费用'],
+      hospital: '广州市医保定点医疗机构', renewal: '每年 9–12 月集中参保缴费，次年享受待遇' },
+    { id: 'pol-4', memberId: 'm2', type: 'commercial', category: 'medical', name: '好医保·终身防癌医疗险', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2002', coverage: '400 万', start: '2025-06-01', end: '2099-12-31',
+      terms: '恶性肿瘤医疗费用 0 免赔、经社保结算后 100% 报销；三高、糖尿病人群可投保。',
+      deductible: '0 免赔', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '90 天', hospital: '二级及以上公立医院普通部',
+      duties: ['恶性肿瘤住院医疗费用', '恶性肿瘤特殊门诊：放化疗、靶向治疗等', '质子重离子医疗费用', '恶性肿瘤院外特定药品费用（清单内）'],
+      exclusions: ['非恶性肿瘤原因的医疗费用', '投保前已有疾病及其并发症', '纯体检 / 一般健康检查'],
+      renewal: '保证续保终身，费率可调整' },
+    { id: 'pol-5', memberId: 'm3', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0003', coverage: '按医保目录', start: '2023-07-01', end: '2026-12-31',
+      terms: '职工医保门诊 / 住院按规定比例结算，个人账户支付门诊费用。',
+      duties: ['普通门诊：选点就医按比例报销', '住院医疗：目录内费用统筹支付', '门诊特定病种待遇'],
+      exclusions: ['非医保目录内项目'],
+      hospital: '广州市医保定点医疗机构', renewal: '随单位按月缴费' },
+    { id: 'pol-6', memberId: 'm3', type: 'commercial', category: 'medical', name: '好医保·长期医疗险（20年版）', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2004', coverage: '一般医疗 200 万 · 重疾医疗 400 万', start: '2025-01-10', end: '2045-01-09',
+      terms: '一般医疗及重疾医疗费用，经社保结算后 100% 报销，免赔额 1 万（重疾 0 免赔）；20 年保证续保。',
+      deductible: '一般医疗 1 万/年；重疾医疗 0 免赔', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '90 天', hospital: '二级及以上公立医院普通部',
+      duties: ['一般住院医疗费用（200 万）', '121 种重大疾病住院医疗费用（400 万）', '特殊门诊：门诊肾透析、门诊恶性肿瘤治疗等', '住院前 7 天后 30 天门急诊费用', '质子重离子医疗（100% 报销）'],
+      exclusions: ['投保前已有疾病及其并发症', '牙科、视力矫正等非疾病治疗项目', '疗养、康复、体检类费用', '同一张发票不可在社保与商业险重复报销原件'],
+      renewal: '20 年保证续保，期满经保险公司审核后续保新版产品' },
+    { id: 'pol-7', memberId: 'm3', type: 'commercial', category: 'critical', name: '健康福·重疾险1号（一年期）', company: '人保健康（支付宝投保）', policyNo: 'DEMO-COM-2005', coverage: '重疾给付 30 万', start: '2025-01-01', end: '2026-12-31',
+      terms: '确诊 120 种重大疾病中的一种即一次性给付保额；给付型，与医疗费报销不冲突。',
+      waiting: '90 天',
+      duties: ['120 种重大疾病：确诊即一次性给付基本保额', '40 种轻症：给付 30% 基本保额', '重疾赔付后轻症责任继续有效'],
+      exclusions: ['等待期内确诊的重大疾病', '投保前已患疾病及其并发症', '遗传性疾病、先天性畸形、变形或染色体异常'],
+      renewal: '一年期产品，续保需重新健康告知与核保' },
+    { id: 'pol-8', memberId: 'm4', type: 'social', name: '广州市职工医保', company: '广州市医保局', policyNo: 'DEMO-4401-0004', coverage: '按医保目录', start: '2022-04-01', end: '2026-12-31',
+      terms: '职工医保门诊 / 住院按规定比例结算。',
+      duties: ['普通门诊：选点就医按比例报销', '住院医疗：目录内费用统筹支付'],
+      exclusions: ['非医保目录内项目'],
+      hospital: '广州市医保定点医疗机构', renewal: '随单位按月缴费' },
+    { id: 'pol-9', memberId: 'm4', type: 'commercial', category: 'medical', name: '好医保·住院医疗（2020版）', company: '众安保险（支付宝投保）', policyNo: 'DEMO-COM-2006', coverage: '300 万', start: '2025-02-01', end: '2027-01-31',
+      terms: '疾病或意外住院医疗费用，经社保结算后 100% 报销，免赔额 1 万。',
+      deductible: '1 万/年', ratio: '经社保结算 100%；未经社保结算 60%', waiting: '30 天', hospital: '二级及以上公立医院普通部',
+      duties: ['住院医疗费用（疾病或意外）', '特殊门诊医疗费用', '住院前后门急诊费用', '恶性肿瘤院外特定药品费用'],
+      exclusions: ['投保前已有疾病及其并发症', '非处方自行购药费用', '整形美容、不孕不育治疗'],
+      renewal: '6 年保证续保，期满经审核续保' },
+    { id: 'pol-10', memberId: 'm4', type: 'commercial', category: 'accident', name: '无忧保·综合意外险', company: '众安保险（支付宝投保）', policyNo: 'DEMO-COM-2007', coverage: '意外身故/伤残 50 万 · 意外医疗 2 万', start: '2025-01-01', end: '2027-01-01',
+      terms: '意外身故 / 伤残一次性给付 + 意外门急诊、住院医疗费用报销（0 免赔，社保内 100%）。猝死不属于意外。',
+      deductible: '意外医疗 0 免赔', ratio: '意外医疗：社保内 100%；未经社保 80%', waiting: '无（投保次日生效）', hospital: '二级及以上公立医院',
+      duties: ['意外身故：一次性给付 50 万', '意外伤残：按 1–10 级伤残比例给付', '意外门急诊与住院医疗费用报销', '意外住院津贴 50 元/天（单次限 90 天）'],
+      exclusions: ['猝死（不属于意外伤害）', '高风险运动：潜水、攀岩、赛车等', '酒驾、无证驾驶', '既往疾病导致的伤害'],
+      renewal: '一年期，到期自动续保扣费（可关闭）' }
+  ],
+  reimbursements: [
+    { id: 'claim-1', memberId: 'm1', policyId: 'pol-2', recordId: 'r1', scene: '门诊治疗', createdAt: dateOffset(-2), status: '整理中', materials: [
+      { label: '理赔申请书（保险公司模板）', done: false },
+      { label: '医疗费用发票原件', done: false },
+      { label: '费用明细清单', done: true },
+      { label: '病历及检查报告（门诊病历已入库）', done: true },
+      { label: '被保险人身份证复印件', done: false },
+      { label: '受益人银行账户信息', done: false }
+    ] },
+    { id: 'claim-2', memberId: 'm4', policyId: 'pol-10', recordId: 'r9', scene: '意外伤害治疗', createdAt: dateOffset(-3), status: '整理中', materials: [
+      { label: '理赔申请书（保险公司模板）', done: false },
+      { label: '意外事故经过说明', done: false },
+      { label: '门诊病历及X光 / 检查报告（外伤病历已入库）', done: true },
+      { label: '医疗费用发票原件', done: false },
+      { label: '费用明细清单', done: false },
+      { label: '被保险人身份证复印件', done: false }
+    ] }
+  ],
+  nextClaimId: 3,
+  nextPolicyId: 11
 };
 let state = loadState();
 let currentTab = 'home';
@@ -125,6 +218,10 @@ function loadState() {
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
+    loaded.insurancePolicies = saved.insurancePolicies || structuredClone(seed.insurancePolicies);
+    loaded.nextPolicyId = saved.nextPolicyId || 8;
+    loaded.reimbursements = Array.isArray(saved.reimbursements) ? saved.reimbursements : structuredClone(seed.reimbursements);
+    loaded.nextClaimId = saved.nextClaimId || 2;
     return loaded;
   } catch { return structuredClone(seed); }
 }
@@ -160,9 +257,21 @@ function formatDate(value) {
   const [y,m,d] = value.split('-').map(Number);
   return `${m}月${d}日`;
 }
-function appointmentLabel() {
+function appointmentLabel(member) {
   const visit = new Date(); visit.setHours(12,0,0,0); visit.setDate(visit.getDate()+4);
-  return `${visit.getMonth()+1}月${visit.getDate()}日 · 心内科复诊`;
+  return `${visit.getMonth()+1}月${visit.getDate()}日 · ${member ? esc(member.name) : '心内科'}复诊`;
+}
+/* 就诊准备清单公共定义与进度（清单全部勾选后才可生成就诊分享码） */
+const APPOINTMENT_ITEMS = [
+  ['idCard', '医保卡与身份证', '就诊时出示'],
+  ['reports', '近期检查报告', '血常规、心电图等资料'],
+  ['medicines', '当前用药清单', '可带药盒或核对档案'],
+  ['questions', '想问医生的问题', '提前记下最关心的几件事'],
+  ['selfDescription', '诊前自我描述', '记录近期症状、变化、饮食和生活情况']
+];
+function appointmentProgress(member) {
+  const checks = (state.appointmentChecksByMember || {})[member.id] || state.appointmentChecks || {};
+  return APPOINTMENT_ITEMS.filter(([key]) => key === 'selfDescription' ? (checks[key] || preVisitEntries(member.id).length > 0) : checks[key]).length;
 }
 function displayToday() {
   const now = new Date();
@@ -172,13 +281,7 @@ function displayToday() {
 }
 function renderRecords() {
   const sorted = [...state.records].sort((a,b) => b.date.localeCompare(a.date));
-  document.getElementById('recordCount').textContent = sorted.length;
-  document.getElementById('recordList').innerHTML = sorted.length ? sorted.map(record => `
-    <article class="record-item" data-open-record="${esc(record.id)}" data-record-type="${esc(record.type)}" tabindex="0" role="button" aria-label="查看${esc(record.title)}">
-      <span class="record-icon ${record.type === '用药记录' ? 'medicine' : ''}">${esc(record.icon || '▤')}</span>
-      <div class="record-body"><strong>${esc(record.title)}</strong><small>${esc(record.hospital)} · ${formatDate(record.date)}</small></div>
-      <span class="record-status">${esc(record.state)}</span>
-    </article>`).join('') : '<p class="empty-hint">还没有资料，添加一份检查报告试试。</p>';
+  /* 资料库已下沉进医疗资料 Tab 的成员块（renderDocs）；这里只维护首页时间线 */
   const preview = sorted.slice(0, 3);
   const timelineHost = document.getElementById('homeTimeline');
   if (timelineHost) timelineHost.innerHTML = preview.map(record => `
@@ -203,6 +306,7 @@ function renderRecords() {
   renderMedicationReminders();
   renderHomeCompanionModule();
   renderHealth();
+  renderDocs();
   renderCompanionViews();
 }
 
@@ -642,18 +746,516 @@ function showCheckupConfirm(memberId) {
   });
 }
 
-function showInsuranceHub(channel) {
-  const isSocial = channel === 'social';
-  openModal(`${modalHead('保险报销 · 保单优先', isSocial ? '社保医疗保险' : '商业医疗保险', '从参保档案或保单进入，创建或关联一次就诊的材料包；材料包只保存一份，各渠道分别维护材料清单和办理进度。')}
-    <div class="insurance-channel-card"><strong>${isSocial ? '医保参保档案' : '演示保单'}：陈兰英</strong><small>${isSocial ? '深圳市职工医保（演示） · 异地就医备案未办理' : '百万医疗险（演示保单） · 保额 200 万 · 生效中'}</small></div>
-    <div class="share-log"><h3>材料包与办理进度（演示）</h3>
-      <div class="log-row"><span>10月22日 市一院门诊 · 材料包</span><small>已提交</small></div>
-      <div class="log-row"><span>${isSocial ? '医保零星报销' : '商业险理赔申请'}</span><small>待补件</small></div>
+/* ============ 保险报销 · 家庭成员保险档案（成员B负责模块） ============ */
+const POLICY_TYPE_LABEL = { social: '社保医保', commercial: '商业保险' };
+/* 险种分类标签（商业险细分） */
+const POLICY_CATEGORY_LABEL = { social: '社保医保', medical: '医疗险', critical: '重疾险', accident: '意外险' };
+/* ============ 报销联动引擎：医疗资料 → 自动匹配保单 + 材料清单（FR-07 演示） ============ */
+const CLAIM_MATERIALS = {
+  social: ['医疗费用发票原件', '费用明细清单', '门诊病历或诊断证明', '社保卡 / 身份证复印件', '本人银行账户信息'],
+  medical: ['理赔申请书（保险公司模板）', '医疗费用发票原件', '费用明细清单', '病历及检查报告', '被保险人身份证复印件', '受益人银行账户信息'],
+  critical: ['理赔申请书（保险公司模板）', '疾病诊断证明书原件', '病理检查 / 化验报告', '被保险人身份证复印件', '受益人银行账户信息'],
+  accident: ['理赔申请书（保险公司模板）', '意外事故经过说明', '门诊病历及X光 / 检查报告', '医疗费用发票原件', '费用明细清单', '被保险人身份证复印件']
+};
+const RECORD_SCENE = {
+  '门诊病历': '门诊治疗',
+  '就诊资料': '门诊就诊',
+  '检查报告': '门诊检查 / 化验',
+  '用药记录': '门诊用药',
+  '出院小结': '住院治疗',
+  '疾病诊断证明书': '重大疾病确诊',
+  '外伤门诊病历': '意外伤害治疗',
+  '医疗费用发票': '医疗费用结算',
+  '费用明细': '医疗费用结算'
+};
+/* 各资料类型可触发的报销通道：纯检查 / 体检报告无费用票据，仅走医保；
+   重疾险按「疾病诊断证明书」触发（确诊给付型）；意外险按「外伤门诊病历」触发 */
+const RECORD_CHANNELS = {
+  '检查报告': ['social'],
+  '疾病诊断证明书': ['critical'],
+  '外伤门诊病历': ['accident']
+};
+function policyChannel(policy) {
+  return policy.type === 'social' ? 'social' : (policy.category || 'medical');
+}
+function policyChip(policy) {
+  const cat = policyChannel(policy);
+  return `<span class="policy-type policy-type-${cat}">${POLICY_CATEGORY_LABEL[cat] || POLICY_TYPE_LABEL[policy.type] || '保险'}</span>`;
+}
+/* 某成员在某日期可用（生效中）的保单 */
+function activePoliciesAt(memberId, date) {
+  const today = dateOffset(0);
+  return (state.insurancePolicies || []).filter(policy => policy.memberId === memberId
+    && (!policy.start || policy.start <= (date || today))
+    && (!policy.end || policy.end >= (date || today)));
+}
+/* 资料录入后自动检索：符合什么报销条件 → 可用保单 + 对应材料清单（按险种通道过滤） */
+function matchReimbursements(record) {
+  const scene = RECORD_SCENE[record.type] || '门诊就诊';
+  const channels = RECORD_CHANNELS[record.type] || ['social', 'medical'];
+  return activePoliciesAt(record.memberId, record.date)
+    .filter(policy => channels.includes(policyChannel(policy)))
+    .map(policy => ({
+      policy,
+      scene,
+      materials: CLAIM_MATERIALS[policyChannel(policy)] || CLAIM_MATERIALS.social
+    }));
+}
+/* 报销提醒：录入资料后自动检索 → 命中即自动开启提醒（同一资料 + 同一保单只开一次） */
+function showReimbursementMatches(record) {
+  const member = state.familyMembers.find(item => item.id === record.memberId);
+  const matches = matchReimbursements(record);
+  if (!matches.length) {
+    toast(`${member?.name || '该成员'}名下没有在此日期生效、且覆盖该资料类型的保单，暂无报销匹配`);
+    return;
+  }
+  matches.forEach(({ policy, scene, materials }) => {
+    const exists = (state.reimbursements || []).some(claim => claim.recordId === record.id && claim.policyId === policy.id);
+    if (exists) return;
+    state.reimbursements.push({
+      id: `claim-${state.nextClaimId++}`,
+      memberId: record.memberId,
+      policyId: policy.id,
+      recordId: record.id,
+      scene,
+      createdAt: dateOffset(0),
+      status: '整理中',
+      materials: materials.map(label => ({ label, done: /病历|诊断证明|检查报告/.test(label) && ['门诊病历', '出院小结', '疾病诊断证明书', '外伤门诊病历'].includes(record.type) }))
+    });
+  });
+  saveState(); renderDocs();
+  const blocks = matches.map(({ policy, scene, materials }, index) => {
+    const st = policyStateOf(policy);
+    return `<div class="claim-match-block">
+      <div class="claim-match-head">${policyChip(policy)}<strong>${esc(policy.name)}</strong><span class="reading-tag ${st.tag}">${st.label}</span></div>
+      <small class="claim-match-scene">报销条件匹配：${esc(scene)} · ${esc(member?.name || '')} · ${formatDate(record.date)}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small>
+      ${policy.terms ? `<p class="claim-terms">条款要点：${esc(policy.terms)}</p>` : ''}
+      <p class="claim-materials-title">需要准备的资料</p>
+      <ul class="claim-materials">${materials.map(item => `<li>□ ${esc(item)}</li>`).join('')}</ul>
+      <button class="text-button" data-policy-detail="${policy.id}">查看该保险全部条款 →</button>
+      ${index === 0 ? '<small class="privacy-small" style="display:block;margin-top:4px">已自动开启报销提醒，材料清单可在医疗资料 · 保险报销区逐项勾选。</small>' : ''}
+      ${policy.type === 'commercial' && record.type === '检查报告' ? '<small class="privacy-small" style="display:block">注意：纯检查 / 体检报告通常不满足商业医疗险赔付条件（无费用票据），一般仅可用医保个人账户或门诊统筹。</small>' : ''}
+      ${index === 0 ? '<small class="privacy-small" style="display:block">社保与商业险通常不可用同一张发票原件重复报销，可用发票复印件 + 理赔分割单向商业险申请。</small>' : ''}
+    </div>`;
+  }).join('');
+  openModal(`${modalHead('报销提醒 · 自动检索', `已自动开启 ${matches.length} 条报销提醒`, `${esc(record.title)} 已存入 ${esc(member?.name || '')} 的档案。系统按保单生效时段与条款范围自动检索，以下保险的报销条件命中，材料清单已记入保险档案。`)}
+    <div class="claim-match-list">${blocks}</div>
+    <button class="primary-button" id="closeClaimAuto">我知道了，去准备材料</button>
+    <p class="privacy-small">材料清单为演示口径，实际以参保地医保局和保险公司要求为准；演示版不做报销金额计算。</p>`);
+  document.getElementById('closeClaimAuto')?.addEventListener('click', closeModal);
+}
+function policyStateOf(policy) {
+  const today = dateOffset(0);
+  if (policy.end && policy.end < today) return { label: '已失效', tag: 'reading-tag-muted' };
+  const days = policy.end ? Math.round((new Date(policy.end) - new Date(today)) / 86400000) : Infinity;
+  if (days <= 60) return { label: '即将到期', tag: 'reading-tag-yellow' };
+  return { label: '生效中', tag: 'reading-tag-ok' };
+}
+/* 报销提醒行 / 保单行（医疗资料成员块与保险档案共用） */
+function claimRowHtml(claim, showMember = true) {
+  const member = state.familyMembers.find(item => item.id === claim.memberId);
+  const policy = (state.insurancePolicies || []).find(item => item.id === claim.policyId);
+  const record = state.records.find(item => item.id === claim.recordId);
+  const done = claim.materials.filter(item => item.done).length;
+  const ready = done === claim.materials.length;
+  return `<button class="claim-reminder-row" data-claim-detail="${claim.id}">
+    <div class="claim-reminder-copy"><strong>${showMember ? `${esc(member?.name || '')} · ` : ''}${esc(policy?.name || '保单已删除')}</strong><small>来源：${esc(record?.title || '资料已删除')} · ${esc(claim.scene)} · 材料 ${done}/${claim.materials.length}</small></div>
+    <span class="reading-tag ${ready ? 'reading-tag-ok' : 'reading-tag-yellow'}">${ready ? '材料齐全' : '待补材料'}</span>
+  </button>`;
+}
+function policyRowHtml(policy) {
+  const st = policyStateOf(policy);
+  return `<button class="policy-row" data-policy-detail="${policy.id}">
+    ${policyChip(policy)}
+    <span class="policy-copy"><strong>${esc(policy.name)}</strong><small>${esc(policy.company || '')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''} · ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')} · 点看条款</small></span>
+    <span class="reading-tag ${st.tag}">${st.label}</span>
+  </button>`;
+}
+/* 医疗资料 Tab：按成员展开 —— 就医信息卡 · 就医资料库（按就诊日期归档） · 保险报销 */
+const expandedDocsMembers = new Set();
+/* 就诊资料按日期归组：同一天的资料 = 一次就诊；AI 概括取组内主资料（病历类优先）的 summary */
+const RECORD_SUMMARY_PRIORITY = ['门诊病历', '出院小结', '疾病诊断证明书', '外伤门诊病历', '就诊资料', '用药记录', '检查报告', '医疗费用发票', '费用明细'];
+function autoSummary(type, title) {
+  if (type === '外伤门诊病历') return `意外受伤就诊 · ${title}`;
+  if (type === '出院小结') return `住院治疗结束 · ${title}`;
+  if (type === '疾病诊断证明书') return `疾病诊断确认 · ${title}`;
+  if (type === '医疗费用发票' || type === '费用明细') return `医疗费用结算 · ${title}`;
+  if (type === '用药记录') return `用药方案整理 · ${title}`;
+  if (type === '检查报告') return `检查 / 化验结果 · ${title}`;
+  return `门诊就诊 · ${title}`;
+}
+function visitGroups(memberId) {
+  const byDate = new Map();
+  state.records.filter(record => record.memberId === memberId).forEach(record => {
+    if (!byDate.has(record.date)) byDate.set(record.date, []);
+    byDate.get(record.date).push(record);
+  });
+  return [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([date, items]) => {
+    items.sort((a, b) => RECORD_SUMMARY_PRIORITY.indexOf(a.type) - RECORD_SUMMARY_PRIORITY.indexOf(b.type));
+    const main = items.find(record => record.summary) || items[0];
+    const override = (state.visitSummaries || {})[`${memberId}|${date}`]; // 家属修改过的概括优先于 AI 生成
+    return { date, records: items, summary: override || main?.summary || autoSummary(main?.type, main?.title) };
+  });
+}
+/* 某次就诊详情：AI 概括 + 当天全部资料（病历 / 发票 / 明细等都能传） */
+function showVisitDetail(memberId, date) {
+  const member = state.familyMembers.find(item => item.id === memberId);
+  const visit = visitGroups(memberId).find(group => group.date === date);
+  if (!visit) return;
+  const rows = visit.records.map(record => {
+    const claimable = activePoliciesAt(memberId, record.date).length > 0;
+    return `<button class="visit-material-row" data-open-record="${esc(record.id)}">
+      <span class="record-icon ${record.type === '用药记录' ? 'medicine' : ''}">${esc(record.icon || '▤')}</span>
+      <span class="visit-material-copy"><strong>${esc(record.title)}</strong><small>${esc(record.type)} · ${esc(record.hospital)} · ${esc(record.state)}</small></span>
+      ${claimable ? '<span class="record-status claimable">可报销</span>' : ''}
+      <span class="member-chevron">›</span>
+    </button>`;
+  }).join('');
+  openModal(`${modalHead(`${esc(member?.name || '')} · 就诊记录`, formatDate(date), `当天共 ${visit.records.length} 份资料；AI 概括仅供整理参考，可编辑修正。`)}
+    <div class="visit-summary-card" id="visitSummaryBlock">
+      <div class="visit-summary-head"><span class="ai-chip">AI 概括</span><button class="text-button" id="editVisitSummary">编辑</button></div>
+      <p id="visitSummaryText">${esc(visit.summary)}</p>
     </div>
-    <div class="health-highlight">进度状态：待整理 → 已提交 → 待补件 → 处理中 → 已办结。演示版不做保险销售、不自动判断承保或赔付金额。</div>
-    <button class="primary-button" id="insuranceTodo">创建 / 关联就诊材料包</button>
-    <p class="privacy-small">完整模块由成员B按需求文档 FR-07 开发，当前为医疗资料分区下的入口演示。</p>`);
-  document.getElementById('insuranceTodo')?.addEventListener('click', () => { closeModal(); toast('演示版：材料包功能开发中，入口与信息架构已就位'); });
+    <p class="claim-materials-title">本次就诊资料（${visit.records.length}）</p>
+    <div class="visit-material-list">${rows}</div>
+    <button class="secondary-button" data-action="upload" data-upload-member="${esc(memberId)}" style="margin-top:8px">＋ 补传本次就诊资料</button>
+    <p class="privacy-small">病历、发票、费用明细、用药记录等都可以上传；同一天上传的资料自动归到同一次就诊，并生成 AI 病症概括。</p>`);
+  document.getElementById('editVisitSummary')?.addEventListener('click', () => {
+    const block = document.getElementById('visitSummaryBlock'); if (!block) return;
+    block.innerHTML = `<div class="visit-summary-head"><span class="ai-chip">AI 概括 · 可修改</span></div>
+      <textarea class="ocr-text-area" id="visitSummaryInput" style="min-height:76px;margin-top:6px">${esc(visit.summary)}</textarea>
+      <div class="visit-summary-ops"><button class="primary-button" id="saveVisitSummary" style="margin-top:8px">保存概括</button></div>`;
+    document.getElementById('saveVisitSummary')?.addEventListener('click', () => {
+      const text = document.getElementById('visitSummaryInput')?.value.trim();
+      if (!text) { toast('概括不能为空，可恢复为原文'); return; }
+      state.visitSummaries = state.visitSummaries || {};
+      state.visitSummaries[`${memberId}|${date}`] = text;
+      saveState(); renderDocs();
+      toast('就诊概括已更新，列表同步生效');
+      showVisitDetail(memberId, date);
+    });
+  });
+}
+function renderDocs() {
+  const host = document.getElementById('docsMemberList');
+  if (!host) return;
+  host.innerHTML = state.familyMembers.map(member => {
+    const open = expandedDocsMembers.has(member.id);
+    const records = state.records.filter(record => record.memberId === member.id);
+    const visits = visitGroups(member.id);
+    const list = (state.insurancePolicies || []).filter(policy => policy.memberId === member.id);
+    const claims = (state.reimbursements || []).filter(claim => claim.memberId === member.id && claim.status !== '已提交');
+    const visitRows = visits.map(visit => {
+      const claimable = visit.records.some(record => activePoliciesAt(member.id, record.date).length > 0);
+      const types = [...new Set(visit.records.map(record => record.type))];
+      return `<article class="record-item visit-item" data-visit-open="${esc(member.id)}|${esc(visit.date)}" tabindex="0" role="button" aria-label="查看${formatDate(visit.date)}就诊记录">
+        <span class="record-icon">▤</span>
+        <div class="record-body">
+          <strong>${esc(visit.summary)}<span class="ai-chip">AI 概括</span></strong>
+          <small>${formatDate(visit.date)} · ${visit.records.length} 份资料（${esc(types.join(' · '))}）</small>
+        </div>
+        ${claimable ? '<span class="record-status claimable">可报销</span>' : ''}
+      </article>`;
+    });
+    return `<article class="insurance-member docs-member">
+      <button class="insurance-member-head docs-member-head" data-docs-toggle="${member.id}" aria-expanded="${open}">
+        <span class="mini-avatar ${member.avatarClass || ''}">${esc(member.name.slice(0, 1))}</span>
+        <div class="insurance-member-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${records.length} 份资料 · ${list.length} 份保单${claims.length ? ` · <b class="member-alert-count">${claims.length} 条报销待办</b>` : ''}</small></div>
+        <span class="member-chevron">${open ? '⌃' : '⌄'}</span>
+      </button>
+      ${open ? `<div class="docs-member-body">
+        <div class="docs-sub-head"><span>就医信息卡</span><span class="docs-sub-ops"><button class="text-button" data-member-edit="${member.id}">编辑</button><button class="text-button" data-action="health-card" data-card-member="${member.id}">查看全部 →</button></span></div>
+        <div class="info-grid">
+          <div><span class="field-label">慢病</span><strong>${esc(member.conditions)}</strong></div>
+          <div><span class="field-label">过敏史</span><strong class="${/无/.test(member.allergies) ? '' : 'alert-text'}">${esc(member.allergies)}</strong></div>
+          <div><span class="field-label">长期用药</span><strong>${esc(member.medications)}</strong></div>
+          <div><span class="field-label">手术史</span><strong>${esc(member.surgeries)}</strong></div>
+        </div>
+        <div class="docs-member-ops single">
+          <button class="secondary-button" data-action="appointment" data-appointment-member="${member.id}">就诊准备清单 · 完成后生成分享码</button>
+        </div>
+        <div class="docs-sub-head"><span>就医资料库 · 按就诊日期归档</span><button class="text-button" data-action="upload" data-upload-member="${member.id}">＋ 添加</button></div>
+        ${visitRows.length ? `<div class="record-list">${previewRows(visitRows, `docsrec-${member.id}`)}</div>` : '<p class="empty-hint" style="margin:2px 0">暂无就诊资料，点右上「＋ 添加」上传，同一天的资料自动归为一次就诊。</p>'}
+        <small class="privacy-small" style="display:block;margin:4px 0 2px">点某次就诊可查看当天全部资料；AI 概括病症仅供整理参考。体检 / 化验报告在「健康档案 · 导入体检单」录入。</small>
+        <div class="docs-sub-head"><span>保险报销</span></div>
+        ${claims.length ? claims.map(claim => claimRowHtml(claim, false)).join('') : '<p class="empty-hint" style="margin:2px 0">暂无报销提醒，录入资料后自动匹配保单生成。</p>'}
+        ${list.map(policy => policyRowHtml(policy)).join('') || '<p class="empty-hint" style="margin:4px 0">暂无保单，点下方「录入保单」添加。</p>'}
+        <button class="text-button" data-member-policy-add="${member.id}" style="margin-top:7px">＋ 录入保单</button>
+      </div>` : ''}
+    </article>`;
+  }).join('');
+}
+/* 报销清单详情：材料勾选 + 提交 */
+function showClaimDetail(claimId) {
+  const claim = (state.reimbursements || []).find(item => item.id === claimId);
+  if (!claim) return;
+  const member = state.familyMembers.find(item => item.id === claim.memberId);
+  const policy = (state.insurancePolicies || []).find(item => item.id === claim.policyId);
+  const record = state.records.find(item => item.id === claim.recordId);
+  const done = claim.materials.filter(item => item.done).length;
+  const ready = done === claim.materials.length;
+  openModal(`${modalHead(`报销提醒 · ${esc(member?.name || '')}`, `${esc(policy?.name || '保单已删除')}`, '勾选已准备好的材料，全部齐备后即可提交报销 / 理赔申请。材料清单为演示口径，以实际参保地与承保机构要求为准。')}
+    <div class="insurance-channel-card">${policy ? policyChip(policy) : ''}<strong>来源资料：${esc(record?.title || '已删除')}（${formatDate(record?.date || claim.createdAt)}）</strong><small>${esc(claim.scene)} · 记录于 ${formatDate(claim.createdAt)}${policy?.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small></div>
+    ${policy?.terms ? `<p class="claim-terms">条款要点：${esc(policy.terms)}</p>` : ''}
+    ${policy ? `<button class="text-button" data-policy-detail="${policy.id}" style="margin-bottom:6px">查看该保险全部条款 →</button>` : ''}
+    <p class="claim-materials-title">材料清单（勾选 ${done}/${claim.materials.length}）</p>
+    <div class="claim-check-list">${claim.materials.map((item, index) => `<button class="claim-check-row ${item.done ? 'is-done' : ''}" data-claim-toggle="${index}" data-claim-id="${claim.id}"><span class="claim-check-mark">${item.done ? '✓' : '□'}</span>${esc(item.label)}</button>`).join('')}</div>
+    ${ready && claim.status !== '已提交' ? '<div class="health-highlight">材料已齐备，可以提交报销 / 理赔申请了。</div>' : ''}
+    ${claim.status === '已提交' ? '<div class="health-highlight">已提交，等待受理结果（演示到此为止）。</div>' : ''}
+    <div class="policy-detail-ops">
+      ${claim.status !== '已提交' ? `<button class="primary-button" data-claim-submit="${claim.id}" ${ready ? '' : 'disabled'}>标记为已提交</button>` : ''}
+      <button class="secondary-button" data-claim-del="${claim.id}">删除提醒</button>
+    </div>`);
+}
+/* ============ 录入保单：上传保单文件 → AI 识别检索条款 → 人工核实确认（原件可随时查看） ============ */
+let policyUploadFile = null;    // 待入库的保单原件（照片 / PDF）
+let policyRecognized = null;    // AI 识别生成的预填保单
+let policyConfirmCtx = null;    // 核实页上下文（查看原件后返回用）
+const POLICY_DEMO_TEXT = '电子保单 好医保 长期医疗险 20年版 人保健康 一般医疗保额200万 重疾医疗保额400万 免赔额1万 等待期90天 保证续保20年';
+/* AI 检索：识别文字 → 保单产品库（关键词匹配，命中即带出整套条款） */
+function matchPolicyTemplate(text) {
+  const content = String(text || '');
+  const rules = [
+    { keys: ['防癌'], name: '好医保·终身防癌医疗险' },
+    { keys: ['长期医疗', '20 年版', '20年版'], name: '好医保·长期医疗险（20年版）' },
+    { keys: ['健康福', '重疾'], name: '健康福·重疾险1号（一年期）' },
+    { keys: ['无忧保', '意外'], name: '无忧保·综合意外险' },
+    { keys: ['住院医疗'], name: '好医保·住院医疗（2020版）' }
+  ];
+  for (const rule of rules) {
+    if (rule.keys.some(key => content.includes(key))) {
+      const tpl = seed.insurancePolicies.find(policy => policy.name === rule.name);
+      if (tpl) return { ...tpl };
+    }
+  }
+  const social = /医保|社保/.test(content) ? seed.insurancePolicies.find(policy => policy.type === 'social') : null;
+  return { ...(social || seed.insurancePolicies.find(policy => policy.name === '好医保·长期医疗险（20年版）')) };
+}
+/* 演示电子保单：canvas 生成一张保单样式图片，作为可查看的原件 */
+function makeDemoPolicyFile() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640; canvas.height = 860;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, 640, 860);
+  ctx.fillStyle = '#2f4a38'; ctx.fillRect(0, 0, 640, 90);
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px sans-serif'; ctx.fillText('电子保单（演示）', 30, 58);
+  ctx.fillStyle = '#333333'; ctx.font = '20px sans-serif';
+  const lines = [
+    '产品名称：好医保·长期医疗险（20年版）', '承保机构：人保健康', '保单号：DEMO-COM-2004（演示）',
+    '被保险人：（演示数据）', '保障期间：2025-01-10 至 2045-01-09', '一般医疗保额：200 万元',
+    '重疾医疗保额：400 万元', '免赔额：1 万/年（重疾 0 免赔）', '等待期：90 天',
+    '—— 保险责任 ——', '· 一般住院医疗费用', '· 121 种重大疾病住院医疗', '· 特殊门诊 / 住院前后门急诊',
+    '—— 除外责任 ——', '· 投保前已有疾病及其并发症', '· 牙科、视力矫正等非疾病治疗'
+  ];
+  lines.forEach((line, index) => ctx.fillText(line, 30, 150 + index * 36));
+  return new Promise(resolve => canvas.toBlob(blob => resolve(new File([blob], '演示电子保单.png', { type: 'image/png' })), 'image/png'));
+}
+/* 第一步：选择成员 + 上传保单文件（照片 / PDF） */
+function showPolicyEntry(memberId = '', policyId = '') {
+  const policy = policyId ? (state.insurancePolicies || []).find(item => item.id === policyId) : null;
+  if (policy) { showPolicyConfirm(policy, null, true); return; }
+  policyUploadFile = null; policyRecognized = null;
+  openModal(`${modalHead('保险档案 · 家庭成员', '录入保单 · 上传保单文件', '保单买好后保险公司会给电子保单（PDF）或凭证截图。上传后 AI 自动识别并检索条款，核对确认后入档。')}
+    <label class="extraction-row"><span>所属成员</span><select id="policyMember" class="extraction-select">${state.familyMembers.map(member => `<option value="${member.id}" ${member.id === (memberId || state.currentMemberId) ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('')}</select></label>
+    <div class="upload-choice">
+      <button class="upload-option" data-policy-source="file"><span>▤</span><strong>上传保单照片 / PDF</strong></button>
+    </div>
+    <button class="secondary-button sample-report-button" id="policyDemoScan">用演示电子保单体验 AI 识别</button>
+    <p class="privacy-small">支持图片与 PDF；识别在本机完成，原件仅保存在当前浏览器，不会上传云端。请勿上传真实保单，演示数据请脱敏。</p>`);
+}
+/* 第二步：AI 识别（图片走本机 OCR；PDF 用演示识别）→ 检索产品库 → 生成预填保单 */
+async function showPolicyRecognize(file) {
+  const memberId = document.getElementById('policyMember')?.value || state.currentMemberId;
+  openModal(`${modalHead('录入保单 · AI 识别', '正在识别保单文件…', '本机识别保单上的产品与关键信息，并自动检索对应条款，随后请你核实确认。')}
+    <div class="file-chip"><b>▤</b><span>${esc(file?.name || '保单文件')}</span><span id="policyOcrStatus" style="margin-left:auto;color:#789078">准备识别…</span></div>
+    ${file?.type?.startsWith('image/') ? '<img class="report-preview" id="policyPreview" alt="保单原件预览" />' : ''}`);
+  if (file?.type?.startsWith('image/')) {
+    const preview = document.getElementById('policyPreview');
+    if (preview) preview.src = URL.createObjectURL(file);
+  }
+  const status = document.getElementById('policyOcrStatus');
+  let text = '';
+  if (file && file.type.startsWith('image/')) {
+    try {
+      if (status) status.textContent = '正在准备本机中文识别…首次载入会稍慢。';
+      const worker = await getOcrWorker();
+      const result = await worker.recognize(file);
+      text = result.data.text || '';
+      if (status) status.textContent = `识别完成（${text.length} 字），正在检索保单产品库…`;
+    } catch {
+      if (status) status.textContent = '本机识别未完成，改用演示识别结果，请人工核实。';
+      text = POLICY_DEMO_TEXT;
+    }
+  } else if (file) {
+    if (status) status.textContent = 'PDF 解析为演示能力，已生成模拟识别结果，请人工核实。';
+    text = POLICY_DEMO_TEXT;
+  } else {
+    text = POLICY_DEMO_TEXT;
+  }
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const template = matchPolicyTemplate(text);
+  policyRecognized = {
+    memberId,
+    type: template.type,
+    category: template.category || 'medical',
+    name: template.name,
+    company: template.company,
+    policyNo: `AI-${Date.now().toString().slice(-6)}`,
+    coverage: template.coverage || '',
+    terms: template.terms || '',
+    deductible: template.deductible || '',
+    ratio: template.ratio || '',
+    waiting: template.waiting || '',
+    hospital: template.hospital || '',
+    renewal: template.renewal || '',
+    duties: [...(template.duties || [])],
+    exclusions: [...(template.exclusions || [])],
+    termsList: [],
+    start: dateOffset(0),
+    end: dateOffset(365)
+  };
+  showPolicyConfirm(policyRecognized, file, false);
+}
+/* 第三步：核实确认表单（可改）+ 底部「查看原件」按钮 */
+function showPolicyConfirm(policy, file, editing) {
+  policyConfirmCtx = { policy: editing ? policy : null, editing, file: file || policyUploadFile };
+  const current = editing ? policy : policyRecognized;
+  if (!current) { showPolicyEntry(); return; }
+  const memberOptions = state.familyMembers.map(member => `<option value="${member.id}" ${member.id === current.memberId ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('');
+  openModal(`${modalHead('录入保单 · 请核实', editing ? `编辑保单 · ${esc(policy.name)}` : 'AI 已识别保单 · 请核实确认', editing ? '以下信息可修改，确认后保存到成员名下。' : `AI 从保单文件识别出以下信息，并自动从产品库检索出条款。请逐项核实（重点：保额、保障期间、条款），确认后入档。`)}
+    <div class="file-chip"><b>▤</b><span>${esc(file?.name || '保单原件（本机）')}</span><button class="text-button" id="viewPolicyFile" style="margin-left:auto">查看原件</button></div>
+    <form class="member-edit-form" id="policyForm">
+      <label><span class="field-label-block">所属成员</span><select class="input-field" name="memberId">${memberOptions}</select></label>
+      <label><span class="field-label-block">类型</span><select class="input-field" name="type">
+        <option value="social" ${current.type === 'social' ? 'selected' : ''}>社保医疗保险</option>
+        <option value="commercial" ${current.type === 'commercial' ? 'selected' : ''}>商业保险</option>
+      </select></label>
+      <label><span class="field-label-block">商业险种（商业保险适用）</span><select class="input-field" name="category">
+        <option value="medical" ${(current.category || 'medical') === 'medical' ? 'selected' : ''}>医疗险（费用报销型）</option>
+        <option value="critical" ${current.category === 'critical' ? 'selected' : ''}>重疾险（确诊给付型）</option>
+        <option value="accident" ${current.category === 'accident' ? 'selected' : ''}>意外险</option>
+      </select></label>
+      <label><span class="field-label-block">保险名称</span><input class="input-field" name="name" required placeholder="例：好医保·长期医疗险" value="${esc(current.name)}" /></label>
+      <label><span class="field-label-block">承保机构</span><input class="input-field" name="company" placeholder="例：人保健康（支付宝投保）" value="${esc(current.company)}" /></label>
+      <label><span class="field-label-block">保单号（选填）</span><input class="input-field" name="policyNo" placeholder="演示数据请勿输入真实号码" value="${esc(current.policyNo)}" /></label>
+      <label><span class="field-label-block">保额（选填）</span><input class="input-field" name="coverage" placeholder="例：200 万 / 按医保目录" value="${esc(current.coverage)}" /></label>
+      <label><span class="field-label-block">条款摘要（选填）</span><input class="input-field" name="terms" placeholder="例：住院医疗费用经社保结算后 100% 报销" value="${esc(current.terms || '')}" /></label>
+      <label><span class="field-label-block">条款明细（选填，每行一条：标题｜内容）</span><textarea class="input-field" name="termsExtra" rows="3" placeholder="免赔额｜1 万/年${'\n'}等待期｜90 天${'\n'}除外责任｜投保前已有疾病">${esc((current.termsList || []).map(item => `${item.title}｜${item.text}`).join('\n'))}</textarea></label>
+      <label><span class="field-label-block">生效日期</span><input class="input-field" name="start" type="date" value="${esc(current.start)}" /></label>
+      <label><span class="field-label-block">到期日期</span><input class="input-field" name="end" type="date" value="${esc(current.end)}" /></label>
+      <button class="primary-button" type="submit">${editing ? '保存修改' : '核实无误，确认入档'}</button>
+    </form>
+    <p class="privacy-small">AI 识别与条款检索为演示能力（关键词匹配产品库），实际以保单合同原件为准；演示版不做承保判断。</p>`);
+  document.getElementById('viewPolicyFile')?.addEventListener('click', () => showPolicyAttachment(policyConfirmCtx.file, editing ? policy.id : null));
+  document.getElementById('policyForm')?.addEventListener('submit', ev => {
+    ev.preventDefault();
+    const data = new FormData(ev.target);
+    const record = {
+      memberId: data.get('memberId'),
+      type: data.get('type'),
+      category: data.get('category') || 'medical',
+      name: String(data.get('name') || '').trim(),
+      company: String(data.get('company') || '').trim(),
+      policyNo: String(data.get('policyNo') || '').trim(),
+      coverage: String(data.get('coverage') || '').trim(),
+      terms: String(data.get('terms') || '').trim(),
+      termsList: parseTermsLines(data.get('termsExtra')),
+      start: String(data.get('start') || ''),
+      end: String(data.get('end') || '')
+    };
+    if (!record.name) { toast('请填写保险名称'); return; }
+    if (editing && !record.termsList.length) record.termsList = policy.termsList || []; // 编辑时未填则保留原条款明细
+    let member = state.familyMembers.find(item => item.id === record.memberId);
+    if (editing) {
+      Object.assign(policy, record);
+      saveState(); renderDocs(); closeModal();
+      toast(`${member?.name || '成员'} 的「${record.name}」已更新`);
+    } else {
+      const saved = { id: `pol-${state.nextPolicyId++}`, ...record };
+      /* AI 识别出的结构化条款（产品库带出）随保单一并保存 */
+      ['deductible', 'ratio', 'waiting', 'hospital', 'renewal'].forEach(key => { if (current[key]) saved[key] = current[key]; });
+      if (current.duties?.length) saved.duties = [...current.duties];
+      if (current.exclusions?.length) saved.exclusions = [...current.exclusions];
+      state.insurancePolicies.push(saved);
+      saveState(); renderDocs(); closeModal();
+      if (policyUploadFile) {
+        putAttachment(saved.id, policyUploadFile)
+          .then(() => toast(`${member?.name || '成员'} 的「${record.name}」已入档，原件保存在本机`))
+          .catch(() => toast(`${member?.name || '成员'} 的「${record.name}」已入档，原件保存失败`));
+      } else {
+        toast(`${member?.name || '成员'} 的「${record.name}」已入档`);
+      }
+    }
+  });
+}
+/* 查看保单原件：新上传文件或本机已存附件（图片 / PDF 内嵌预览） */
+async function showPolicyAttachment(file, policyId) {
+  if (!file && policyId) {
+    try {
+      const item = await getAttachment(policyId);
+      if (item?.blob) file = { name: item.name, type: item.type, blob: item.blob };
+    } catch { /* 本机附件可能不存在 */ }
+  }
+  if (!file || (!file.blob && !(file instanceof File))) { toast('没有找到保单原件；可通过「上传保单文件」重新录入'); return; }
+  const url = URL.createObjectURL(file.blob || file);
+  const name = file.name || '保单原件';
+  const media = file.type?.startsWith('image/')
+    ? `<img class="report-preview" src="${url}" alt="${esc(name)}" />`
+    : file.type === 'application/pdf'
+      ? `<iframe class="policy-pdf-frame" src="${url}" title="${esc(name)}"></iframe>`
+      : `<p class="privacy-small">当前格式暂不支持内嵌预览（演示）。</p>`;
+  openModal(`${modalHead('保单原件 · 本机保存', esc(name), '原件仅保存在当前设备，用于人工核实 AI 识别结果。')}${media}
+    <button class="primary-button" id="policyFileDone">返回核实</button>`);
+  document.getElementById('policyFileDone')?.addEventListener('click', () => {
+    if (policyConfirmCtx?.editing && policyConfirmCtx.policy) showPolicyConfirm(policyConfirmCtx.policy, null, true);
+    else if (policyConfirmCtx && !policyConfirmCtx.editing) showPolicyConfirm(policyRecognized, policyUploadFile, false);
+    else closeModal();
+  });
+}
+/* 条款明细 textarea（每行「标题｜内容」）→ 结构化条款列表 */
+function parseTermsLines(text) {
+  return String(text || '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    const parts = line.split(/｜|\||：|:/);
+    return { title: (parts[0] || '').trim(), text: parts.slice(1).join('：').trim() };
+  }).filter(item => item.title && item.text);
+}
+/* 保单详情：全部条款信息 + 关联报销提醒 + 编辑删除 */
+function showPolicyDetail(policyId) {
+  const policy = (state.insurancePolicies || []).find(item => item.id === policyId);
+  if (!policy) return;
+  const member = state.familyMembers.find(item => item.id === policy.memberId);
+  const st = policyStateOf(policy);
+  const claims = (state.reimbursements || []).filter(item => item.policyId === policy.id);
+  const termsRows = [
+    ['免赔额', policy.deductible],
+    ['报销比例', policy.ratio],
+    ['等待期', policy.waiting],
+    ['医院范围', policy.hospital],
+    ['续保条件', policy.renewal],
+    ...parseTermsLines((policy.termsList || []).map(item => `${item.title}｜${item.text}`).join('\n')).map(item => [item.title, item.text])
+  ].filter(([, value]) => value);
+  const hasDetail = termsRows.length || policy.duties?.length || policy.exclusions?.length;
+  openModal(`${modalHead(`保险档案 · ${esc(member?.name || '')}`, `${esc(policy.name)}`, '点击保单即可查看这份保险的全部条款信息；报销与理赔从这份保单发起。')}
+    <div class="insurance-channel-card">${policyChip(policy)}<strong>${esc(policy.name)} · ${esc(member?.name || '')}</strong><small>保单号 ${esc(policy.policyNo || '未填写')} · ${esc(policy.company || '承保机构未填')}${policy.coverage ? ` · 保额 ${esc(policy.coverage)}` : ''}</small><small>保障期间 ${esc(policy.start || '')} ~ ${esc(policy.end || '长期')} · ${st.label}</small></div>
+    ${policy.terms ? `<p class="claim-terms">条款摘要：${esc(policy.terms)}</p>` : ''}
+    ${hasDetail ? `<div class="policy-terms">
+      <h3>条款信息</h3>
+      ${termsRows.map(([label, value]) => `<div class="terms-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('')}
+      ${policy.duties?.length ? `<p class="claim-materials-title">保险责任（保什么）</p><ul class="terms-list">${policy.duties.map(item => `<li>● ${esc(item)}</li>`).join('')}</ul>` : ''}
+      ${policy.exclusions?.length ? `<p class="claim-materials-title">除外责任（不保什么）</p><ul class="terms-list terms-list-ex">${policy.exclusions.map(item => `<li>✕ ${esc(item)}</li>`).join('')}</ul>` : ''}
+    </div>` : '<p class="empty-hint" style="margin:4px 0">暂无结构化条款，可通过「编辑保单」补充条款明细。</p>'}
+    <div class="share-log"><h3>关联报销提醒（${claims.length}）</h3>
+      ${claims.length ? claims.map(claim => claimRowHtml(claim, false)).join('') : '<p class="empty-hint" style="margin:2px 0">暂无报销提醒；上传对应病历资料后会自动检索这份保单并开启提醒。</p>'}
+    </div>
+    <div class="health-highlight">报销从对应成员的保单发起：上传病历 → 自动检索条款 → 命中即开启提醒 → 勾材料 → 提交。演示版不做承保与赔付金额判断。</div>
+    <div class="policy-detail-ops">
+      <button class="secondary-button" data-policy-attachment="${policy.id}">查看原件</button>
+      <button class="secondary-button" data-policy-edit="${policy.id}">编辑保单</button>
+    </div>
+    <div class="policy-detail-ops" style="margin-top:8px">
+      <button class="secondary-button policy-del-button" data-policy-del="${policy.id}">删除</button>
+    </div>
+    <p class="privacy-small">演示版：条款为模拟内容（支付宝在售产品风格），实际以保单合同条款为准。</p>`);
 }
 
 function renderHomeCompanionModule() {
@@ -1041,6 +1643,9 @@ function showAlertCenter() {
 }
 /* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件，读数按成员归属） ============ */
 let readingMemberId = 'm1';   // 当前录入读数的目标成员（设备数据各归各人）
+let uploadMemberId = '';      // 「＋ 添加资料」预选的成员（医疗资料成员块内触发时传入）
+let appointmentMemberId = ''; // 当前就诊准备清单对应的成员（弹窗间跳转保持上下文）
+let preVisitMemberId = '';    // 当前诊前自我描述对应的成员
 let histEditContext = 'dashboard'; // 编辑/删除后的返回上下文：dashboard / daily
 const previewOpen = new Set();   // 成员卡内长列表预览展开状态（track-m1 / daily-m1 ...）
 const READING_METHODS = [
@@ -1486,7 +2091,8 @@ function showExtraction(file) {
     <div class="extraction-list"><label class="extraction-row"><span>版面类型</span><select id="ocrLayoutMode"><option value="3">普通文档</option><option value="11">表格 / 课程表</option></select></label></div>
     ${file ? '<button class="secondary-button" id="rerunOcr">按所选版面重新识别</button>' : ''}
     <div class="extraction-list">
-      <label class="extraction-row"><span>资料类型</span><input id="extractType" value="就医资料" /></label>
+      <label class="extraction-row"><span>所属成员</span><select id="extractMember" class="extraction-select">${state.familyMembers.map(member => `<option value="${member.id}" ${member.id === (uploadMemberId || state.currentMemberId) ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('')}</select></label>
+      <label class="extraction-row"><span>资料类型</span><input id="extractType" value="门诊病历" placeholder="病历 / 发票 / 费用明细" /></label>
       <label class="extraction-row"><span>医院 / 科室</span><input id="extractHospital" value="" placeholder="请填写医院或科室" /></label>
       <label class="extraction-row"><span>检查日期</span><input id="extractDate" type="date" value="${iso}" /></label>
       <label class="extraction-row"><span>用户补充</span><input id="extractNote" value="${esc(note)}" placeholder="可补充就诊背景" /></label>
@@ -1494,48 +2100,62 @@ function showExtraction(file) {
     <label class="ocr-text-label" for="extractText">图片识别出的文字（可修改）</label><textarea class="ocr-text-area" id="extractText" placeholder="识别文字会显示在这里；也可以手动录入关键信息"></textarea>
     <button class="secondary-button medication-plan-button" id="buildMedicationPlan" hidden>从医嘱生成服药提醒</button>
     <p class="privacy-small">提取内容仅作为资料录入辅助，不构成诊断结论。请以原始报告为准。</p>
-    <button class="primary-button" id="saveRecord">确认并加入妈妈的档案</button>
+    <button class="primary-button" id="saveRecord">确认并加入档案 · 自动匹配报销</button>
+    <p class="privacy-small">资料库只收就诊资料：病历、医疗费用发票、费用明细、用药记录等；体检 / 化验报告请到「健康档案 · 导入体检单」录入。</p>
     <button class="secondary-button" id="backToUpload">返回修改</button>`);
   const runButton = document.getElementById('rerunOcr');
   runButton?.addEventListener('click', () => runLocalOcr(file, iso));
   runLocalOcr(file, iso);
 }
-function showHealthCard() {
-  openModal(`${modalHead('妈妈 · 68岁 · 最近核对 10月22日', '就医信息卡', '由家人协助整理，供就诊时主动展示。医生可按需查看原始报告。')}
+function showHealthCard(memberId = '') {
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  const visits = visitGroups(member.id);
+  const latest = visits[0];
+  const contact = state.familyMembers.find(item => item.id !== member.id);
+  const allergyAlert = member.allergies && !/无/.test(member.allergies);
+  openModal(`${modalHead(`${esc(member.name)} · ${member.age}岁 · 最近核对`, '就医信息卡', '由家人协助整理，供就诊时主动展示。医生可按需查看原始报告。')}
     <div class="health-list">
-      <div class="health-row"><span>过敏史</span><strong style="color:#a15d4c">青霉素</strong></div>
-      <div class="health-row"><span>重要病史</span><strong>高血压 · 2018年发现</strong></div>
-      <div class="health-row"><span>长期用药</span><strong>氨氯地平片 · 每日一次</strong></div>
-      <div class="health-row"><span>近期用药</span><strong>阿托伐他汀钙片 · 每晚一次</strong></div>
-      <div class="health-row"><span>紧急联系人</span><strong>小林 · 女儿</strong></div>
-      <div class="health-row"><span>近期就诊</span><strong>10月22日 · 心内科</strong></div>
+      <div class="health-row"><span>过敏史</span><strong ${allergyAlert ? 'style="color:#a15d4c"' : ''}>${esc(member.allergies || '无')}</strong></div>
+      <div class="health-row"><span>重要病史</span><strong>${esc(member.conditions || '无')}</strong></div>
+      <div class="health-row"><span>长期用药</span><strong>${esc(member.medications || '无')}</strong></div>
+      <div class="health-row"><span>手术史</span><strong>${esc(member.surgeries || '无')}</strong></div>
+      <div class="health-row"><span>紧急联系人</span><strong>${esc(contact ? `${contact.name} · ${contact.role}` : '未填写')}</strong></div>
+      <div class="health-row"><span>近期就诊</span><strong>${latest ? `${formatDate(latest.date)} · ${esc(latest.summary.slice(0, 18))}` : '暂无记录'}</strong></div>
     </div>
-    <div class="health-highlight">过敏史已由家属核对。就诊时请以医生问诊和原始病历为准；本信息卡不替代医疗判断。</div>
-    <button class="primary-button" id="openShareFromCard">生成就诊分享码</button>`);
+    <div class="health-highlight">${allergyAlert ? '过敏史已由家属核对，请主动告知医生。' : '信息已由家属核对。'}就诊时请以医生问诊和原始病历为准；本信息卡不替代医疗判断。</div>
+    <button class="primary-button" id="openShareFromCard" data-share-member="${member.id}">生成就诊分享码</button>
+    <button class="secondary-button" data-member-edit="${member.id}">编辑信息卡</button>`);
 }
-function showAppointment() {
-  const checks = state.appointmentChecks || {};
-  const hasDescription = (state.preVisitDescriptions || []).length > 0;
-  const items = [
-    ['idCard', '医保卡与身份证', '就诊时出示'],
-    ['reports', '近期检查报告', '血常规、心电图等资料'],
-    ['medicines', '当前用药清单', '可带药盒或核对档案'],
-    ['questions', '想问医生的问题', '提前记下最关心的几件事'],
-    ['selfDescription', '诊前自我描述', '记录近期症状、变化、饮食和生活情况']
-  ];
+function showAppointment(memberId = '') {
+  appointmentMemberId = memberId;
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  const memberChecks = (state.appointmentChecksByMember || (state.appointmentChecksByMember = {}))[member.id];
+  const checks = memberChecks || state.appointmentChecks || {};
+  const hasDescription = preVisitEntries(member.id).length > 0;
+  const items = APPOINTMENT_ITEMS;
   const count = items.filter(([key]) => key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]).length;
-  openModal(`${modalHead(appointmentLabel(), '就诊准备清单', '和妈妈一起确认要带的资料。勾选状态会保存在这台设备上。')}
-    <div class="checklist-progress"><strong id="checklistCount">已准备 ${count} / ${items.length} 项</strong><span>${count === items.length ? '准备好了' : '逐项确认'}</span></div>
-    <div class="appointment-checklist">${items.map(([key, title, hint]) => `<label class="checklist-row"><input type="checkbox" data-checklist="${key}" ${(key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]) ? 'checked' : ''} ${key === 'selfDescription' && hasDescription ? 'disabled' : ''}><span class="checkmark"></span><span class="checklist-copy"><strong>${title}</strong><small>${hint}</small></span></label>`).join('')}</div>
+  const ready = count === items.length;
+  openModal(`${modalHead(appointmentLabel(member), `${esc(member.name)} · 就诊准备清单`, `和${esc(member.name)}一起确认要带的资料。全部确认后即可生成就诊分享码。`)}
+    <div class="checklist-progress"><strong id="checklistCount">已准备 ${count} / ${items.length} 项</strong><span>${ready ? '已就绪 · 可生成分享码' : '逐项确认'}</span></div>
+    <div class="appointment-checklist">${items.map(([key, title, hint]) => `<label class="checklist-row"><input type="checkbox" data-checklist="${key}" data-appointment-member="${member.id}" ${(key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]) ? 'checked' : ''} ${key === 'selfDescription' && hasDescription ? 'disabled' : ''}><span class="checkmark"></span><span class="checklist-copy"><strong>${title}</strong><small>${hint}</small></span></label>`).join('')}</div>
     <button class="secondary-button" id="openPreVisitDescription">${hasDescription ? '查看 / 补充诊前描述' : '添加诊前自我描述'}</button>
-    <div class="health-highlight">就诊信息卡可由妈妈主动向医生展示。清单仅帮助准备资料，不替代医生问诊。</div>
-    <button class="primary-button" id="appointmentCard">打开就医信息卡</button>`);
+    <div class="health-highlight">${ready ? '清单已全部确认，可以生成就诊分享码了。' : `还差 ${items.length - count} 项：全部勾选后解锁「生成就诊分享码」。`}</div>
+    ${ready
+      ? `<button class="primary-button" data-action="share" data-share-member="${member.id}">生成就诊分享码</button>`
+      : `<button class="secondary-button" data-action="share" data-share-member="${member.id}" style="opacity:.6">🔒 生成就诊分享码（完成清单后解锁）</button>`}
+    <button class="secondary-button" id="appointmentCard" data-card-member="${member.id}">打开${esc(member.name)}的就医信息卡</button>`);
 }
-function showPreVisitDescription() {
+/* 诊前描述按成员隔离；早期演示数据未带成员标记，归到首位长辈名下 */
+function preVisitEntries(memberId) {
+  return (state.preVisitDescriptions || []).filter(entry => (entry.memberId || state.familyMembers[0]?.id) === memberId);
+}
+function showPreVisitDescription(memberId = '') {
   preVisitFiles = [];
-  const entries = state.preVisitDescriptions || [];
+  if (memberId) preVisitMemberId = memberId;
+  const member = state.familyMembers.find(item => item.id === preVisitMemberId) || state.familyMembers.find(item => item.id === appointmentMemberId) || state.familyMembers[0];
+  const entries = preVisitEntries(member.id);
   const history = entries.length ? `<div class="previsit-history">${entries.map(entry => `<article><small>${esc(entry.createdAt)}</small><p>${esc(entry.text || '未添加文字说明')}</p><div class="previsit-files">${(entry.attachments || []).map(file => `<button class="text-button" data-previsit-attachment="${esc(file.id)}" data-previsit-type="${esc(file.type)}">查看附件：${esc(file.name)}</button>`).join('') || '<small>无附件</small>'}</div></article>`).join('')}</div>` : '<p class="privacy-small">还没有诊前描述。可记录这次不舒服从什么时候开始、出现频率、饮食睡眠和已采取的处理。</p>';
-  openModal(`${modalHead('就诊前记录', '诊前自我描述', '把病人的主观感受和近期情况先记下来，方便就诊时向医生说明。可拍照、录音或语音转文字。')}
+  openModal(`${modalHead(`${esc(member.name)} · 就诊前记录`, '诊前自我描述', '把病人的主观感受和近期情况先记下来，方便就诊时向医生说明。可拍照、录音或语音转文字。')}
     ${history}
     <label class="ocr-text-label" for="preVisitText">病情、饮食及其他情况</label><textarea class="ocr-text-area" id="preVisitText" placeholder="例如：从周一开始饭后腹胀，近两天食欲下降；饮食、睡眠、排便或活动有哪些变化？"></textarea>
     <div class="voice-controls"><button class="secondary-button" id="preVisitDictate">语音转文字</button><button class="secondary-button" id="preVisitRecord">录制语音</button><button class="secondary-button" id="preVisitPhoto">添加照片</button><button class="secondary-button" id="preVisitAudioFile">上传录音</button></div>
@@ -1574,9 +2194,13 @@ async function savePreVisitDescription() {
       await putAttachment(attachmentId, file);
       attachments.push({ id: attachmentId, name: file.name, type: file.type });
     }
-    state.preVisitDescriptions = [{ id: entryId, text, createdAt: new Date().toLocaleString('zh-CN'), attachments }, ...(state.preVisitDescriptions || [])];
+    state.preVisitDescriptions = [{ id: entryId, memberId: preVisitMemberId || appointmentMemberId || state.currentMemberId || state.familyMembers[0]?.id, text, createdAt: new Date().toLocaleString('zh-CN'), attachments }, ...(state.preVisitDescriptions || [])];
     state.appointmentChecks = { ...(state.appointmentChecks || {}), selfDescription: true };
-    saveState(); preVisitFiles = []; closeModal(); showAppointment(); toast('诊前描述和附件已保存在本机');
+    if (appointmentMemberId) {
+      const byMember = state.appointmentChecksByMember || (state.appointmentChecksByMember = {});
+      byMember[appointmentMemberId] = { ...(byMember[appointmentMemberId] || {}), selfDescription: true };
+    }
+    saveState(); preVisitFiles = []; closeModal(); showAppointment(appointmentMemberId); toast('诊前描述和附件已保存在本机');
   } catch (error) { if (saveButton) saveButton.disabled = false; toast('保存失败，请检查本机存储空间后重试'); }
 }
 async function showPreVisitAttachment(id, type) {
@@ -1585,7 +2209,7 @@ async function showPreVisitAttachment(id, type) {
   const url = URL.createObjectURL(item.blob); preVisitAttachmentUrl = url;
   const media = type.startsWith('image/') ? `<img class="previsit-preview" src="${url}" alt="诊前描述附件">` : type.startsWith('audio/') ? `<audio class="previsit-audio" controls src="${url}"></audio>` : '<p class="privacy-small">当前设备无法预览此附件格式。</p>';
   openModal(`${modalHead('诊前附件', esc(item.name), '附件保存在当前设备。')}${media}<button class="primary-button" id="closePreVisitAttachment">返回诊前描述</button>`);
-  document.getElementById('closePreVisitAttachment')?.addEventListener('click', () => { closeModal(); showPreVisitDescription(); });
+  document.getElementById('closePreVisitAttachment')?.addEventListener('click', () => { closeModal(); showPreVisitDescription(preVisitMemberId); });
 }
 async function showRecord(recordId) {
   const record = state.records.find(item => item.id === recordId); if (!record) return;
@@ -1593,17 +2217,77 @@ async function showRecord(recordId) {
   try { attachment = await getAttachment(recordId); } catch { /* local attachment storage may be unavailable */ }
   const preview = attachment?.type?.startsWith('image/') ? `<img class="report-preview" src="${URL.createObjectURL(attachment.blob)}" alt="${esc(attachment.name)}" />` : '';
   const fileLine = attachment ? `<div class="file-chip"><b>▤</b><span>${esc(attachment.name)}</span><span style="margin-left:auto;color:#789078">本机附件</span></div>` : '<p class="privacy-small">此演示条目没有原始文件附件。</p>';
-  const recognized = record.ocrText ? `<section class="saved-ocr"><strong>本机识别文字</strong><p>${esc(record.ocrText)}</p></section>` : '';
-  openModal(`${modalHead(esc(record.type), esc(record.title), `${esc(record.hospital)} · ${formatDate(record.date)}`)}${fileLine}${preview}${recognized}<div class="health-highlight">资料为家庭自行整理的信息。文字识别仅作录入辅助，不构成诊断意见。</div><button class="primary-button" id="recordDone">返回家庭档案</button>`);
+  const recognized = record.ocrText ? `<section class="saved-ocr" id="savedOcrBlock"><div class="saved-ocr-head"><strong>本机识别文字</strong><button class="text-button" id="editOcrText">编辑</button></div><p id="savedOcrText">${esc(record.ocrText)}</p></section>` : '';
+  openModal(`${modalHead(esc(record.type), esc(record.title), `${esc(record.hospital)} · ${formatDate(record.date)}`)}${fileLine}${preview}${recognized}<div class="health-highlight">资料为家庭自行整理的信息。文字识别仅作录入辅助，不构成诊断意见；识别文字可编辑修正。</div><button class="primary-button" id="recordDone">返回家庭档案</button>`);
+  document.getElementById('editOcrText')?.addEventListener('click', () => {
+    const block = document.getElementById('savedOcrBlock'); if (!block) return;
+    block.innerHTML = `<strong>本机识别文字（可修改）</strong><textarea class="ocr-text-area" id="savedOcrInput" style="min-height:96px;margin-top:7px">${esc(record.ocrText)}</textarea><button class="primary-button" id="saveOcrText" style="margin-top:8px">保存修改</button>`;
+    document.getElementById('saveOcrText')?.addEventListener('click', () => {
+      record.ocrText = document.getElementById('savedOcrInput')?.value.trim() || '';
+      saveState(); toast('识别文字已更新');
+      showRecord(recordId);
+    });
+  });
 }
-function showShare() {
-  const recent = state.shares.slice(-3).reverse();
-  openModal(`${modalHead('由患者或家属现场发起', '分享就医资料', '选择分享内容并生成演示二维码。访问记录会显示在家庭档案中，可随时撤销。')}
-    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> 妈妈的就医信息卡</span><h3>市第一人民医院 · 复诊</h3><p>摘要信息 · 过敏史 · 当前用药</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
-    <div class="share-toggle"><span>允许查看摘要信息和关键病史</span><span class="switch"></span></div>
-    <div class="share-log"><h3>最近访问记录</h3>${recent.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)}</small></div>`).join('')}</div>
+function showShare(memberId = '') {
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  const done = appointmentProgress(member);
+  /* 闸门：就诊准备清单全部勾选后才可生成就诊分享码 */
+  if (done < APPOINTMENT_ITEMS.length) {
+    openModal(`${modalHead(`还差 ${APPOINTMENT_ITEMS.length - done} 项 · ${esc(member.name)}`, '先完成就诊准备清单', `生成就诊分享码前，请先和${esc(member.name)}逐项确认要带的资料；全部勾选后即可生成。`)}
+      <div class="checklist-progress"><strong>已准备 ${done} / ${APPOINTMENT_ITEMS.length} 项</strong><span>逐项确认</span></div>
+      <button class="primary-button" data-action="appointment" data-appointment-member="${member.id}">回到就诊准备清单</button>
+      <p class="privacy-small">清单包含医保卡证件、检查报告、用药清单、想问医生的问题和诊前自我描述。</p>`);
+    return;
+  }
+  const recent = (state.shares || []).slice(-3).reverse();
+  const allergyAlert = member.allergies && !/无/.test(member.allergies);
+  const visits = visitGroups(member.id);
+  /* 三大分享项：就医信息卡 / 当前用药清单 / 历史看诊记录（内含每次就诊小项，可单独勾选，过往折叠） */
+  const scopes = [
+    { key: 'card', label: '就医信息卡', hint: `慢病摘要${allergyAlert ? ' · 过敏史（红标）' : ' · 过敏史'} · 长期用药`, on: true },
+    { key: 'meds', label: '当前用药清单', hint: '全部在服药物与频次', on: false },
+    { key: 'visits', label: '历史看诊记录', hint: `${visits.length} 次就诊 · 勾选要分享的记录`, on: true }
+  ];
+  const visitRow = (visit, index) => `<label class="share-toggle share-visit-row"><span><strong>${formatDate(visit.date)} · ${esc(visit.summary.slice(0, 16))}</strong><small>${visit.records.length} 份资料</small></span><input type="checkbox" class="share-visit-check" ${index === 0 ? 'checked' : ''} /><span class="switch"></span></label>`;
+  const firstVisits = visits.slice(0, 1).map((visit, index) => visitRow(visit, index)).join('');
+  const restVisits = visits.slice(1).map((visit, index) => visitRow(visit, index + 1)).join('');
+  openModal(`${modalHead('由患者或家属现场发起', `分享${esc(member.name)}的就医资料`, '清单已全部确认。勾选分享范围后出示二维码，历史看诊记录里可单独勾选每一次就诊。')}
+    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> ${esc(member.name)}的就医信息卡</span><h3>${visits[0] ? esc(visits[0].summary.slice(0, 16)) : '下次复诊'}</h3><p id="shareScopeSummary">就医信息卡 · 历史看诊记录 × 1</p><div class="share-code" aria-label="演示二维码"></div><div class="code-caption">仅供现场演示 · 10分钟后失效</div></div>
+    <div class="share-scope-list">${scopes.map(item => `<label class="share-toggle"><span><strong>${item.label}</strong><small>${item.hint}</small></span><input type="checkbox" data-share-scope="${item.key}" data-share-summary="${item.label}" ${item.on ? 'checked' : ''} /><span class="switch"></span></label>`).join('')}
+      <div id="shareVisitSub">
+        ${firstVisits}
+        <div id="shareVisitRest" hidden>${restVisits}</div>
+        ${visits.length > 1 ? `<button class="text-button preview-toggle" id="shareVisitExpand">展开全部 ${visits.length} 次就诊 ⌄</button>` : ''}
+        <p class="privacy-small" style="text-align:left;margin:4px 0 0">关闭「历史看诊记录」即不分享任何就诊资料。</p>
+      </div>
+    </div>
+    <div class="share-log"><h3>最近访问记录</h3>${recent.length ? recent.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)}</small></div>`).join('') : '<p class="privacy-small">还没有访问记录。</p>'}</div>
     <button class="primary-button" id="revokeShare">撤销此演示分享</button>
-    <p class="privacy-small">演示二维码为界面模拟，未连接外部扫码服务。</p>`);
+    <p class="privacy-small">演示二维码为界面模拟，未连接外部扫码服务；勾选仅改变摘要展示，不发送任何数据。</p>`);
+  const updateSummary = () => {
+    const labels = [...document.querySelectorAll('[data-share-scope]:checked')].map(item => item.dataset.shareSummary);
+    const visitsOn = document.querySelector('[data-share-scope="visits"]')?.checked;
+    const visitCount = visitsOn ? document.querySelectorAll('.share-visit-check:checked').length : 0;
+    const parts = [...labels];
+    if (visitCount) parts[parts.length - 1] = `历史看诊记录 × ${visitCount}`;
+    const summary = document.getElementById('shareScopeSummary');
+    if (summary) summary.textContent = parts.length ? parts.join(' · ') : '未选择任何内容（二维码不可用）';
+  };
+  document.querySelectorAll('[data-share-scope], .share-visit-check').forEach(input => input.addEventListener('change', event => {
+    if (event.target.dataset.shareScope === 'visits') {
+      const sub = document.getElementById('shareVisitSub');
+      if (sub) sub.hidden = !event.target.checked;
+    }
+    updateSummary();
+  }));
+  document.getElementById('shareVisitExpand')?.addEventListener('click', event => {
+    const rest = document.getElementById('shareVisitRest');
+    if (!rest) return;
+    const open = !rest.hidden;
+    rest.hidden = open;
+    event.currentTarget.textContent = open ? `展开全部 ${visits.length} 次就诊 ⌄` : '收起 ⌃';
+  });
 }
 function showCompanionForm(service, sourceOrder = null) {
   if (!state.companionProfile.available) { showInfo('暂不可预约', `${state.companionProfile.name}目前暂停接单。你可以稍后再查看。`); return; }
@@ -1697,17 +2381,17 @@ document.addEventListener('click', async event => {
   const nav = event.target.closest('[data-nav]');
   if (nav) { navigate(nav.dataset.nav); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
-  if (action === 'upload') showUpload();
+  if (action === 'upload') { uploadMemberId = event.target.closest('[data-upload-member]')?.dataset.uploadMember || ''; showUpload(); }
   if (action === 'medications') showMedicationManager();
   if (action === 'reminders') showReminderManager();
   if (action === 'add-reminder') showReminderForm();
   if (action === 'add-medication') showUpload();
-  if (action === 'health-card') showHealthCard();
-  if (action === 'share') showShare();
+  if (action === 'health-card') showHealthCard(event.target.closest('[data-card-member]')?.dataset.cardMember || '');
+  if (action === 'share') showShare(event.target.closest('[data-share-member]')?.dataset.shareMember || '');
   if (action === 'alerts') showAlertCenter();
   if (action === 'add-reading') showReadingEntry();
-  if (action === 'insurance-social') showInsuranceHub('social');
-  if (action === 'insurance-commercial') showInsuranceHub('commercial');
+  if (action === 'insurance-entry') showPolicyEntry();
+  if (action === 'insurance-social' || action === 'insurance-commercial') showPolicyEntry();
   if (action === 'ai-assistant') showInfo('AI 管理助手（规划中）', '规划能力：自动总结父母健康周报、回答健康咨询、生成就医准备清单，并支持「小康，今天该吃什么药」式语音交互。当前演示版可在「我的 · 健康趋势」查看固定统计。');
   if (action === 'devices') showInfo('设备管理（规划中）', '计划预留华为运动健康、小米运动健康等智能手表接入入口，同步睡眠、运动与跌倒监测数据。当前演示版可在预警中心「模拟手表同步」体验。');
   if (action === 'companion') navigate('companion');
@@ -1717,16 +2401,17 @@ document.addEventListener('click', async event => {
     saveState(); renderRole(); renderRecords();
     toast(state.companionProfile.available ? '已恢复接受预约' : '已暂停接受新预约');
   }
-  if (action === 'appointment') showAppointment();
+  if (action === 'appointment') showAppointment(event.target.closest('[data-appointment-member]')?.dataset.appointmentMember || '');
+  if (action === 'previsit') showPreVisitDescription(event.target.closest('[data-previsit-member]')?.dataset.previsitMember || '');
   if (action === 'privacy') showInfo('隐私与资料管理', '本原型将演示资料保存在当前设备浏览器中。分享流程仅作交互展示，不会发送到网络。\n\n真实产品需提供资料导出、更正、删除和授权撤回功能。');
   if (action === 'help') showInfo('服务说明', '康伴帮助家庭整理就医资料和协同就诊准备。资料提取仅辅助整理，不替代医生判断。陪诊服务仅提供就诊流程协助。');
   if (event.target.closest('[data-upload-source="camera"]')) openFilePicker('camera');
   if (event.target.closest('[data-upload-source="library"]')) openFilePicker('library');
   if (event.target.closest('#loadSampleReport')) loadSampleReport();
   if (event.target.closest('#startVoice')) startListening();
-  if (event.target.closest('#appointmentCard')) showHealthCard();
-  if (event.target.closest('#openPreVisitDescription')) showPreVisitDescription();
-  if (event.target.closest('#backToAppointment')) showAppointment();
+  if (event.target.closest('#appointmentCard')) showHealthCard(event.target.closest('[data-card-member]')?.dataset.cardMember || appointmentMemberId);
+  if (event.target.closest('#openPreVisitDescription')) showPreVisitDescription(appointmentMemberId);
+  if (event.target.closest('#backToAppointment')) showAppointment(appointmentMemberId);
   if (event.target.closest('#preVisitPhoto')) document.getElementById('preVisitPhotoInput').click();
   if (event.target.closest('#preVisitAudioFile')) document.getElementById('preVisitAudioInput').click();
   if (event.target.closest('#preVisitRecord')) {
@@ -1776,10 +2461,13 @@ document.addEventListener('click', async event => {
     const source = medicationSource || { hospital: '家属整理', date: dateOffset(0), text: '' };
     const recordId = `r${state.nextRecordId++}`;
     state.medications = [...(state.medications || []), ...planned];
-    state.records.unshift({ id: recordId, type: '用药记录', title: '处方用药医嘱', hospital: source.hospital, date: source.date, state: '已核对', icon: '＋', ocrText: source.text });
+    const rxMemberId = document.getElementById('extractMember')?.value || state.currentMemberId || 'm1';
+    const rxRecord = { id: recordId, memberId: rxMemberId, type: '用药记录', title: '处方用药医嘱', hospital: source.hospital, date: source.date, state: '已核对', icon: '＋', summary: autoSummary('用药记录', '处方用药医嘱'), ocrText: source.text };
+    state.records.unshift(rxRecord);
     saveState(); renderRecords(); closeModal();
     if (source.file) putAttachment(recordId, source.file).then(() => toast('服药提醒与处方原图已保存在本机')).catch(() => toast('服药提醒已保存，处方原图未能存入本机'));
     else toast('每日服药提醒已创建');
+    showReimbursementMatches(rxRecord);
     selectedFile = null; medicationSource = null;
   }
   if (event.target.closest('#enableMedicationNotifications')) {
@@ -1816,18 +2504,29 @@ document.addEventListener('click', async event => {
     const date = document.getElementById('extractDate')?.value || new Date().toISOString().slice(0,10);
     const title = document.getElementById('extractType')?.value.trim() || '就医资料';
     const hospital = document.getElementById('extractHospital')?.value.trim() || '家属补充';
+    const memberId = document.getElementById('extractMember')?.value || state.currentMemberId || 'm1';
     const recordId = `r${state.nextRecordId++}`;
-    const record = { id: recordId, type: title.includes('药') ? '用药记录' : title.includes('报告') || title.includes('检查') ? '检查报告' : '就诊资料', title, hospital, date, state: '已核对', icon: title.includes('药') ? '＋' : '▤', ocrText: document.getElementById('extractText')?.value || '' };
+    const inferType = title.includes('诊断证明') ? ['疾病诊断证明书', '⌂'] : (title.includes('意外') || title.includes('外伤')) ? ['外伤门诊病历', '⌂'] : (title.includes('出院') || title.includes('住院')) ? ['出院小结', '⌂'] : title.includes('药') ? ['用药记录', '＋'] : title.includes('发票') ? ['医疗费用发票', '▤'] : title.includes('明细') ? ['费用明细', '≣'] : title.includes('病历') ? ['门诊病历', '⌂'] : (title.includes('报告') || title.includes('检查') || title.includes('体检')) ? ['检查报告', '▤'] : ['就诊资料', '⌂'];
+    const record = { id: recordId, memberId, type: inferType[0], title, hospital, date, state: '已核对', icon: inferType[1], summary: autoSummary(inferType[0], title), ocrText: document.getElementById('extractText')?.value || '' };
     state.records.unshift(record);
     state.voiceNote = document.getElementById('extractNote')?.value || ''; saveState(); renderRecords(); closeModal();
     if (selectedFile) putAttachment(recordId, selectedFile).then(() => toast('资料和原始文件已保存在本机')).catch(() => toast('资料已保存，原始文件未能存入本机'));
-    else toast('资料已加入妈妈的家庭档案');
+    else toast('资料已加入家庭档案');
+    /* 报销联动：入库后自动检索该成员保单，符合条件则弹报销提醒 */
+    showReimbursementMatches(record);
+    selectedFile = null;
   }
   if (event.target.closest('#backToUpload')) showUpload();
-  if (event.target.closest('#openShareFromCard')) showShare();
+  if (event.target.closest('#openShareFromCard')) showShare(event.target.closest('[data-share-member]')?.dataset.shareMember || appointmentMemberId);
   const checklistInput = event.target.closest('[data-checklist]');
   if (checklistInput) {
-    state.appointmentChecks = { ...(state.appointmentChecks || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
+    const checklistMember = checklistInput.dataset.appointmentMember;
+    if (checklistMember) {
+      const byMember = state.appointmentChecksByMember || (state.appointmentChecksByMember = {});
+      byMember[checklistMember] = { ...(byMember[checklistMember] || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
+    } else {
+      state.appointmentChecks = { ...(state.appointmentChecks || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
+    }
     saveState();
     const total = document.querySelectorAll('[data-checklist]').length;
     const done = document.querySelectorAll('[data-checklist]:checked').length;
@@ -1858,7 +2557,7 @@ document.addEventListener('click', async event => {
   if (previewToggle) {
     const key = previewToggle.dataset.previewToggle;
     if (previewOpen.has(key)) previewOpen.delete(key); else previewOpen.add(key);
-    renderHealth();
+    renderHealth(); renderDocs(); // 展开按钮在健康档案与医疗资料两个 Tab 都可能出现，各自有空容器守卫
     return;
   }
   const memberEditButton = event.target.closest('[data-member-edit]');
@@ -1867,6 +2566,66 @@ document.addEventListener('click', async event => {
   if (memberReadingButton) { showReadingEntry(memberReadingButton.dataset.memberReading); return; }
   const memberDailyButton = event.target.closest('[data-member-daily]');
   if (memberDailyButton) { showDailyLog(memberDailyButton.dataset.memberDaily); return; }
+  const docsToggle = event.target.closest('[data-docs-toggle]');
+  if (docsToggle) {
+    const id = docsToggle.dataset.docsToggle;
+    if (expandedDocsMembers.has(id)) expandedDocsMembers.delete(id); else expandedDocsMembers.add(id);
+    renderDocs();
+    return;
+  }
+  const policyDetailButton = event.target.closest('[data-policy-detail]');
+  if (policyDetailButton) { showPolicyDetail(policyDetailButton.dataset.policyDetail); return; }
+  if (event.target.closest('[data-policy-source]')) { document.getElementById('policyFileInput')?.click(); return; }
+  if (event.target.closest('#policyDemoScan')) {
+    makeDemoPolicyFile().then(file => { policyUploadFile = file; showPolicyRecognize(file); });
+    return;
+  }
+  const policyAttachmentButton = event.target.closest('[data-policy-attachment]');
+  if (policyAttachmentButton) { showPolicyAttachment(null, policyAttachmentButton.dataset.policyAttachment); return; }
+  const policyEditButton = event.target.closest('[data-policy-edit]');
+  if (policyEditButton) { showPolicyEntry('', policyEditButton.dataset.policyEdit); return; }
+  const policyDelButton = event.target.closest('[data-policy-del]');
+  if (policyDelButton) {
+    const policy = (state.insurancePolicies || []).find(item => item.id === policyDelButton.dataset.policyDel);
+    if (policy) {
+      state.insurancePolicies = state.insurancePolicies.filter(item => item.id !== policy.id);
+      saveState(); renderDocs(); closeModal();
+      toast(`已删除保单「${policy.name}」`);
+    }
+    return;
+  }
+  const memberPolicyAddButton = event.target.closest('[data-member-policy-add]');
+  if (memberPolicyAddButton) { showPolicyEntry(memberPolicyAddButton.dataset.memberPolicyAdd); return; }
+  /* 报销提醒：详情 / 材料勾选 / 提交 / 删除 */
+  const claimDetailButton = event.target.closest('[data-claim-detail]');
+  if (claimDetailButton) { showClaimDetail(claimDetailButton.dataset.claimDetail); return; }
+  const claimToggle = event.target.closest('[data-claim-toggle]');
+  if (claimToggle) {
+    const claim = (state.reimbursements || []).find(item => item.id === claimToggle.dataset.claimId);
+    const index = Number(claimToggle.dataset.claimToggle);
+    if (claim && claim.materials[index]) {
+      claim.materials[index].done = !claim.materials[index].done;
+      saveState(); showClaimDetail(claim.id); renderDocs();
+    }
+    return;
+  }
+  const claimSubmit = event.target.closest('[data-claim-submit]');
+  if (claimSubmit) {
+    const claim = (state.reimbursements || []).find(item => item.id === claimSubmit.dataset.claimSubmit);
+    if (claim) {
+      claim.status = '已提交';
+      saveState(); renderDocs(); closeModal();
+      toast('已标记提交（演示），受理结果由医保局 / 保险公司反馈');
+    }
+    return;
+  }
+  const claimDel = event.target.closest('[data-claim-del]');
+  if (claimDel) {
+    state.reimbursements = (state.reimbursements || []).filter(item => item.id !== claimDel.dataset.claimDel);
+    saveState(); renderDocs(); closeModal();
+    toast('已删除这条报销提醒');
+    return;
+  }
   const dashboardButton = event.target.closest('[data-member-dashboard]');
   if (dashboardButton) { showMemberDashboard(dashboardButton.dataset.memberDashboard); return; }
   const metricChip = event.target.closest('[data-metric-chip]');
@@ -1941,6 +2700,12 @@ document.addEventListener('click', async event => {
   if (rebookButton) {
     const previous = state.companionOrders.find(item => item.id === rebookButton.dataset.rebook);
     if (previous) showCompanionForm(previous.service, previous);
+  }
+  const visitOpen = event.target.closest('[data-visit-open]');
+  if (visitOpen) {
+    const [visitMemberId, visitDate] = visitOpen.dataset.visitOpen.split('|');
+    showVisitDetail(visitMemberId, visitDate);
+    return;
   }
   const recordId = event.target.closest('[data-open-record]')?.dataset.openRecord;
   if (recordId) showRecord(recordId);
@@ -2085,6 +2850,13 @@ document.addEventListener('change', event => {
 for (const id of ['fileInput','libraryInput']) document.getElementById(id).addEventListener('change', event => {
   const file = event.target.files?.[0]; if (!file) return;
   selectedFile = file; showExtraction(file);
+});
+document.getElementById('policyFileInput').addEventListener('change', event => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  policyUploadFile = file;
+  showPolicyRecognize(file);
 });
 document.getElementById('preVisitPhotoInput').addEventListener('change', event => {
   preVisitFiles.push(...Array.from(event.target.files || [])); event.target.value = '';

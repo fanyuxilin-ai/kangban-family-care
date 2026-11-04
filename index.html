@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <div class="app-shell">
@@ -66,43 +66,8 @@
       </section>
 
       <section class="view" id="view-docs">
-        <div class="page-heading"><p class="eyebrow">就医凭证，按次整理</p><h1>医疗资料</h1><p class="subtle">信息卡、就诊清单、资料库和报销入口都在这一区。</p></div>
-        <section class="section-block collapsible" data-panel="docs-info-card">
-          <div class="section-heading"><div><p class="eyebrow">妈妈 · 68岁</p><h2>就医信息卡</h2></div><button class="text-button" data-action="health-card">查看全部 <span>→</span></button><button class="section-collapse" data-panel-toggle="docs-info-card" aria-label="折叠或展开">▾</button></div>
-          <div class="section-body">
-          <div class="info-card">
-            <div class="info-card-head"><span class="mini-avatar">陈</span><div><strong>陈兰英</strong><span class="muted-small">信息由家人共同整理</span></div><span class="verified"><span>✓</span> 已核对</span></div>
-            <div class="info-grid">
-              <div><span class="field-label">过敏史</span><strong class="alert-text">青霉素</strong></div>
-              <div><span class="field-label">长期用药</span><strong>2 种 <span class="tiny-arrow">↗</span></strong></div>
-              <div><span class="field-label">既往史</span><strong>高血压</strong></div>
-              <div><span class="field-label">最近更新</span><strong>10月22日</strong></div>
-            </div>
-            <button class="card-link" data-action="health-card">打开就医信息卡 <span>↗</span></button>
-          </div>
-          </div>
-        </section>
-        <div class="docs-quick-row">
-          <button class="secondary-button" data-action="appointment">就诊准备清单</button>
-          <button class="secondary-button" data-action="share">生成就诊分享码</button>
-        </div>
-        <section class="section-block collapsible" data-panel="docs-insurance">
-          <div class="section-heading"><div><p class="eyebrow">保单优先 · 成员B负责模块</p><h2>保险报销</h2></div><button class="section-collapse" data-panel-toggle="docs-insurance" aria-label="折叠或展开">▾</button></div>
-          <div class="section-body">
-          <div class="insurance-grid">
-            <button class="insurance-card" data-action="insurance-social"><strong>社保医疗保险</strong><small>参保档案 · 就医材料包 · 零星报销</small></button>
-            <button class="insurance-card" data-action="insurance-commercial"><strong>商业医疗保险</strong><small>保单管理 · 材料清单 · 理赔进度</small></button>
-          </div>
-          </div>
-        </section>
-        <section class="section-block collapsible docs-library-block" data-panel="docs-library">
-          <div class="section-heading"><div><p class="eyebrow">拍照上传 · OCR 识别入库</p><h2>资料库</h2></div><button class="section-collapse" data-panel-toggle="docs-library" aria-label="折叠或展开">▾</button></div>
-          <div class="section-body">
-          <div class="record-summary"><div><strong id="recordCount">0</strong><span>份资料</span></div><div class="summary-divider"></div><div><strong>已核对</strong><span>关键病史</span></div><button class="add-record" data-action="upload">＋ 添加</button></div>
-          <div class="filter-row"><button class="filter-chip selected">全部</button><button class="filter-chip">检查报告</button><button class="filter-chip">用药记录</button></div>
-          <div id="recordList" class="record-list"></div>
-          </div>
-        </section>
+        <div class="page-heading"><p class="eyebrow">就医凭证，按人归档</p><h1>医疗资料</h1><p class="subtle">点开任意家庭成员，查看 TA 的就医信息卡、资料库和保险报销；资料录入后自动匹配保单提醒报销。</p></div>
+        <div id="docsMemberList" class="docs-member-list"></div>
       </section>
 
       <section class="view" id="view-companion">
@@ -185,8 +150,9 @@
   <input type="file" id="preVisitPhotoInput" accept="image/*" capture="environment" multiple hidden />
   <input type="file" id="preVisitAudioInput" accept="audio/*" multiple hidden />
   <input type="file" id="evidenceInput" accept="image/*" capture="environment" hidden />
+  <input type="file" id="policyFileInput" accept="image/*,.pdf" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="vendor/tesseract.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
