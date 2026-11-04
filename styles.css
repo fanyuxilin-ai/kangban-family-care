@@ -92,10 +92,141 @@ nav[hidden]{display:none!important}
 .reading-tag-red{background:#f6e0da;color:#a1543f}
 .reading-tag-yellow{background:#f6ecd8;color:#9a7c3f}
 .reading-tag-blue{background:#e5ecf3;color:#5c7690}
-.trend-card{background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;padding:13px 14px;box-shadow:0 4px 18px rgba(52,64,55,.045)}
-.trend-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f0efe9}
-.trend-row:last-of-type{border-bottom:0}
-.trend-row strong{font-size:11px}
-.trend-row .field-label{font-size:9px}
+.trend-svg{width:100%;height:auto;display:block}
 .trend-warn{color:#a1543f}
 .trend-ok{color:#55735c}
+/* 模拟账号 · 四人健康档案 + 体检看板 */
+.member-archive{background:var(--white);border:1px solid rgba(223,225,215,.7);border-radius:14px;margin-bottom:9px;box-shadow:0 4px 18px rgba(52,64,55,.045);overflow:hidden}
+.member-archive-head{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:13px 14px;background:transparent}
+.member-avatar,.role-choice-avatar.member-avatar-1,.role-choice-avatar.member-avatar-2,.role-choice-avatar.member-avatar-3,.role-choice-avatar.member-avatar-4{width:40px;height:40px;flex:none;border-radius:14px;display:grid;place-items:center;font-weight:700;font-size:16px}
+.member-avatar-1{background:#e8e3ef;color:#65577c}
+.member-avatar-2{background:#dce9de;color:#4c6c51}
+.member-avatar-3{background:#f7e8dc;color:#a1705a}
+.member-avatar-4{background:#e5ecf3;color:#5c7690}
+.member-archive-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.member-archive-title strong{font-size:12px}
+.member-archive-title small{font-size:9px;color:#8a958c}
+.member-alert-count{color:#a1543f;font-weight:700;font-style:normal}
+.member-chevron{font-size:14px;color:#9aa49c}
+.member-archive-body{padding:2px 14px 13px;border-top:1px solid #f0efe9}
+.member-archive-body .info-grid{margin-top:11px}
+.member-archive-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.member-archive-actions.member-archive-actions-3{grid-template-columns:1fr 1fr 1fr}
+.member-archive-actions .primary-button,.member-archive-actions .secondary-button{margin:0;height:42px;font-size:10px}
+.member-archive-actions .member-dashboard-button{grid-column:1/-1}
+/* 手动录入 · 一句话 + AI 识别 + 可编辑指标行 */
+.ai-parse-block{margin-bottom:11px}
+.ai-parse-block>strong{display:block;font-size:11px;color:#445449;margin-bottom:9px}
+.ai-parse-row{display:flex;gap:8px;align-items:stretch;margin-bottom:9px}
+.ai-parse-row .input-field{flex:1 1 auto;width:auto;min-width:0;height:42px;min-height:42px;padding:0 12px;font-size:11px;resize:none;line-height:42px}
+.ai-parse-row .secondary-button{flex:0 0 auto;width:auto;min-width:96px;margin:0;height:42px;min-height:42px;line-height:42px;white-space:nowrap;border-radius:9px}
+.quick-metric-chips{margin-bottom:9px}
+.quick-metric-chips .metric-chip{cursor:pointer}
+.manual-rows{display:flex;flex-direction:column;gap:7px;margin-bottom:7px}
+.manual-row{display:grid;grid-template-columns:1.3fr 1fr .8fr 24px;gap:7px;align-items:center}
+.manual-row .input-field{width:100%;height:38px;min-height:38px;font-size:11px;padding:0 10px}
+.manual-row .row-del{flex:none;font-size:14px;color:#a1543f;padding:4px}
+/* 卡内长列表预览：默认一条，可展开/收起 */
+.preview-toggle{display:block;width:100%;text-align:center;font-size:9px;color:#6f8875;padding:6px 0 0}
+.daily-log-row{display:flex;align-items:center;gap:6px}
+.daily-log-row .reading-row{flex:1;min-width:0}
+.daily-row-ops{display:flex;gap:2px;flex:none}
+.daily-row-ops .text-button{font-size:9px}
+.member-edit-form{display:flex;flex-direction:column;gap:11px;margin-top:2px}
+.board-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:13px}
+.board-stats>div{background:#f4f6f0;border-radius:11px;padding:10px 8px;display:flex;flex-direction:column;gap:4px;text-align:left}
+.board-stats span{font-size:8px;color:#8a958c}
+.board-stats strong{font-size:12px;color:#3e5146}
+.board-stats small{font-size:8px;color:#9aa49c}
+.board-block{background:var(--white);border:1px solid #ecece4;border-radius:13px;padding:12px 13px;margin-bottom:10px}
+.board-block-head{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+.board-block-head strong{font-size:11px;flex:1}
+.board-block-head small{font-size:8px;color:#9aa49c}
+.metric-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.metric-chip{font-size:9px;padding:6px 11px;border-radius:16px;background:#f1f3ec;color:#75827a}
+.metric-chip.selected{background:#e3ece1;color:#3c6350;font-weight:700}
+.trend-svg{width:100%;height:auto;display:block}
+.trend-val{font-size:8px;fill:#5c7663}
+.trend-date{font-size:8px;fill:#9aa49c}
+.trend-empty{border:1.5px dashed #dfe2d8;border-radius:11px;padding:22px 10px;text-align:center;font-size:10px;color:#9aa49c}
+.track-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #f0efe9}
+.track-row:first-child{border-top:0}
+.track-row>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.track-row strong{font-size:11px}
+.track-row small{font-size:8px;color:#9aa49c}
+.board-history{max-height:220px;overflow:auto}
+.checkup-photo{background:#eef2ea;border-radius:13px;padding:22px 14px;text-align:center;font-size:12px;font-weight:700;color:#4c6452;display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.checkup-photo small{font-weight:400;font-size:9px;color:#75827a}
+.checkup-list{display:flex;flex-direction:column;margin-bottom:12px}
+.checkup-row{display:grid;grid-template-columns:64px 76px 1fr auto;align-items:center;gap:8px;padding:9px 0;border-top:1px solid #f0efe9}
+.checkup-row:first-child{border-top:0}
+.checkup-name{font-size:10px;font-weight:700;color:#445449}
+.checkup-row input{border:1px solid #e3e5dd;border-radius:8px;height:34px;padding:0 8px;font-size:11px;color:#3b4c40;background:#fffefa;width:100%}
+.checkup-row small{font-size:8px;color:#9aa49c;line-height:1.5}
+/* 化验报告区（参考产品稿） */
+.board-filter-chips{margin-bottom:8px}
+.board-legend{font-size:9px;color:#9aa49c;margin:0 0 10px;line-height:1.6}
+.board-day{border:1px solid #ecece4;border-radius:12px;margin-bottom:8px;overflow:hidden;background:#fafbf7}
+.board-day.open{background:var(--white)}
+.board-day-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:11px 13px;background:transparent}
+.board-day-head strong{font-size:11px;flex:1}
+.board-day-head span{font-size:9px;color:#8a958c;flex:2}
+.board-day-head b{font-weight:700}
+.board-day-head .board-abn{color:#a1543f}
+.board-day-head .board-ok{color:#55735c}
+.board-day-body{padding:0 13px 8px}
+.board-lab-row small{font-size:9px}
+.board-follow{margin-top:10px;background:#f6efe9;border-radius:11px;padding:4px 12px}
+.board-follow .track-row:first-child{border-top:0}
+.track-row-actions{flex-wrap:wrap}
+.track-ops{display:flex;align-items:center;gap:2px;flex:none}
+.track-btn{font-size:9px;padding:5px 4px}
+.track-btn-del{color:#b06a55}
+.checkup-category{font-size:9px;font-weight:700;color:#6d8272;background:#eef2ea;border-radius:8px;padding:5px 9px;margin:10px 0 2px}
+.checkup-category:first-child{margin-top:0}
+/* 全局面板可折叠 */
+.collapsible > .section-body{min-width:0}
+.collapsible.collapsed > .section-body{display:none}
+button.panel-head{width:100%;text-align:left;background:transparent;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer}
+.panel-chevron{font-style:normal;font-size:11px;color:#9aa49c;margin-left:auto;flex:none;transition:transform .15s}
+.collapsible.collapsed .panel-chevron{transform:rotate(-90deg)}
+.section-collapse{flex:none;border:0;background:transparent;color:#9aa49c;font-size:11px;line-height:1;padding:6px 4px 6px 8px;cursor:pointer;transition:transform .15s;font-family:inherit}
+.section-block.collapsed .section-collapse,.collapsible.collapsed .section-collapse{transform:rotate(-90deg)}
+.section-heading{align-items:center}
+.docs-library-block .section-heading{margin-bottom:0}
+.collapsible.collapsed .board-block-head{margin-bottom:0}
+/* 录入读数多通道 */
+.entry-method-chips{margin-bottom:2px}
+.entry-hint{margin:0 0 12px}
+.entry-capture-card{background:#eef2ea;border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:8px;margin-bottom:2px}
+.entry-capture-card strong{font-size:11px;color:#4c6452}
+.entry-capture-card p{margin:0;font-size:10px;line-height:1.7;color:#75827a}
+.entry-capture-card .secondary-button{margin:0}
+.entry-capture-icon{font-size:26px}
+.entry-result{background:#fffefa;border:1px solid #e3e6dc;border-radius:10px;padding:9px 11px;font-size:10px;line-height:1.6;color:#5c7663}
+.entry-photo{background:#fffefa;border:1.5px dashed #c9d3c5;border-radius:11px;padding:18px 12px;text-align:center;font-size:12px;font-weight:700;color:#4c6452;display:flex;flex-direction:column;gap:5px}
+.entry-photo small{font-weight:400;font-size:9px;color:#9aa49c}
+/* 成员档案卡内的异常指标跟踪 */
+.member-tracking{margin-top:13px;border-top:1px solid #f0efe9;padding-top:6px}
+.member-tracking-title{display:block;font-size:9px;font-weight:700;color:#8a958c;padding:6px 0 2px}
+.member-tracking .track-row:first-of-type{border-top:0}
+.member-tracking-empty{margin:12px 0 0;font-size:9px;color:#8a958c}
+/* 历史记录：按指标分组 + 时间线 */
+.hist-group{margin-bottom:12px}
+.hist-group:last-of-type{margin-bottom:2px}
+.hist-group-head{display:flex;align-items:baseline;gap:8px;padding:2px 0 8px}
+.hist-group-head strong{font-size:11px}
+.hist-group-head small{font-size:9px;color:#8a958c}
+.hist-group-head b{color:#a1543f}
+.hist-timeline{position:relative;margin-left:5px;padding-left:14px;border-left:1.5px solid #e3e6dc;display:flex;flex-direction:column;gap:10px}
+.hist-node{position:relative}
+.hist-dot{position:absolute;left:-20px;top:5px;width:9px;height:9px;border-radius:50%;background:#a7bfa9;border:2px solid #fff;box-shadow:0 0 0 1px #dfe5da}
+.hist-dot-abn{background:#c97a5f;box-shadow:0 0 0 1px #e8cfc2}
+.hist-node-body{display:flex;flex-direction:column;gap:3px}
+.hist-node-body small{font-size:8.5px;color:#9aa49c}
+.hist-node-top{display:flex;align-items:center;gap:8px}
+.hist-node-top strong{font-size:12px}
+/* 历史记录搜索框 */
+.hist-search{margin-bottom:10px}
+.hist-search .input-field{width:100%;height:42px;background:#fffefa;border:1px solid #e3e5dd;border-radius:11px;padding:0 12px;font-size:11px;color:#3b4c40}
+.hist-search .input-field::placeholder{color:#a4aea6}
