@@ -95,6 +95,33 @@ nav[hidden]{display:none!important}
 .insurance-channel-card{display:flex;flex-direction:column;gap:6px;background:#eef2ea;border-radius:12px;padding:12px 13px;margin-top:2px}
 .insurance-channel-card strong{font-size:11px;color:#4c6452}
 .insurance-channel-card small{font-size:9px;color:#75827a;line-height:1.5}
+/* 报销提醒（保险区顶部） */
+.claim-reminder-list{margin-bottom:10px}
+.claim-reminder-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+.claim-reminder-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#fdf6ec;border:1px solid #eadfc8;border-radius:11px;padding:9px 10px;margin-top:5px;cursor:pointer}
+.claim-reminder-row:active{background:#f7edda}
+.claim-reminder-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.claim-reminder-copy strong{font-size:10.5px;color:#6b5537;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.claim-reminder-copy small{font-size:9px;color:#99855f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 报销匹配结果弹窗（医疗资料录入后自动触发） */
+.claim-match-list{display:flex;flex-direction:column;gap:9px;margin-bottom:10px}
+.claim-match-block{background:#fafaf6;border:1px solid rgba(223,225,215,.7);border-radius:12px;padding:11px 12px}
+.claim-match-head{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.claim-match-head strong{flex:1;min-width:0;font-size:11px;color:#445449;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.claim-match-scene{display:block;font-size:9px;color:#8a958c;margin-bottom:7px}
+.claim-materials-title{font-size:10px;font-weight:600;color:#5c7663;margin:2px 0 5px}
+.claim-materials{list-style:none;margin:0;padding:0}
+.claim-materials li{font-size:9.5px;color:#5a6a5e;line-height:1.9}
+/* 报销清单勾选（提醒详情） */
+.claim-check-list{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.claim-check-row{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#fafaf6;border:1px solid rgba(223,225,215,.6);border-radius:10px;padding:9px 11px;font-size:10px;color:#5a6a5e;cursor:pointer}
+.claim-check-row.is-done{background:#eef2ea;border-color:#d5e2cf;color:#4c6452}
+.claim-check-mark{flex:none;font-weight:700;font-size:11px}
+.claim-check-row.is-done .claim-check-mark{color:#4a7350}
+.policy-detail-ops .primary-button:disabled{opacity:.45;cursor:not-allowed}
+/* 资料库：可报销标签 + 录入弹窗成员选择 */
+.record-status.claimable{background:#e9f2e9;color:#4a7350}
+.extraction-select{flex:1;border:none;background:transparent;font-size:10px;color:#5a6a5e;text-align:right;font-family:inherit;outline:none}
 .reading-list{display:flex;flex-direction:column}
 .reading-row{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #efeEE6}
 .reading-row:last-of-type{border-bottom:0}
