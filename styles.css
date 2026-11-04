@@ -362,3 +362,6 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .visit-summary-ops{display:flex}
 .saved-ocr-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .saved-ocr-head .text-button{padding:0}
+/* 就医信息卡 sub-head 双操作（编辑 + 查看全部） */
+.docs-sub-ops{display:flex;align-items:center;gap:12px}
+.docs-sub-ops .text-button{padding:0}

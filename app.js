@@ -952,7 +952,7 @@ function renderDocs() {
         <span class="member-chevron">${open ? '⌃' : '⌄'}</span>
       </button>
       ${open ? `<div class="docs-member-body">
-        <div class="docs-sub-head"><span>就医信息卡</span><button class="text-button" data-action="health-card" data-card-member="${member.id}">查看全部 →</button></div>
+        <div class="docs-sub-head"><span>就医信息卡</span><span class="docs-sub-ops"><button class="text-button" data-member-edit="${member.id}">编辑</button><button class="text-button" data-action="health-card" data-card-member="${member.id}">查看全部 →</button></span></div>
         <div class="info-grid">
           <div><span class="field-label">慢病</span><strong>${esc(member.conditions)}</strong></div>
           <div><span class="field-label">过敏史</span><strong class="${/无/.test(member.allergies) ? '' : 'alert-text'}">${esc(member.allergies)}</strong></div>
@@ -2111,7 +2111,8 @@ function showHealthCard(memberId = '') {
       <div class="health-row"><span>近期就诊</span><strong>${latest ? `${formatDate(latest.date)} · ${esc(latest.summary.slice(0, 18))}` : '暂无记录'}</strong></div>
     </div>
     <div class="health-highlight">${allergyAlert ? '过敏史已由家属核对，请主动告知医生。' : '信息已由家属核对。'}就诊时请以医生问诊和原始病历为准；本信息卡不替代医疗判断。</div>
-    <button class="primary-button" id="openShareFromCard" data-share-member="${member.id}">生成就诊分享码</button>`);
+    <button class="primary-button" id="openShareFromCard" data-share-member="${member.id}">生成就诊分享码</button>
+    <button class="secondary-button" data-member-edit="${member.id}">编辑信息卡</button>`);
 }
 function showAppointment(memberId = '') {
   appointmentMemberId = memberId;
