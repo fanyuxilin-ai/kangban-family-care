@@ -26,6 +26,13 @@ const seed = {
     { id: 'r11', memberId: 'm4', type: '费用明细', title: '急诊费用明细清单', hospital: '区人民医院 · 收费处', date: dateOffset(-4), state: '已核对', icon: '≣' },
   ],
   companionOrders: [],
+  /* 需求区帖子（FR-12）：家庭发布 → 陪诊师接单 → 转入标准陪诊订单 */
+  demandPosts: [
+    { id: 'dp-1', patient: '周建国', patientMemberId: 'm2', requester: '周晓林', hospital: '市第一人民医院', date: dateOffset(6), service: '检查陪同', need: '父亲做腹部 B 超和空腹抽血，需要有人陪同引导路线、协助取报告', budget: '150–200 元', status: '招募中', createdAt: '演示数据' },
+    { id: 'dp-2', patient: '陈兰英', patientMemberId: 'm1', requester: '周晓东', hospital: '市中医院', date: dateOffset(9), service: '取药与报告', need: '代取上周检查报告，顺便帮妈妈带一个月的降压药', budget: '面议', status: '招募中', createdAt: '演示数据' }
+  ],
+  /* 本次任务分享码（FR-10）：家庭生成 → 陪诊师输入查看，短时效、可撤销、留痕 */
+  taskShares: [],
   currentRole: 'family',
   familyMembers: [{ id: 'member-mom', name: '陈兰英', relationship: '妈妈' }],
   companionProfile: {
@@ -204,8 +211,19 @@ function loadState() {
       status: order.status || 'pending',
       patient: order.patient || '陈兰英',
       requester: order.requester || '小林',
+      source: order.source || 'family',
+      patientMemberId: order.patientMemberId || 'm1',
+      price: Number(order.price ?? 0),
       reviews: order.reviews || { family: null, escort: null }
     }));
+    loaded.demandPosts = Array.isArray(saved.demandPosts) ? saved.demandPosts.map((post, index) => ({
+      ...post,
+      id: post.id || `legacy-dp-${index}`,
+      status: post.status || '招募中',
+      service: post.service || '全程陪诊',
+      budget: post.budget || ''
+    })) : structuredClone(seed.demandPosts);
+    loaded.taskShares = Array.isArray(saved.taskShares) ? saved.taskShares.map(share => ({ ...share, accessLogs: Array.isArray(share.accessLogs) ? share.accessLogs : [] })) : [];
     loaded.metricDefs = saved.metricDefs || {};
     loaded.familyMembers = saved.familyMembers || structuredClone(seed.familyMembers);
     loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
@@ -296,8 +314,9 @@ function renderRecords() {
     })() : '';
     return `<article class="family-order-card"><div class="family-order-top"><strong>${esc(o.service)}</strong><span class="record-status">${statusLabel[o.status] || '待确认'}</span></div>
       <p>${esc(o.hospital)} · ${esc(o.date)}<br>${esc(o.providerName || state.companionProfile.name)}</p>
+      ${['pending','accepted'].includes(o.status) ? `<button class="text-button" data-task-share="${esc(o.id)}">生成本次任务分享码 →</button>` : ''}
       ${exec}
-      ${o.status === 'completed' && o.serviceReport ? `<section class="service-report-card"><div class="service-report-heading"><strong>陪诊反馈</strong><small>${esc(o.serviceReport.submittedAt || '')} · ${esc(o.providerName || state.companionProfile.name)}</small></div><p><b>服务情况</b>${esc(o.serviceReport.summary)}</p>${o.serviceReport.followUp ? `<p><b>后续待办</b>${esc(o.serviceReport.followUp)}</p>` : ''}<p><b>离院交接</b>${esc(o.serviceReport.handoff)}</p>${o.serviceReport.needsFamily ? '<div class="service-report-alert">陪诊员标记需要家属跟进，请尽快联系患者或陪诊员确认。</div>' : ''}<small class="privacy-small">陪诊过程记录仅供家庭沟通参考；诊疗和用药安排请以医院原始资料为准。</small></section>` : ''}
+      ${o.status === 'completed' && o.serviceReport ? `<section class="service-report-card"><div class="service-report-heading"><strong>陪诊反馈</strong><small>${esc(o.serviceReport.submittedAt || '')} · ${esc(o.providerName || state.companionProfile.name)}</small></div><p><b>服务情况</b>${esc(o.serviceReport.summary)}</p>${o.serviceReport.followUp ? `<p><b>后续待办</b>${esc(o.serviceReport.followUp)}</p>` : ''}<p><b>离院交接</b>${esc(o.serviceReport.handoff)}</p>${o.serviceReport.nextVisitDate ? `<p><b>下次复诊</b>${formatDate(o.serviceReport.nextVisitDate)}${o.serviceReport.nextVisitNote ? ` · ${esc(o.serviceReport.nextVisitNote)}` : ''} · 已自动创建家庭提醒</p>` : ''}${o.serviceReport.needsFamily ? '<div class="service-report-alert">陪诊员标记需要家属跟进，请尽快联系患者或陪诊员确认。</div>' : ''}<small class="privacy-small">陪诊过程记录仅供家庭沟通参考；诊疗和用药安排请以医院原始资料为准。</small></section>` : ''}
       ${o.status === 'completed' && !o.reviews?.family ? `<button class="text-button" data-order-review="${esc(o.id)}" data-review-role="family">评价本次陪诊 →</button>` : ''}
       ${o.status === 'completed' && o.reviews?.family ? `<small class="review-complete">你已完成评价${o.reviews?.escort ? ' · 双方已互评' : ' · 等待陪诊员评价'}</small>` : ''}${reviewSummary(o)}
       ${(o.status === 'completed' || o.status === 'declined') ? `<button class="text-button" data-rebook="${esc(o.id)}">再次预约 →</button>` : ''}
@@ -1278,10 +1297,23 @@ function reviewSummary(order) {
 }
 
 /* ============ 陪诊履约清单与佐证（FR-09 演示版） ============ */
+/* 模拟服务价格（FR-11：收入与订单记录用模拟金额，不做真实支付） */
+const SERVICE_PRICES = { '全程陪诊': 268, '检查陪同': 168, '取药与报告': 98 };
+/* 标准化服务清单模板（需求文档 4.1，可按需增减）：evidence 为佐证要求，optional 表示可不上传佐证直接勾选 */
+const STANDARD_EXEC_TEMPLATE = [
+  { label: '就诊前电话确认（时间/集合点/带齐物品）', evidence: '沟通记录截图', optional: true },
+  { label: '协助取号 / 挂号', evidence: '挂号凭证照片' },
+  { label: '候诊陪同至就诊', evidence: '候诊 / 就诊场景照' },
+  { label: '代述病情（仅转述家庭端准备的自我描述）', evidence: '' },
+  { label: '陪同检查、缴费、取药', evidence: '缴费单 / 药袋照片' },
+  { label: '领取 / 整理检查报告', evidence: '报告照片' },
+  { label: '协助下次复诊预约', evidence: '预约凭证' },
+  { label: '服务小结与信息回传', evidence: '服务单提交', optional: true }
+];
 const EXECUTION_ITEMS = {
-  '全程陪诊': ['到院接送', '协助取号', '陪同就诊', '取药与报告', '就诊后信息交接'],
-  '检查陪同': ['到院接送', '检查陪同', '报告领取', '就诊后信息交接'],
-  '取药与报告': ['到院取号', '取药 / 领取报告', '用药信息交接']
+  '全程陪诊': [0, 1, 2, 3, 4, 5, 6, 7],
+  '检查陪同': [0, 1, 2, 4, 5, 7],
+  '取药与报告': [0, 1, 5, 7]
 };
 function executionChecklist(service) {
   return EXECUTION_ITEMS[service] || EXECUTION_ITEMS['全程陪诊'];
@@ -1289,7 +1321,10 @@ function executionChecklist(service) {
 function ensureExecution(order) {
   if (order.status !== 'accepted' && order.status !== 'completed') return order;
   if (order.execution?.items?.length) return order;
-  const items = executionChecklist(order.service).map(label => ({ key: `exec-${label}`, label, done: false, doneAt: null, evidenceId: null, evidenceName: null }));
+  const items = executionChecklist(order.service).map(seq => {
+    const template = STANDARD_EXEC_TEMPLATE[seq];
+    return { key: `exec-${seq}-${template.label}`, label: template.label, evidenceHint: template.evidence, evidenceRequired: !template.optional && Boolean(template.evidence), done: false, doneAt: null, evidenceId: null, evidenceName: null };
+  });
   order.execution = { items, startedAt: new Date().toISOString() };
   return order;
 }
@@ -1308,6 +1343,236 @@ function showEvidenceModal(orderId, key) {
     openModal(`${modalHead('陪诊履约 · 佐证查看', esc(item.label), '陪诊员在服务过程中上传的现场佐证，仅对本次预约的家庭成员可见。')}${preview}<p class="privacy-small">佐证照片保存在本机浏览器，不上传云端。</p><button class="primary-button" id="evidenceDone">返回</button>`);
     document.getElementById('evidenceDone')?.addEventListener('click', closeModal);
   }).catch(() => toast('读取佐证失败'));
+}
+
+function orderPrice(order) { return Number(order.price || SERVICE_PRICES[order.service] || 0); }
+function taskShareActive(share) { return share && !share.revokedAt && Date.now() < Date.parse(share.expiresAt); }
+
+/* ============ 社区需求区（FR-12）：家庭发布需求帖 → 陪诊师接单大厅 ============ */
+function demandPostStatusChip(status) {
+  const map = { '招募中': 'record-status', '已接单': 'record-status', '服务中': 'record-status', '已完成': 'record-status', '已取消': 'record-status' };
+  return `<span class="${map[status] || 'record-status'}">${esc(status)}</span>`;
+}
+function renderDemandPosts() {
+  const host = document.getElementById('demandPostList');
+  if (!host) return;
+  const posts = state.demandPosts || [];
+  host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => `
+    <article class="demand-post-card">
+      <div class="family-order-top"><strong>${esc(post.service)} · ${esc(post.patient)}</strong>${demandPostStatusChip(post.status)}</div>
+      <p>${esc(post.hospital)} · ${esc(post.date)}<br>需求：${esc(post.need || '未补充')}${post.budget ? `<br>预算：${esc(post.budget)}` : ''}</p>
+      <small class="privacy-small">发布人：${esc(post.requester || '家庭成员')} · 需求帖不含任何健康档案信息。</small>
+      ${post.status === '招募中' ? `<div class="order-actions"><button class="secondary-button" data-demand-cancel="${esc(post.id)}">取消需求</button></div>` : ''}
+      ${post.status === '已接单' || post.status === '服务中' ? `<small class="privacy-small">陪诊员已接单，进度可在上方「我的陪诊安排」查看。</small>` : ''}
+    </article>`).join('')}</div>` : '<div class="empty-hint">还没有发布需求。点「发布需求」，把医院、日期和需要帮忙的事写清楚，陪诊员会在需求大厅看到。</div>';
+}
+function showDemandForm() {
+  const members = state.familyMembers?.length ? state.familyMembers : seed.familyMembers;
+  const memberOptions = members.map(member => `<option value="${esc(member.id)}">${esc(member.name)}（${esc(member.role)}）</option>`).join('');
+  const serviceOptions = Object.keys(SERVICE_PRICES).map(service => `<option value="${esc(service)}">${esc(service)} · 参考 ¥${SERVICE_PRICES[service]}</option>`).join('');
+  openModal(`${modalHead('社区需求区 · 发布陪诊需求', '发布一条需求帖', '需求帖只包含医院、时间、服务项和需求描述，不包含健康档案；陪诊师在需求大厅看到后会接单。')}
+    <form class="order-form" id="demandForm">
+      <label><span class="field-label-block">需要陪诊的家人</span><select class="input-field" name="patientMemberId" required>${memberOptions}</select></label>
+      <label><span class="field-label-block">就诊医院</span><input class="input-field" name="hospital" value="市第一人民医院" required /></label>
+      <label><span class="field-label-block">期望日期</span><input class="input-field" name="date" type="date" value="${dateOffset(5)}" required /></label>
+      <label><span class="field-label-block">需要的服务</span><select class="input-field" name="service" required>${serviceOptions}</select></label>
+      <label><span class="field-label-block">预算（选填）</span><input class="input-field" name="budget" maxlength="24" placeholder="例如：150–200 元、面议" /></label>
+      <label><span class="field-label-block">需要帮忙的事</span><input class="input-field" name="need" maxlength="80" placeholder="例如：陪同做检查、引导院内路线" /></label>
+      <label class="consent-row"><input type="checkbox" name="shareConsent" required /><span>我同意需求帖仅展示医院、时间和服务需求，不包含完整病历。</span></label>
+      <button class="primary-button" type="submit">发布需求</button>
+    </form><p class="privacy-small">演示版需求帖保存在本机浏览器，接单后转入标准陪诊订单流程。</p>`);
+}
+/* 陪诊师端 · 接单大厅（FR-09-1）：展示需求帖与预约单，不含医疗隐私 */
+function renderEscortHall() {
+  const host = document.getElementById('escortHallList');
+  if (!host) return;
+  const posts = state.demandPosts || [];
+  const recruiting = posts.filter(post => post.status === '招募中');
+  const others = posts.filter(post => post.status !== '招募中');
+  host.innerHTML = `
+    <div class="section-heading"><div><p class="eyebrow">招募中 · ${recruiting.length} 条</p><h2>可接需求</h2></div></div>
+    ${recruiting.length ? `<div class="demand-post-list">${recruiting.map(post => `
+      <article class="demand-post-card">
+        <div class="family-order-top"><strong>${esc(post.service)} · ${esc(post.patient)}</strong>${demandPostStatusChip(post.status)}</div>
+        <p>${esc(post.hospital)} · ${esc(post.date)}<br>需求：${esc(post.need || '未补充')}${post.budget ? `<br>预算：${esc(post.budget)}` : ''}<br>参考报酬：¥${SERVICE_PRICES[post.service] || 268}（模拟）</p>
+        <small class="privacy-small">发布人：${esc(post.requester || '家庭成员')} · 仅任务信息，不含健康档案。</small>
+        <div class="order-actions"><button class="primary-button" data-demand-accept="${esc(post.id)}">接下这个需求</button></div>
+      </article>`).join('')}</div>` : '<div class="empty-hint">暂无招募中的需求。家庭端在「陪诊 · 需求大厅」发布后，会实时出现在这里。</div>'}
+    ${others.length ? `<div class="section-heading" style="margin-top:18px"><div><p class="eyebrow">已处理需求</p><h2>历史需求帖</h2></div></div><div class="demand-post-list">${others.map(post => `
+      <article class="demand-post-card demand-post-card-done">
+        <div class="family-order-top"><strong>${esc(post.service)} · ${esc(post.patient)}</strong>${demandPostStatusChip(post.status)}</div>
+        <p>${esc(post.hospital)} · ${esc(post.date)}</p>
+      </article>`).join('')}</div>` : ''}`;
+}
+function acceptDemandPost(postId) {
+  const post = (state.demandPosts || []).find(item => item.id === postId);
+  if (!post || post.status !== '招募中') { toast('这条需求已被处理'); return; }
+  if (!state.companionProfile.available) { toast('你已暂停接单，请先在工作台恢复接单'); return; }
+  const order = {
+    id: `order-${Date.now()}`,
+    source: 'demand',
+    demandPostId: post.id,
+    service: post.service,
+    hospital: post.hospital,
+    date: post.date,
+    need: post.need,
+    patient: post.patient,
+    patientMemberId: post.patientMemberId || 'm1',
+    requester: post.requester,
+    providerName: state.companionProfile.name,
+    price: SERVICE_PRICES[post.service] || 268,
+    status: 'accepted',
+    reviews: { family: null, escort: null },
+    createdAt: new Date().toISOString()
+  };
+  post.status = '已接单';
+  post.orderId = order.id;
+  state.companionOrders.unshift(order);
+  ensureExecution(order);
+  saveState(); renderRecords();
+  toast(`已接单：${post.service} · ${post.hospital}，请按履约清单逐项执行`);
+}
+function cancelDemandPost(postId) {
+  const post = (state.demandPosts || []).find(item => item.id === postId);
+  if (!post || post.status !== '招募中') { toast('只有招募中的需求可以取消'); return; }
+  post.status = '已取消';
+  saveState(); renderRecords();
+  toast('需求帖已取消');
+}
+/* 需求帖状态联动：陪诊订单开始履约 → 服务中；完成 → 已完成 */
+function syncDemandPostByOrder(order) {
+  if (!order?.demandPostId) return;
+  const post = (state.demandPosts || []).find(item => item.id === order.demandPostId);
+  if (!post) return;
+  if (order.status === 'completed' && post.status !== '已完成') post.status = '已完成';
+  else if (order.status === 'accepted' && post.status === '已接单') post.status = '服务中';
+}
+
+/* ============ 本次任务分享码（FR-10 医疗隐私隔离）：家庭生成 → 陪诊师输入查看 ============ */
+function showTaskShareForm(orderId) {
+  const order = state.companionOrders.find(item => item.id === orderId);
+  if (!order || !['pending', 'accepted'].includes(order.status)) { toast('只有待确认或服务中的预约可以生成任务分享码'); return; }
+  const existing = (state.taskShares || []).find(share => share.orderId === orderId && taskShareActive(share));
+  if (existing) { showTaskShareDetail(existing.id); return; }
+  const member = state.familyMembers.find(item => item.id === (order.patientMemberId || 'm1'));
+  const descriptionCount = preVisitEntries(member?.id || 'm1').length;
+  openModal(`${modalHead('本次任务分享码 · 10 分钟有效', `向陪诊员分享${esc(order.patient)}的本次任务`, '分享码是陪诊员获取任务信息的唯一通道：仅包含本次医院、时间与服务需求；勾选后才会附上诊前自我描述。')}
+    <form class="order-form" id="taskShareForm" data-order-id="${esc(orderId)}">
+      <div class="task-share-scope">
+        <label class="share-toggle"><span><strong>本次任务信息</strong><small>${esc(order.hospital)} · ${esc(order.date)} · ${esc(order.service)}</small></span><input type="checkbox" checked disabled /><span class="switch"></span></label>
+        <label class="share-toggle"><span><strong>附上诊前自我描述</strong><small>${descriptionCount ? `最近 ${descriptionCount} 条描述，用于陪诊员代述病情` : '暂无描述，可先在就诊准备清单中补充'}</small></span><input type="checkbox" name="withSelfDescription" ${descriptionCount ? '' : 'disabled'} /><span class="switch"></span></label>
+      </div>
+      <button class="primary-button" type="submit">生成 6 位分享码</button>
+    </form>
+    <p class="privacy-small">演示版分享码保存在本机：短时效、可撤销、访问留痕。陪诊员端无法查看健康档案、病史或用药信息。</p>`);
+}
+function generateTaskShare(orderId, withSelfDescription) {
+  const order = state.companionOrders.find(item => item.id === orderId);
+  if (!order) return null;
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const share = {
+    id: `tshare-${Date.now()}`,
+    code,
+    orderId,
+    patient: order.patient,
+    patientMemberId: order.patientMemberId || 'm1',
+    hospital: order.hospital,
+    date: order.date,
+    service: order.service,
+    need: order.need || '',
+    withSelfDescription: Boolean(withSelfDescription),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    revokedAt: null,
+    accessLogs: []
+  };
+  state.taskShares = [share, ...(state.taskShares || [])].slice(0, 20);
+  saveState();
+  return share;
+}
+function showTaskShareDetail(shareId) {
+  const share = (state.taskShares || []).find(item => item.id === shareId);
+  if (!share) { toast('没有找到这条分享'); return; }
+  const active = taskShareActive(share);
+  const expireText = new Date(share.expiresAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  const logs = share.accessLogs || [];
+  openModal(`${modalHead('本次任务分享码 · 10 分钟有效', `分享${esc(share.patient)}的本次任务`, active ? `有效至 ${expireText}；陪诊员输入此码可查看任务信息${share.withSelfDescription ? '与诊前自我描述' : ''}。` : '此分享码已失效或被撤销。')}
+    <div class="share-card"><span class="pill pill-light"><span class="status-dot"></span> 本次任务信息${share.withSelfDescription ? ' · 诊前自我描述' : ''}</span><h3 class="task-share-code">${active ? esc(share.code) : '已失效'}</h3><div class="code-caption">${active ? `仅供现场演示 · ${expireText} 后失效` : share.revokedAt ? '家属已撤销此分享' : '已超过 10 分钟有效期'}</div></div>
+    <div class="share-log"><h3>访问记录</h3>${logs.length ? logs.map(entry => `<div class="log-row"><span>${esc(entry.who)}</span><small>${esc(entry.when)} · 查看了${esc(entry.what)}</small></div>`).join('') : '<p class="privacy-small">陪诊员还没有查看。</p>'}</div>
+    ${active ? `<button class="secondary-button" data-task-share-revoke="${esc(share.id)}">撤销此分享码</button>` : ''}
+    <p class="privacy-small">陪诊员端通过分享码只能看到勾选范围的内容；每次查看都会记录在这里。</p>`);
+}
+function revokeTaskShare(shareId) {
+  const share = (state.taskShares || []).find(item => item.id === shareId);
+  if (!share || share.revokedAt) { toast('此分享码已撤销'); return; }
+  share.revokedAt = new Date().toISOString();
+  saveState(); renderRecords();
+  toast('分享码已撤销，陪诊员端将无法再查看');
+  showTaskShareDetail(shareId);
+}
+/* 陪诊师端：输入分享码 → 校验 → 展示任务信息（唯一数据通道，留痕） */
+function lookupTaskShareCode() {
+  const input = document.getElementById('taskShareCodeInput');
+  const host = document.getElementById('taskShareResult');
+  const code = String(input?.value || '').trim();
+  if (!/^\d{6}$/.test(code)) { if (host) host.innerHTML = ''; toast('请输入 6 位数字分享码'); return; }
+  const share = (state.taskShares || []).find(item => item.code === code);
+  if (!share) { if (host) host.innerHTML = '<p class="privacy-small task-share-error">分享码不存在，请向家属确认。</p>'; return; }
+  if (share.revokedAt) { if (host) host.innerHTML = '<p class="privacy-small task-share-error">此分享码已被家属撤销。</p>'; return; }
+  if (Date.now() >= Date.parse(share.expiresAt)) { if (host) host.innerHTML = '<p class="privacy-small task-share-error">此分享码已超过 10 分钟有效期，请家属重新生成。</p>'; return; }
+  const member = state.familyMembers.find(item => item.id === share.patientMemberId);
+  const latestDescription = share.withSelfDescription ? preVisitEntries(share.patientMemberId)[0] : null;
+  const when = new Date().toLocaleString('zh-CN', { hour12: false });
+  share.accessLogs.push({ who: `陪诊员 · ${state.companionProfile.name}`, when, what: share.withSelfDescription ? '本次任务信息 · 诊前自我描述' : '本次任务信息' });
+  state.shares = [...(state.shares || []), { who: `陪诊员 · ${state.companionProfile.name}`, when }];
+  const order = state.companionOrders.find(item => item.id === share.orderId);
+  if (order) order.taskUnlocked = true;
+  saveState(); renderRecords();
+  if (host) host.innerHTML = `<div class="task-share-result">
+    <div class="family-order-top"><strong>${esc(share.patient)} · 本次任务信息</strong><span class="record-status">已授权查看</span></div>
+    <p>${esc(share.service)} · ${esc(share.date)}<br>${esc(share.hospital)}<br>需求：${esc(share.need || '未补充')}</p>
+    ${latestDescription ? `<div class="exec-block"><div class="exec-progress"><strong>诊前自我描述（家属授权）</strong><span>仅用于代述病情</span></div><p class="task-share-desc">${esc(latestDescription.text || '未添加文字说明')}</p><small class="privacy-small">记录时间：${esc(latestDescription.createdAt || '')}</small></div>` : ''}
+    <small class="privacy-small order-share-note">以上为家属通过分享码授权的全部内容。陪诊员端不提供健康档案、病史、用药或报告的查看入口。</small>
+  </div>`;
+  if (input) input.value = '';
+  toast('任务信息已展示，本次查看已记录并同步家属');
+}
+/* 陪诊师端 · 收入与订单记录（FR-11，模拟金额） */
+function renderEscortIncome() {
+  const strip = document.getElementById('escortIncomeStrip');
+  if (strip) {
+    const completed = state.companionOrders.filter(order => order.status === 'completed');
+    const income = completed.reduce((sum, order) => sum + orderPrice(order), 0);
+    strip.innerHTML = `<div><strong>¥${income}</strong><span>累计收入（模拟）</span></div><div><strong>${completed.length}</strong><span>已完成订单</span></div><div><strong>${completed.length ? `¥${Math.round(income / completed.length)}` : '—'}</strong><span>单均（模拟）</span></div>`;
+  }
+  const bioCompleted = document.getElementById('escortBioCompleted');
+  if (bioCompleted) {
+    const completed = state.companionOrders.filter(order => order.status === 'completed');
+    const income = completed.reduce((sum, order) => sum + orderPrice(order), 0);
+    bioCompleted.textContent = String(completed.length);
+    document.getElementById('escortBioIncome').textContent = `¥${income}`;
+    const ratings = state.companionOrders.flatMap(order => order.reviews?.family ? [order.reviews.family.score] : []);
+    document.getElementById('escortBioRating').textContent = ratings.length ? `${(ratings.reduce((sum, score) => sum + Number(score || 0), 0) / ratings.length).toFixed(1)} 分` : '新加入';
+  }
+}
+/* 服务单提交后：下次复诊信息自动转成家庭端提醒（FR-09-3） */
+function createVisitReminderFromReport(order, nextVisitDate, nextVisitNote) {
+  if (!nextVisitDate) return false;
+  const visitDay = new Date(`${nextVisitDate}T12:00:00`).getDay();
+  const reminder = {
+    id: `reminder-visit-${Date.now()}`,
+    memberId: order.patientMemberId || 'm1',
+    kind: 'custom',
+    title: `复诊提醒 · ${nextVisitNote || order.hospital}`,
+    detail: `${order.hospital}${nextVisitNote ? ` · ${nextVisitNote}` : ''} · 由陪诊服务单自动生成`,
+    time: '08:00',
+    days: [visitDay],
+    startDate: nextVisitDate,
+    endDate: nextVisitDate,
+    active: true
+  };
+  state.customReminders = [...(state.customReminders || []), reminder];
+  return true;
 }
 
 function renderCompanionViews() {
@@ -1348,18 +1613,24 @@ function renderCompanionViews() {
         const progress = executionProgress(order);
         executionBlock = `<div class="exec-block"><div class="exec-progress"><strong>履约进度 ${progress.done} / ${progress.total}</strong>${progress.all ? '<span class="exec-progress-done">已完成全部项目</span>' : '<span>逐项完成并上传佐证</span>'}</div>
           <div class="exec-list">${order.execution.items.map(item => `<div class="exec-row ${item.done ? 'is-done' : ''}">
-            <button class="exec-toggle" data-exec-toggle="${esc(item.key)}" data-order-id="${esc(order.id)}" ${item.done ? 'disabled' : ''}>${item.done ? '✓' : ''}</button>
-            <div class="exec-copy"><strong>${esc(item.label)}</strong>${item.done ? `<small>完成于 ${esc(item.doneAt || '')}</small>` : '<small>待执行</small>'}</div>
-            ${item.evidenceId ? `<button class="exec-evidence has-evidence" data-evidence-view="${esc(item.key)}" data-order-id="${esc(order.id)}">查看佐证</button>` : `<button class="exec-evidence" data-exec-evidence="${esc(item.key)}" data-order-id="${esc(order.id)}">上传佐证</button>`}
+            ${item.evidenceRequired && !item.evidenceId ? '<span class="exec-mark" title="此项需上传佐证后自动完成">◎</span>' : `<button class="exec-toggle" data-exec-toggle="${esc(item.key)}" data-order-id="${esc(order.id)}" ${item.done ? 'disabled' : ''}>${item.done ? '✓' : ''}</button>`}
+            <div class="exec-copy"><strong>${esc(item.label)}</strong>${item.done ? `<small>完成于 ${esc(item.doneAt || '')}</small>` : `<small>待执行${item.evidenceHint ? ` · 佐证：${esc(item.evidenceHint)}${item.evidenceRequired ? '（必传）' : ''}` : ''}</small>`}</div>
+            ${item.evidenceId ? `<button class="exec-evidence has-evidence" data-evidence-view="${esc(item.key)}" data-order-id="${esc(order.id)}">查看佐证</button>` : item.evidenceHint ? `<button class="exec-evidence" data-exec-evidence="${esc(item.key)}" data-order-id="${esc(order.id)}">上传佐证</button>` : ''}
           </div>`).join('')}</div></div>`;
       }
       const actions = order.status === 'pending' ? `<div class="order-actions"><button class="secondary-button" data-order-action="decline" data-order-id="${esc(order.id)}">暂不接单</button><button class="primary-button" data-order-action="accept" data-order-id="${esc(order.id)}">接受预约</button></div>`
         : order.status === 'accepted' ? (() => { const progress = executionProgress(order); return `${executionBlock}${progress.all ? `<button class="primary-button" data-order-action="complete" data-order-id="${esc(order.id)}">标记陪诊已完成</button>` : '<small class="review-complete">完成全部履约项目后才能标记完成</small>'}`; })()
         : order.status === 'completed' ? `${executionBlock}${!order.reviews?.escort ? `<button class="primary-button" data-order-review="${esc(order.id)}" data-review-role="escort">评价本次家庭</button>` : `<small class="review-complete">你已评价${order.reviews?.family ? ' · 双方已互评' : ' · 等待家庭评价'}</small>`}`
         : '';
-      return `<article class="escort-order-card"><div class="family-order-top"><strong>${esc(order.patient || '家庭预约')}</strong><span class="record-status">${label}</span></div><p>${esc(order.service)} · ${esc(order.date)}<br>${esc(order.hospital)}<br>需求：${esc(order.need || '未补充')}</p><small class="privacy-small order-share-note">本次申请仅分享以上预约信息，不包含完整病历。</small>${reviewSummary(order)}${actions}</article>`;
-    }).join('') : '<div class="empty-hint">还没有预约申请。切换到家庭端创建一笔演示预约，就能在这里体验接单流程。</div>';
+      const shareCodeHint = order.status === 'accepted'
+        ? `<small class="privacy-small order-share-note">${order.taskUnlocked ? '已通过分享码查看本次任务信息。' : '如需诊前自我描述等更多信息，请让家属在预约卡上生成本次任务分享码，在上方输入查看。'}</small>`
+        : '<small class="privacy-small order-share-note">本次申请仅分享以上预约信息，不包含完整病历。</small>';
+      return `<article class="escort-order-card"><div class="family-order-top"><strong>${esc(order.patient || '家庭预约')}</strong><span class="record-status">${label}</span></div><p>${esc(order.service)} · ${esc(order.date)}<br>${esc(order.hospital)}<br>需求：${esc(order.need || '未补充')}<br>报酬：¥${orderPrice(order)}（模拟）</p>${shareCodeHint}${reviewSummary(order)}${actions}</article>`;
+    }).join('') : '<div class="empty-hint">还没有预约申请。家庭端可直接预约，或在需求大厅发布需求帖，你接单后就会出现在这里。</div>';
   }
+  renderEscortHall();
+  renderDemandPosts();
+  renderEscortIncome();
 }
 
 function renderRole() {
@@ -2291,9 +2562,12 @@ function showShare(memberId = '') {
 }
 function showCompanionForm(service, sourceOrder = null) {
   if (!state.companionProfile.available) { showInfo('暂不可预约', `${state.companionProfile.name}目前暂停接单。你可以稍后再查看。`); return; }
-  openModal(`${modalHead('陪诊需求 · 演示流程', `预约${esc(service)}`, `向${esc(state.companionProfile.name)}提交申请；陪诊员接受后，家庭端会显示接单状态。`)}
+  const members = state.familyMembers?.length ? state.familyMembers : seed.familyMembers;
+  const memberOptions = members.map(member => `<option value="${esc(member.id)}" ${member.id === (sourceOrder?.patientMemberId || 'm1') ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('');
+  openModal(`${modalHead('陪诊需求 · 演示流程', `预约${esc(service)}`, `向${esc(state.companionProfile.name)}提交申请；陪诊员接受后，家庭端会显示接单状态。参考服务费 ¥${SERVICE_PRICES[service] || 268}（演示金额，不产生真实支付）。`)}
     <form class="order-form" id="companionForm" data-rebook-id="${esc(sourceOrder?.id || '')}">
       <input type="hidden" name="service" value="${esc(service)}" />
+      <label><span class="field-label-block">需要陪诊的家人</span><select class="input-field" name="patientMemberId" required>${memberOptions}</select></label>
       <label><span class="field-label-block">就诊医院</span><input class="input-field" name="hospital" value="${esc(sourceOrder?.hospital || '市第一人民医院')}" required /></label>
       <label><span class="field-label-block">期望日期</span><input class="input-field" name="date" type="date" value="${dateOffset(4)}" required /></label>
       <label><span class="field-label-block">需要的帮助</span><input class="input-field" name="need" value="${esc(sourceOrder?.need || '心内科复诊，协助院内路线')}" /></label>
@@ -2333,9 +2607,11 @@ function showCompletionReportForm(orderId) {
       <label><span class="field-label-block">本次服务情况</span><textarea class="input-field" name="summary" maxlength="500" required placeholder="例如：已陪同完成挂号、就诊和检查，医生资料已交给患者。"></textarea></label>
       <label><span class="field-label-block">需要家属跟进的事项（选填）</span><textarea class="input-field" name="followUp" maxlength="300" placeholder="例如：协助预约复诊、确认是否已安全到家。诊疗建议请按医院原文记录。"></textarea></label>
       <label><span class="field-label-block">患者离院 / 交接状态</span><select class="input-field" name="handoff" required><option value="">请选择</option><option>已当面交接给家属</option><option>已陪同患者安全到家</option><option>患者选择自行离院，已确认去向</option><option>尚未完成交接，需要家属联系</option></select></label>
+      <label><span class="field-label-block">下次复诊日期（选填）</span><input class="input-field" name="nextVisitDate" type="date" min="${dateOffset(0)}" /></label>
+      <label><span class="field-label-block">下次复诊事项（选填）</span><input class="input-field" name="nextVisitNote" maxlength="40" placeholder="例如：心内科复诊 · 带上检查报告" /></label>
       <label class="consent-row"><input type="checkbox" name="needsFamily" value="yes" /><span>标记为需要家属尽快跟进（如联系不上患者、交接未完成或出现安全顾虑）</span></label>
       <button class="primary-button" type="submit">提交反馈并完成服务</button>
-    </form><p class="privacy-small">演示版反馈保存在本机浏览器；真实跨设备通知、身份核验与紧急联络需接入服务端。</p>`);
+    </form><p class="privacy-small">填写下次复诊日期后，会自动为该成员创建一条家庭端复诊提醒。演示版反馈保存在本机浏览器；真实跨设备通知、身份核验与紧急联络需接入服务端。</p>`);
 }
 function showInfo(title, message) {
   openModal(`${modalHead('家庭就医助手', title, message)}<button class="primary-button" id="infoDone">知道了</button>`);
@@ -2396,6 +2672,7 @@ document.addEventListener('click', async event => {
   if (action === 'devices') showInfo('设备管理（规划中）', '计划预留华为运动健康、小米运动健康等智能手表接入入口，同步睡眠、运动与跌倒监测数据。当前演示版可在预警中心「模拟手表同步」体验。');
   if (action === 'companion') navigate('companion');
   if (action === 'book-profile') showCompanionForm('全程陪诊');
+  if (action === 'demand-form') showDemandForm();
   if (action === 'toggle-availability') {
     state.companionProfile.available = !state.companionProfile.available;
     saveState(); renderRole(); renderRecords();
@@ -2701,6 +2978,15 @@ document.addEventListener('click', async event => {
     const previous = state.companionOrders.find(item => item.id === rebookButton.dataset.rebook);
     if (previous) showCompanionForm(previous.service, previous);
   }
+  const demandAccept = event.target.closest('[data-demand-accept]');
+  if (demandAccept) acceptDemandPost(demandAccept.dataset.demandAccept);
+  const demandCancel = event.target.closest('[data-demand-cancel]');
+  if (demandCancel) cancelDemandPost(demandCancel.dataset.demandCancel);
+  const taskShareButton = event.target.closest('[data-task-share]');
+  if (taskShareButton) showTaskShareForm(taskShareButton.dataset.taskShare);
+  const taskShareRevoke = event.target.closest('[data-task-share-revoke]');
+  if (taskShareRevoke) revokeTaskShare(taskShareRevoke.dataset.taskShareRevoke);
+  if (event.target.closest('#taskShareLookup')) lookupTaskShareCode();
   const visitOpen = event.target.closest('[data-visit-open]');
   if (visitOpen) {
     const [visitMemberId, visitDate] = visitOpen.dataset.visitOpen.split('|');
@@ -2720,6 +3006,7 @@ document.addEventListener('click', async event => {
     const item = order?.execution?.items?.find(entry => entry.key === execToggle.dataset.execToggle);
     if (item && !item.done) {
       item.done = true; item.doneAt = nowLabel();
+      syncDemandPostByOrder(order);
       saveState(); renderRecords();
       toast(`已记录：${item.label}`);
     }
@@ -2785,14 +3072,19 @@ document.addEventListener('submit', event => {
   }
   if (event.target.id === 'companionForm') {
     event.preventDefault(); const data = new FormData(event.target);
+    const patientMemberId = String(data.get('patientMemberId') || 'm1');
+    const patientMember = state.familyMembers.find(member => member.id === patientMemberId);
     const order = {
       id: `order-${Date.now()}`,
       service: data.get('service'),
       hospital: data.get('hospital'),
       date: data.get('date'),
       need: data.get('need'),
-      patient: '陈兰英',
+      patient: patientMember?.name || '陈兰英',
+      patientMemberId,
       requester: '小林',
+      source: 'family',
+      price: SERVICE_PRICES[data.get('service')] || 268,
       providerName: state.companionProfile.name,
       status: 'pending',
       rebookOf: event.target.dataset.rebookId || null,
@@ -2821,17 +3113,51 @@ document.addEventListener('submit', event => {
     const form = event.target; const data = new FormData(form);
     const order = state.companionOrders.find(item => item.id === form.dataset.orderId);
     if (!order || order.status !== 'accepted' || !executionProgress(order).all) { toast('订单状态已变化，请重新确认'); closeModal(); return; }
+    const nextVisitDate = String(data.get('nextVisitDate') || '').trim();
+    const nextVisitNote = String(data.get('nextVisitNote') || '').trim();
     order.serviceReport = {
       summary: data.get('summary').trim(),
       followUp: data.get('followUp').trim(),
       handoff: data.get('handoff'),
+      nextVisitDate,
+      nextVisitNote,
       needsFamily: data.get('needsFamily') === 'yes',
       submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
     };
     order.completedAt = new Date().toISOString();
     order.status = 'completed';
+    const reminderCreated = createVisitReminderFromReport(order, nextVisitDate, nextVisitNote);
+    syncDemandPostByOrder(order);
     saveState(); closeModal(); renderRecords();
-    toast(order.serviceReport.needsFamily || order.serviceReport.handoff.includes('尚未') ? '反馈已提交，提醒家属尽快跟进' : '反馈已提交，家庭端可查看');
+    toast(reminderCreated ? `反馈已提交，${formatDate(nextVisitDate)}的复诊提醒已自动创建` : order.serviceReport.needsFamily || order.serviceReport.handoff.includes('尚未') ? '反馈已提交，提醒家属尽快跟进' : '反馈已提交，家庭端可查看');
+  }
+  if (event.target.id === 'demandForm') {
+    event.preventDefault(); const data = new FormData(event.target);
+    const patientMemberId = String(data.get('patientMemberId') || 'm1');
+    const patientMember = state.familyMembers.find(member => member.id === patientMemberId);
+    const post = {
+      id: `dp-${Date.now()}`,
+      patient: patientMember?.name || '家庭成员',
+      patientMemberId,
+      requester: (state.familyMembers.find(member => member.id === state.currentMemberId)?.name) || '家庭成员',
+      hospital: String(data.get('hospital') || '').trim(),
+      date: String(data.get('date') || ''),
+      service: String(data.get('service') || '全程陪诊'),
+      need: String(data.get('need') || '').trim(),
+      budget: String(data.get('budget') || '').trim(),
+      status: '招募中',
+      createdAt: new Date().toLocaleString('zh-CN', { hour12: false })
+    };
+    state.demandPosts = [post, ...(state.demandPosts || [])];
+    saveState(); renderRecords(); closeModal();
+    toast('需求已发布，陪诊员在需求大厅可见');
+  }
+  if (event.target.id === 'taskShareForm') {
+    event.preventDefault();
+    const orderId = event.target.dataset.orderId;
+    const share = generateTaskShare(orderId, new FormData(event.target).get('withSelfDescription') === 'on');
+    if (!share) { toast('没有找到这笔预约'); return; }
+    showTaskShareDetail(share.id);
   }
 });
 
@@ -2878,6 +3204,7 @@ document.getElementById('evidenceInput').addEventListener('change', async event 
     await putAttachment(evidenceId, file);
     item.evidenceId = evidenceId; item.evidenceName = file.name;
     if (!item.done) { item.done = true; item.doneAt = nowLabel(); }
+    syncDemandPostByOrder(order);
     saveState(); renderRecords();
     toast('佐证照片已保存，履约项已标记完成');
   } catch { toast('佐证保存失败，请重试'); }
