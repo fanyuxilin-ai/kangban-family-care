@@ -963,6 +963,15 @@ function renderDocs() {
           <button class="secondary-button" data-action="appointment" data-appointment-member="${member.id}">就诊准备清单</button>
           <button class="secondary-button" data-action="share" data-share-member="${member.id}">生成就诊分享码</button>
         </div>
+        ${(() => {
+          const previsit = preVisitEntries(member.id);
+          return `<div class="docs-sub-head"><span>诊前自我描述</span><button class="text-button" data-action="previsit" data-previsit-member="${member.id}">${previsit.length ? '查看 / 补充 →' : '添加 →'}</button></div>
+          ${previsit.length ? `<article class="record-item previsit-item" data-action="previsit" data-previsit-member="${member.id}" tabindex="0" role="button" aria-label="查看诊前自我描述">
+            <span class="record-icon">✎</span>
+            <div class="record-body"><strong>${esc((previsit[0].text || '（语音 / 照片记录）').slice(0, 42))}</strong><small>${esc(previsit[0].createdAt)}${previsit.length > 1 ? ` · 共 ${previsit.length} 条` : ''}</small></div>
+            <span class="member-chevron">›</span>
+          </article>` : '<p class="empty-hint" style="margin:2px 0">还没有记录；就诊前把近期症状、饮食睡眠先写下来，见医生时更好描述。</p>'}`;
+        })()}
         <div class="docs-sub-head"><span>就医资料库 · 按就诊日期归档</span><button class="text-button" data-action="upload" data-upload-member="${member.id}">＋ 添加</button></div>
         ${visitRows.length ? `<div class="record-list">${previewRows(visitRows, `docsrec-${member.id}`)}</div>` : '<p class="empty-hint" style="margin:2px 0">暂无就诊资料，点右上「＋ 添加」上传，同一天的资料自动归为一次就诊。</p>'}
         <small class="privacy-small" style="display:block;margin:4px 0 2px">点某次就诊可查看当天全部资料；AI 概括病症仅供整理参考。体检 / 化验报告在「健康档案 · 导入体检单」录入。</small>
@@ -1634,6 +1643,7 @@ function showAlertCenter() {
 let readingMemberId = 'm1';   // 当前录入读数的目标成员（设备数据各归各人）
 let uploadMemberId = '';      // 「＋ 添加资料」预选的成员（医疗资料成员块内触发时传入）
 let appointmentMemberId = ''; // 当前就诊准备清单对应的成员（弹窗间跳转保持上下文）
+let preVisitMemberId = '';    // 当前诊前自我描述对应的成员
 let histEditContext = 'dashboard'; // 编辑/删除后的返回上下文：dashboard / daily
 const previewOpen = new Set();   // 成员卡内长列表预览展开状态（track-m1 / daily-m1 ...）
 const READING_METHODS = [
@@ -2119,7 +2129,7 @@ function showAppointment(memberId = '') {
   const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
   const memberChecks = (state.appointmentChecksByMember || (state.appointmentChecksByMember = {}))[member.id];
   const checks = memberChecks || state.appointmentChecks || {};
-  const hasDescription = (state.preVisitDescriptions || []).length > 0;
+  const hasDescription = preVisitEntries(member.id).length > 0;
   const items = [
     ['idCard', '医保卡与身份证', '就诊时出示'],
     ['reports', '近期检查报告', '血常规、心电图等资料'],
@@ -2135,11 +2145,17 @@ function showAppointment(memberId = '') {
     <div class="health-highlight">就医信息卡可由${esc(member.name)}主动向医生展示。清单仅帮助准备资料，不替代医生问诊。</div>
     <button class="primary-button" id="appointmentCard" data-card-member="${member.id}">打开${esc(member.name)}的就医信息卡</button>`);
 }
-function showPreVisitDescription() {
+/* 诊前描述按成员隔离；早期演示数据未带成员标记，归到首位长辈名下 */
+function preVisitEntries(memberId) {
+  return (state.preVisitDescriptions || []).filter(entry => (entry.memberId || state.familyMembers[0]?.id) === memberId);
+}
+function showPreVisitDescription(memberId = '') {
   preVisitFiles = [];
-  const entries = state.preVisitDescriptions || [];
+  if (memberId) preVisitMemberId = memberId;
+  const member = state.familyMembers.find(item => item.id === preVisitMemberId) || state.familyMembers.find(item => item.id === appointmentMemberId) || state.familyMembers[0];
+  const entries = preVisitEntries(member.id);
   const history = entries.length ? `<div class="previsit-history">${entries.map(entry => `<article><small>${esc(entry.createdAt)}</small><p>${esc(entry.text || '未添加文字说明')}</p><div class="previsit-files">${(entry.attachments || []).map(file => `<button class="text-button" data-previsit-attachment="${esc(file.id)}" data-previsit-type="${esc(file.type)}">查看附件：${esc(file.name)}</button>`).join('') || '<small>无附件</small>'}</div></article>`).join('')}</div>` : '<p class="privacy-small">还没有诊前描述。可记录这次不舒服从什么时候开始、出现频率、饮食睡眠和已采取的处理。</p>';
-  openModal(`${modalHead('就诊前记录', '诊前自我描述', '把病人的主观感受和近期情况先记下来，方便就诊时向医生说明。可拍照、录音或语音转文字。')}
+  openModal(`${modalHead(`${esc(member.name)} · 就诊前记录`, '诊前自我描述', '把病人的主观感受和近期情况先记下来，方便就诊时向医生说明。可拍照、录音或语音转文字。')}
     ${history}
     <label class="ocr-text-label" for="preVisitText">病情、饮食及其他情况</label><textarea class="ocr-text-area" id="preVisitText" placeholder="例如：从周一开始饭后腹胀，近两天食欲下降；饮食、睡眠、排便或活动有哪些变化？"></textarea>
     <div class="voice-controls"><button class="secondary-button" id="preVisitDictate">语音转文字</button><button class="secondary-button" id="preVisitRecord">录制语音</button><button class="secondary-button" id="preVisitPhoto">添加照片</button><button class="secondary-button" id="preVisitAudioFile">上传录音</button></div>
@@ -2178,13 +2194,13 @@ async function savePreVisitDescription() {
       await putAttachment(attachmentId, file);
       attachments.push({ id: attachmentId, name: file.name, type: file.type });
     }
-    state.preVisitDescriptions = [{ id: entryId, text, createdAt: new Date().toLocaleString('zh-CN'), attachments }, ...(state.preVisitDescriptions || [])];
+    state.preVisitDescriptions = [{ id: entryId, memberId: preVisitMemberId || appointmentMemberId || state.currentMemberId || state.familyMembers[0]?.id, text, createdAt: new Date().toLocaleString('zh-CN'), attachments }, ...(state.preVisitDescriptions || [])];
     state.appointmentChecks = { ...(state.appointmentChecks || {}), selfDescription: true };
     if (appointmentMemberId) {
       const byMember = state.appointmentChecksByMember || (state.appointmentChecksByMember = {});
       byMember[appointmentMemberId] = { ...(byMember[appointmentMemberId] || {}), selfDescription: true };
     }
-    saveState(); preVisitFiles = []; closeModal(); showAppointment(); toast('诊前描述和附件已保存在本机');
+    saveState(); preVisitFiles = []; closeModal(); showAppointment(appointmentMemberId); toast('诊前描述和附件已保存在本机');
   } catch (error) { if (saveButton) saveButton.disabled = false; toast('保存失败，请检查本机存储空间后重试'); }
 }
 async function showPreVisitAttachment(id, type) {
@@ -2193,7 +2209,7 @@ async function showPreVisitAttachment(id, type) {
   const url = URL.createObjectURL(item.blob); preVisitAttachmentUrl = url;
   const media = type.startsWith('image/') ? `<img class="previsit-preview" src="${url}" alt="诊前描述附件">` : type.startsWith('audio/') ? `<audio class="previsit-audio" controls src="${url}"></audio>` : '<p class="privacy-small">当前设备无法预览此附件格式。</p>';
   openModal(`${modalHead('诊前附件', esc(item.name), '附件保存在当前设备。')}${media}<button class="primary-button" id="closePreVisitAttachment">返回诊前描述</button>`);
-  document.getElementById('closePreVisitAttachment')?.addEventListener('click', () => { closeModal(); showPreVisitDescription(); });
+  document.getElementById('closePreVisitAttachment')?.addEventListener('click', () => { closeModal(); showPreVisitDescription(preVisitMemberId); });
 }
 async function showRecord(recordId) {
   const record = state.records.find(item => item.id === recordId); if (!record) return;
@@ -2351,6 +2367,7 @@ document.addEventListener('click', async event => {
     toast(state.companionProfile.available ? '已恢复接受预约' : '已暂停接受新预约');
   }
   if (action === 'appointment') showAppointment(event.target.closest('[data-appointment-member]')?.dataset.appointmentMember || '');
+  if (action === 'previsit') showPreVisitDescription(event.target.closest('[data-previsit-member]')?.dataset.previsitMember || '');
   if (action === 'privacy') showInfo('隐私与资料管理', '本原型将演示资料保存在当前设备浏览器中。分享流程仅作交互展示，不会发送到网络。\n\n真实产品需提供资料导出、更正、删除和授权撤回功能。');
   if (action === 'help') showInfo('服务说明', '康伴帮助家庭整理就医资料和协同就诊准备。资料提取仅辅助整理，不替代医生判断。陪诊服务仅提供就诊流程协助。');
   if (event.target.closest('[data-upload-source="camera"]')) openFilePicker('camera');
@@ -2358,7 +2375,7 @@ document.addEventListener('click', async event => {
   if (event.target.closest('#loadSampleReport')) loadSampleReport();
   if (event.target.closest('#startVoice')) startListening();
   if (event.target.closest('#appointmentCard')) showHealthCard(event.target.closest('[data-card-member]')?.dataset.cardMember || appointmentMemberId);
-  if (event.target.closest('#openPreVisitDescription')) showPreVisitDescription();
+  if (event.target.closest('#openPreVisitDescription')) showPreVisitDescription(appointmentMemberId);
   if (event.target.closest('#backToAppointment')) showAppointment(appointmentMemberId);
   if (event.target.closest('#preVisitPhoto')) document.getElementById('preVisitPhotoInput').click();
   if (event.target.closest('#preVisitAudioFile')) document.getElementById('preVisitAudioInput').click();
