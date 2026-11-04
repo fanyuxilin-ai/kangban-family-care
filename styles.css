@@ -230,3 +230,42 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .hist-search{margin-bottom:10px}
 .hist-search .input-field{width:100%;height:42px;background:#fffefa;border:1px solid #e3e5dd;border-radius:11px;padding:0 12px;font-size:11px;color:#3b4c40}
 .hist-search .input-field::placeholder{color:#a4aea6}
+.reminder-add-home{width:100%;margin-top:8px;border:1px dashed #dce2d8;border-radius:10px;background:#fbfaf6}
+.med-reminder-copy strong i{font-style:normal;font-size:8px;font-weight:500;color:#718574;background:#eef2eb;border-radius:9px;padding:3px 6px;margin-left:4px;vertical-align:1px}
+.reminder-manager-list{background:#fffefa;border:1px solid #eeede6;border-radius:13px;padding:0 12px;max-height:36vh;overflow:auto}
+.reminder-manager-card{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #f0efe9}
+.reminder-manager-card:last-child{border:0}
+.reminder-manager-card>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.reminder-manager-card strong{font-size:11px;color:#445449}
+.reminder-manager-card small{font-size:9px;line-height:1.5;color:#89958b}
+.reminder-delete{background:#f6ebe5;color:#9a6a52;border-radius:8px;padding:7px 9px;font-size:9px;flex:none}
+.reminder-form{display:flex;flex-direction:column;gap:11px}
+.reminder-form label{display:block}
+.reminder-form textarea.input-field{min-height:65px}
+.reminder-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.reminder-day{position:relative;cursor:pointer}
+.reminder-day input{position:absolute;opacity:0;pointer-events:none}
+.reminder-day span{display:grid;place-items:center;height:34px;border-radius:9px;background:#f0f1eb;color:#758177;font-size:9px}
+.reminder-day input:checked+span{background:#e2ecdf;color:#4f7357;font-weight:700}
+.reminder-day input:focus-visible+span{outline:2px solid #94b5a0}
+.reminder-template-row>div{display:flex;gap:7px;flex-wrap:wrap}
+.reminder-template{background:#edf2ea;color:#5d795f;border-radius:18px;padding:7px 11px;font-size:9px}
+.reminder-history-row{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:9px 0;border-bottom:1px solid #f0efe9}
+.reminder-history-row strong,.reminder-history-row span{font-size:10px;color:#526357}
+.reminder-history-row small{grid-column:1/-1;font-size:8px;color:#929b93}
+.reminder-form [hidden]{display:none!important}
+.reminder-inline-actions{display:flex;align-items:center;gap:4px;flex:none}
+.reminder-inline-actions .med-taken-button{padding:7px 8px}
+.reminder-later,.reminder-skip{border-radius:8px;padding:7px 6px;font-size:8px;white-space:nowrap;background:#f0f1eb;color:#758177}
+.reminder-skip{background:#f6ebe5;color:#9a6a52}
+.service-report-card{margin:10px 0;padding:12px;background:#f2f5ee;border:1px solid #e3eade;border-radius:11px}
+.service-report-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:7px}
+.service-report-heading strong{font-size:11px;color:#526e57}
+.service-report-heading small{font-size:8px;color:#89958b;text-align:right}
+.service-report-card p{margin:7px 0;font-size:10px;line-height:1.65;white-space:pre-wrap}
+.service-report-card p b{display:block;margin-bottom:2px;color:#526357;font-size:9px}
+.service-report-alert{padding:8px 9px;margin:8px 0;background:#f7e9df;border-radius:8px;color:#985f45;font-size:9px;line-height:1.5}
+.service-report-card .privacy-small{display:block;margin:8px 0 0;line-height:1.5}
+.service-report-form{display:flex;flex-direction:column;gap:12px}
+.service-report-form textarea.input-field{width:100%;min-height:78px;border:1px solid #e3e5dd;border-radius:9px;background:#fffefa;padding:11px;font:inherit;font-size:11px;resize:vertical;color:#38493e}
+@media(max-width:370px){.med-reminder-row{flex-wrap:wrap;padding:8px 0}.med-reminder-copy{flex:1}.reminder-inline-actions{margin-left:54px}}

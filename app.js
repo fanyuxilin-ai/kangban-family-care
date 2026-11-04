@@ -12,6 +12,7 @@ const seed = {
   ],
   companionOrders: [],
   currentRole: 'family',
+  familyMembers: [{ id: 'member-mom', name: '陈兰英', relationship: '妈妈' }],
   companionProfile: {
     name: '王阿姨',
     experience: '5年陪诊经验',
@@ -24,6 +25,10 @@ const seed = {
   medications: [],
   medicationTaken: {},
   medicationNotified: {},
+  customReminders: [],
+  reminderLogs: {},
+  reminderNotified: {},
+  measurementRecords: [],
   appointmentChecks: { idCard: true, reports: false, medicines: false, questions: false, selfDescription: false },
   preVisitDescriptions: [],
   voiceNote: '',
@@ -113,6 +118,10 @@ function loadState() {
     loaded.bodyMetrics = saved.bodyMetrics || structuredClone(seed.bodyMetrics);
     loaded.currentMemberId = saved.currentMemberId || 'm1';
     loaded.nextMetricId = saved.nextMetricId || 37;
+    loaded.customReminders = Array.isArray(saved.customReminders) ? saved.customReminders.map(reminder => ({ ...reminder, memberId: reminder.memberId === 'member-mom' || !reminder.memberId ? 'm1' : reminder.memberId })) : [];
+    loaded.reminderLogs = saved.reminderLogs && typeof saved.reminderLogs === 'object' ? saved.reminderLogs : {};
+    loaded.reminderNotified = saved.reminderNotified && typeof saved.reminderNotified === 'object' ? saved.reminderNotified : {};
+    loaded.measurementRecords = Array.isArray(saved.measurementRecords) ? saved.measurementRecords : [];
     loaded.alerts = saved.alerts || [];
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
@@ -185,6 +194,7 @@ function renderRecords() {
     return `<article class="family-order-card"><div class="family-order-top"><strong>${esc(o.service)}</strong><span class="record-status">${statusLabel[o.status] || '待确认'}</span></div>
       <p>${esc(o.hospital)} · ${esc(o.date)}<br>${esc(o.providerName || state.companionProfile.name)}</p>
       ${exec}
+      ${o.status === 'completed' && o.serviceReport ? `<section class="service-report-card"><div class="service-report-heading"><strong>陪诊反馈</strong><small>${esc(o.serviceReport.submittedAt || '')} · ${esc(o.providerName || state.companionProfile.name)}</small></div><p><b>服务情况</b>${esc(o.serviceReport.summary)}</p>${o.serviceReport.followUp ? `<p><b>后续待办</b>${esc(o.serviceReport.followUp)}</p>` : ''}<p><b>离院交接</b>${esc(o.serviceReport.handoff)}</p>${o.serviceReport.needsFamily ? '<div class="service-report-alert">陪诊员标记需要家属跟进，请尽快联系患者或陪诊员确认。</div>' : ''}<small class="privacy-small">陪诊过程记录仅供家庭沟通参考；诊疗和用药安排请以医院原始资料为准。</small></section>` : ''}
       ${o.status === 'completed' && !o.reviews?.family ? `<button class="text-button" data-order-review="${esc(o.id)}" data-review-role="family">评价本次陪诊 →</button>` : ''}
       ${o.status === 'completed' && o.reviews?.family ? `<small class="review-complete">你已完成评价${o.reviews?.escort ? ' · 双方已互评' : ' · 等待陪诊员评价'}</small>` : ''}${reviewSummary(o)}
       ${(o.status === 'completed' || o.status === 'declined') ? `<button class="text-button" data-rebook="${esc(o.id)}">再次预约 →</button>` : ''}
@@ -773,15 +783,149 @@ function renderMedicationReminders() {
   const host = document.getElementById('homeMedicationReminders');
   if (!host) return;
   const today = dateOffset(0);
-  const slots = (state.medications || []).flatMap(med => (med.times || []).map(time => ({ med, time }))).sort((a,b) => a.time.localeCompare(b.time));
-  if (!slots.length) {
-    host.innerHTML = `<div class="med-empty"><span>还没有服药提醒</span><button class="text-button" data-action="add-medication">拍照添加医嘱 →</button></div>`;
+  const day = new Date(`${today}T12:00:00`).getDay();
+  const memberName = id => state.familyMembers.find(member => member.id === id)?.name || '陈兰英';
+  const items = [
+    ...(state.medications || []).flatMap(med => (med.times || []).map(time => ({ id: med.id, kind: 'medication', title: med.name, detail: med.dose || med.frequencyLabel || '按已确认医嘱', time, memberId: med.memberId === 'member-mom' || !med.memberId ? 'm1' : med.memberId, med }))),
+    ...(state.customReminders || []).filter(reminder => reminder.active !== false && (!reminder.startDate || reminder.startDate <= today) && (!reminder.endDate || reminder.endDate >= today) && (reminder.days || [0,1,2,3,4,5,6]).includes(day)).map(reminder => ({ ...reminder, kind: reminder.kind || 'custom' }))
+  ].sort((a,b) => a.time.localeCompare(b.time));
+  if (!items.length) {
+    host.innerHTML = `<div class="med-empty"><span>今天暂无安排，可添加量血压、散步或自定义事项。</span><button class="text-button" data-action="add-reminder">新增提醒 →</button></div>`;
     return;
   }
-  host.innerHTML = `<div class="med-reminder-list">${slots.map(({med,time}) => {
-    const key = `${today}|${med.id}|${time}`; const done = Boolean(state.medicationTaken?.[key]);
-    return `<div class="med-reminder-row ${done ? 'is-taken' : ''}"><time>${esc(time)}</time><div class="med-reminder-copy"><strong>${esc(med.name)}</strong><small>${esc(med.dose || '按已核对医嘱')} · ${esc(med.frequencyLabel || `每日${med.times.length}次`)}</small></div><button class="med-taken-button" data-med-taken="${esc(med.id)}" data-med-time="${esc(time)}" ${done ? 'disabled' : ''}>${done ? '已记录' : '记录已服'}</button></div>`;
+  host.innerHTML = `<div class="med-reminder-list">${items.map(item => {
+    const key = `${today}|${item.id}|${item.time}`;
+    const log = item.kind === 'medication' ? null : state.reminderLogs?.[key];
+    const skipped = log?.status === 'skipped';
+    const done = item.kind === 'medication' ? Boolean(state.medicationTaken?.[key]) : log?.status === 'done' || skipped;
+    const typeLabel = item.kind === 'medication' ? '服药' : item.kind === 'measurement' ? '测量' : item.kind === 'activity' ? '活动' : '自定义';
+    const subline = item.kind === 'medication' ? `${esc(item.detail)} · ${esc(memberName(item.memberId))}` : `${typeLabel} · ${esc(memberName(item.memberId))}${item.unit ? ` · ${esc(item.unit)}` : ''}`;
+    const button = item.kind === 'medication'
+      ? `<button class="med-taken-button" data-med-taken="${esc(item.id)}" data-med-time="${esc(item.time)}" ${done ? 'disabled' : ''}>${done ? '已记录' : '记录已服'}</button>`
+      : `<div class="reminder-inline-actions"><button class="med-taken-button" data-reminder-complete="${esc(item.id)}" data-reminder-time="${esc(item.time)}" ${done ? 'disabled' : ''}>${skipped ? '已跳过' : done ? (item.kind === 'measurement' ? '已记录' : '已完成') : (item.kind === 'measurement' ? '记录读数' : '完成')}</button>${!done ? `<button class="reminder-later" data-reminder-snooze="${esc(item.id)}" data-reminder-time="${esc(item.time)}">＋30分</button><button class="reminder-skip" data-reminder-skip="${esc(item.id)}" data-reminder-time="${esc(item.time)}">跳过</button>` : ''}</div>`;
+    const snoozedText = log?.status === 'snoozed' ? ` · 已延后至 ${new Date(log.snoozedUntil).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` : '';
+    return `<div class="med-reminder-row ${done ? 'is-taken' : ''}"><time>${esc(item.time)}</time><div class="med-reminder-copy"><strong>${esc(item.title)} <i>${typeLabel}</i></strong><small>${subline}${esc(snoozedText)}</small></div>${button}</div>`;
   }).join('')}</div>`;
+}
+
+function reminderWeekdays(days = []) { return ['日','一','二','三','四','五','六'].filter((_, index) => days.includes(index)).map(day => `周${day}`).join('、') || '未设置'; }
+function reminderOccurrenceKey(reminder, time, date = dateOffset(0)) { return `${date}|${reminder.id}|${time}`; }
+function showReminderManager() {
+  const members = state.familyMembers || [];
+  const reminders = state.customReminders || [];
+  const rows = reminders.length ? reminders.map(reminder => {
+    const member = members.find(item => item.id === reminder.memberId)?.name || '陈兰英';
+    const type = reminder.kind === 'measurement' ? '测量' : reminder.kind === 'activity' ? '活动' : '自定义';
+    const schedule = `${esc(reminder.time)} · ${reminderWeekdays(reminder.days || [])}${reminder.endDate ? ` · 至 ${formatDate(reminder.endDate)}` : ''}`;
+    return `<article class="reminder-manager-card"><div><strong>${esc(reminder.title)}</strong><small>${type} · ${esc(member)} · ${schedule}</small>${reminder.detail ? `<small>${esc(reminder.detail)}</small>` : ''}</div><button class="reminder-delete" data-reminder-delete="${esc(reminder.id)}" aria-label="删除${esc(reminder.title)}">删除</button></article>`;
+  }).join('') : '<div class="med-empty med-empty-large">还没有自定义提醒。可添加量血压、测血糖、散步或任何需要记得做的事。</div>';
+  const history = (state.measurementRecords || []).slice(0, 5).map(item => `<div class="reminder-history-row"><strong>${esc(item.title)}</strong><span>${esc(item.value)}${item.unit ? ` ${esc(item.unit)}` : ''}</span><small>${formatDate(item.date)} ${esc(item.time)} · ${esc(item.memberName || '陈兰英')}</small></div>`).join('');
+  openModal(`${modalHead('按成员安排 · 家庭共享', '提醒管理', '服药提醒由已确认医嘱生成；血压、血糖、活动和其他事项由家人自定义。提醒保存在当前设备。')}
+    <div class="reminder-manager-list">${rows}</div>
+    <button class="primary-button" id="openAddReminder">新增提醒</button>
+    <button class="secondary-button" id="openMedicationManager">管理服药提醒（医嘱）</button>
+    ${history ? `<div class="share-log"><h3>最近测量记录</h3>${history}</div>` : ''}
+    <button class="secondary-button" id="enableMedicationNotifications">开启浏览器通知</button>
+    <p class="privacy-small">提醒记录用于家庭日常协同，不提供诊断或治疗建议。浏览器关闭后，定时通知暂不可用。</p>`);
+}
+function showReminderForm() {
+  const members = state.familyMembers?.length ? state.familyMembers : seed.familyMembers;
+  const memberOptions = members.map(member => `<option value="${esc(member.id)}">${esc(member.name)}${member.role ? `（${esc(member.role)}）` : member.relationship ? `（${esc(member.relationship)}）` : ''}</option>`).join('');
+  const weekdays = ['日','一','二','三','四','五','六'].map((day,index) => `<label class="reminder-day"><input type="checkbox" name="days" value="${index}" checked><span>周${day}</span></label>`).join('');
+  openModal(`${modalHead('家庭自定义 · 按成员记录', '新增提醒', '不限于预设项目，写下家人需要记住的事项。测量类完成时会记录读数。')}
+    <form class="reminder-form" id="reminderForm">
+      <label><span class="field-label-block">提醒对象</span><select class="input-field" name="memberId" required>${memberOptions}</select></label>
+      <label><span class="field-label-block">项目类型</span><select class="input-field" name="kind" id="reminderKind"><option value="measurement">健康测量</option><option value="activity">活动 / 训练</option><option value="custom">自定义事项</option></select></label>
+      <div class="reminder-template-row"><span class="field-label-block">快速选择，也可自己填写</span><div><button type="button" class="reminder-template" data-reminder-template="bloodPressure">测血压</button><button type="button" class="reminder-template" data-reminder-template="bloodSugar">测血糖</button><button type="button" class="reminder-template" data-reminder-template="walk">散步</button></div></div>
+      <label><span class="field-label-block">提醒名称</span><input class="input-field" name="title" maxlength="40" placeholder="例如：测量血压、散步、复诊前准备" required></label>
+      <label id="metricTypeRow"><span class="field-label-block">记录方式</span><select class="input-field" name="metricType"><option value="bloodPressure">血压（收缩压 / 舒张压）</option><option value="bloodSugar">血糖（数值）</option><option value="custom">其他指标（自定义数值）</option></select></label>
+      <label id="metricUnitRow"><span class="field-label-block">单位</span><input class="input-field" name="unit" value="mmHg" maxlength="12" placeholder="例如 mmol/L、次、分钟"></label>
+      <label><span class="field-label-block">说明（选填）</span><input class="input-field" name="detail" maxlength="100" placeholder="例如：饭后两小时；如身体不适请及时告知家人"></label>
+      <label><span class="field-label-block">提醒时间</span><input class="input-field" name="time" type="time" required value="08:00"></label>
+      <div><span class="field-label-block">重复日期</span><div class="reminder-days">${weekdays}</div></div>
+      <label><span class="field-label-block">开始日期</span><input class="input-field" name="startDate" type="date" value="${dateOffset(0)}" required></label>
+      <label><span class="field-label-block">结束日期（选填）</span><input class="input-field" name="endDate" type="date"></label>
+      <button class="primary-button" type="submit">保存提醒</button>
+    </form><p class="privacy-small">设置的时间和频次请以医生、药师或家庭实际安排为准。</p>`);
+  document.getElementById('reminderKind')?.addEventListener('change', event => {
+    const isMeasurement = event.target.value === 'measurement';
+    document.getElementById('metricTypeRow').hidden = !isMeasurement;
+    document.getElementById('metricUnitRow').hidden = !isMeasurement;
+  });
+  document.getElementById('reminderKind')?.dispatchEvent(new Event('change'));
+  document.querySelector('[name="metricType"]')?.addEventListener('change', event => {
+    const unit = document.querySelector('[name="unit"]');
+    if (unit) unit.value = event.target.value === 'bloodPressure' ? 'mmHg' : event.target.value === 'bloodSugar' ? 'mmol/L' : '';
+  });
+  document.querySelectorAll('[data-reminder-template]').forEach(button => button.addEventListener('click', () => {
+    const title = document.querySelector('[name="title"]');
+    const kind = document.getElementById('reminderKind');
+    const metricType = document.querySelector('[name="metricType"]');
+    if (button.dataset.reminderTemplate === 'bloodPressure') { kind.value = 'measurement'; title.value = '测量血压'; metricType.value = 'bloodPressure'; }
+    if (button.dataset.reminderTemplate === 'bloodSugar') { kind.value = 'measurement'; title.value = '测量血糖'; metricType.value = 'bloodSugar'; }
+    if (button.dataset.reminderTemplate === 'walk') { kind.value = 'activity'; title.value = '散步'; }
+    kind.dispatchEvent(new Event('change'));
+    metricType.dispatchEvent(new Event('change'));
+  }));
+}
+function showReminderCompletion(id, time) {
+  const reminder = state.customReminders.find(item => item.id === id);
+  if (!reminder) return;
+  const key = reminderOccurrenceKey(reminder, time);
+  if (state.reminderLogs?.[key]?.status === 'done') return;
+  const measurementFields = reminder.kind === 'measurement'
+    ? reminder.metricType === 'bloodPressure'
+      ? `<div class="reading-inputs"><label><span>收缩压 (mmHg)</span><input class="input-field" name="systolic" type="number" min="60" max="260" required></label><label><span>舒张压 (mmHg)</span><input class="input-field" name="diastolic" type="number" min="40" max="160" required></label></div>`
+      : `<label><span class="field-label-block">${esc(reminder.title)}${reminder.unit ? `（${esc(reminder.unit)}）` : ''}</span><input class="input-field" name="value" type="number" step="any" required></label>`
+    : '';
+  openModal(`${modalHead(`${esc(reminder.time)} · ${esc(reminder.title)}`, reminder.kind === 'measurement' ? '记录测量结果' : '记录完成情况', `记录对象：${esc((state.familyMembers.find(item => item.id === reminder.memberId)?.name) || '陈兰英')}`)}
+    <form class="reminder-form" id="reminderCompletionForm" data-reminder-id="${esc(id)}" data-reminder-time="${esc(time)}">${measurementFields}
+      <label><span class="field-label-block">备注（选填）</span><textarea class="input-field" name="note" maxlength="120" placeholder="记录当时情况"></textarea></label>
+      <button class="primary-button" type="submit">保存记录</button>
+    </form><p class="privacy-small">测量值按原样记录，不自动判断是否正常。</p>`);
+}
+function completeCustomReminder(reminder, time, formData) {
+  const today = dateOffset(0);
+  const key = reminderOccurrenceKey(reminder, time, today);
+  const member = state.familyMembers.find(item => item.id === reminder.memberId);
+  const entry = { status: 'done', memberId: reminder.memberId, actor: '小林', completedAt: nowLabel(), note: String(formData.get('note') || '').trim() };
+  if (reminder.kind === 'measurement') {
+    if (reminder.metricType === 'bloodPressure') {
+      entry.value = `${formData.get('systolic')}/${formData.get('diastolic')}`;
+      entry.unit = 'mmHg';
+      const reading = { systolic: Number(formData.get('systolic')), diastolic: Number(formData.get('diastolic')) };
+      const time = new Date().toTimeString().slice(0,5);
+      state.nextMetricId = Number(state.nextMetricId || 1);
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId: reminder.memberId, metric: '收缩压', value: reading.systolic, unit: 'mmHg', date: today, time, source: '提醒记录', channel: 'daily' });
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId: reminder.memberId, metric: '舒张压', value: reading.diastolic, unit: 'mmHg', date: today, time, source: '提醒记录', channel: 'daily' });
+    } else {
+      entry.value = String(formData.get('value') || '').trim();
+      entry.unit = reminder.unit || '';
+      const metric = reminder.metricType === 'bloodSugar' ? '血糖' : reminder.title;
+      state.nextMetricId = Number(state.nextMetricId || 1);
+      state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId: reminder.memberId, metric, value: Number(entry.value), unit: entry.unit, date: today, time: new Date().toTimeString().slice(0,5), source: '提醒记录', channel: 'daily' });
+    }
+    state.measurementRecords.unshift({ id: `measure-${Date.now()}`, reminderId: reminder.id, memberId: reminder.memberId, memberName: member?.name || '陈兰英', title: reminder.title, value: entry.value, unit: entry.unit, date: today, time: new Date().toTimeString().slice(0,5), note: entry.note });
+  }
+  state.reminderLogs = { ...(state.reminderLogs || {}), [key]: entry };
+  saveState(); renderRecords(); closeModal(); toast(reminder.kind === 'measurement' ? '测量结果已保存' : '已记录完成');
+}
+function snoozeCustomReminder(id, time) {
+  const reminder = state.customReminders.find(item => item.id === id);
+  if (!reminder) return;
+  const key = reminderOccurrenceKey(reminder, time);
+  if (['done','skipped'].includes(state.reminderLogs?.[key]?.status)) return;
+  const until = new Date(Date.now() + 30 * 60 * 1000);
+  state.reminderLogs = { ...(state.reminderLogs || {}), [key]: { ...(state.reminderLogs?.[key] || {}), status: 'snoozed', memberId: reminder.memberId, actor: '小林', snoozedAt: nowLabel(), snoozedUntil: until.toISOString() } };
+  saveState(); renderRecords(); toast(`已延后到 ${until.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`);
+}
+function skipCustomReminder(id, time) {
+  const reminder = state.customReminders.find(item => item.id === id);
+  if (!reminder) return;
+  const key = reminderOccurrenceKey(reminder, time);
+  if (['done','skipped'].includes(state.reminderLogs?.[key]?.status)) return;
+  state.reminderLogs = { ...(state.reminderLogs || {}), [key]: { status: 'skipped', memberId: reminder.memberId, actor: '小林', completedAt: nowLabel() } };
+  saveState(); renderRecords(); toast('已跳过本次提醒');
 }
 function checkMedicationReminders() {
   const now = new Date();
@@ -805,6 +949,34 @@ function checkMedicationReminders() {
         changed = true;
         createAlert('yellow', '提醒后仍未记录服药', `${med.name}（${med.dose || '按医嘱'}）计划 ${time} 服用，超过 90 分钟未记录已服。请联系妈妈确认是否漏服，不要自行补服处方药。`, '服药提醒闭环');
       }
+    }
+  }
+  if (changed) saveState();
+}
+function checkCustomReminders() {
+  const now = new Date();
+  const today = dateOffset(0);
+  const day = now.getDay();
+  const currentMinute = now.getHours() * 60 + now.getMinutes();
+  let changed = false;
+  for (const reminder of state.customReminders || []) {
+    if (reminder.active === false || (reminder.startDate && reminder.startDate > today) || (reminder.endDate && reminder.endDate < today) || !(reminder.days || [0,1,2,3,4,5,6]).includes(day)) continue;
+    const [hour, minute] = String(reminder.time || '').split(':').map(Number);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) continue;
+    const delta = currentMinute - (hour * 60 + minute);
+    const key = reminderOccurrenceKey(reminder, reminder.time, today);
+    const log = state.reminderLogs?.[key];
+    if (['done','skipped'].includes(log?.status)) continue;
+    const snoozedUntil = log?.status === 'snoozed' ? Date.parse(log.snoozedUntil) : NaN;
+    const notificationKey = Number.isFinite(snoozedUntil) && now.getTime() >= snoozedUntil ? `${key}|snooze|${log.snoozedUntil}` : key;
+    const shouldNotify = Number.isFinite(snoozedUntil) ? now.getTime() >= snoozedUntil : delta >= 0 && delta <= 3;
+    if (shouldNotify && !state.reminderNotified?.[notificationKey]) {
+      state.reminderNotified = { ...(state.reminderNotified || {}), [notificationKey]: true };
+      changed = true;
+      const member = state.familyMembers.find(item => item.id === reminder.memberId)?.name || '家人';
+      const message = `${member}：${reminder.title}${reminder.detail ? ` · ${reminder.detail}` : ''}`;
+      if ('Notification' in window && Notification.permission === 'granted') new Notification('康伴提醒', { body: message, tag: notificationKey });
+      else if (document.visibilityState === 'visible') toast(`康伴提醒：${reminder.title} · ${reminder.time}`);
     }
   }
   if (changed) saveState();
@@ -1185,6 +1357,7 @@ function showMedicationManager() {
   const permissionText = '提醒只在康伴保持打开时运行；关闭应用后的定时推送尚未接入。';
   openModal(`${modalHead('按确认过的处方医嘱', '服药提醒', '康伴只整理医嘱中明确写出的内容。没有写明的提醒时间由家人确认填写，不代替医生或药师指导。')}${list}
     <button class="primary-button" id="addPrescription">拍照添加处方</button>
+    <button class="secondary-button" id="returnToReminderCenter">管理其他提醒</button>
     <button class="secondary-button" id="enableMedicationNotifications">开启浏览器通知</button>
     <p class="privacy-small">${permissionText} 提醒和处方保存在当前设备。</p>`);
 }
@@ -1468,6 +1641,18 @@ function showReviewForm(orderId, role) {
       <button class="primary-button" type="submit">提交评价</button>
     </form><p class="privacy-small">演示版评价保存在本机，不会公开发布。</p>`);
 }
+function showCompletionReportForm(orderId) {
+  const order = state.companionOrders.find(item => item.id === orderId);
+  if (!order || order.status !== 'accepted' || !executionProgress(order).all) { toast('请先完成全部履约项目'); return; }
+  openModal(`${modalHead('陪诊服务反馈', '提交就诊后反馈', '向家属说明服务经过、后续待办和患者离院交接情况。请只记录亲历事实，不代替医生解释诊疗意见。')}
+    <form class="service-report-form" id="serviceReportForm" data-order-id="${esc(orderId)}">
+      <label><span class="field-label-block">本次服务情况</span><textarea class="input-field" name="summary" maxlength="500" required placeholder="例如：已陪同完成挂号、就诊和检查，医生资料已交给患者。"></textarea></label>
+      <label><span class="field-label-block">需要家属跟进的事项（选填）</span><textarea class="input-field" name="followUp" maxlength="300" placeholder="例如：协助预约复诊、确认是否已安全到家。诊疗建议请按医院原文记录。"></textarea></label>
+      <label><span class="field-label-block">患者离院 / 交接状态</span><select class="input-field" name="handoff" required><option value="">请选择</option><option>已当面交接给家属</option><option>已陪同患者安全到家</option><option>患者选择自行离院，已确认去向</option><option>尚未完成交接，需要家属联系</option></select></label>
+      <label class="consent-row"><input type="checkbox" name="needsFamily" value="yes" /><span>标记为需要家属尽快跟进（如联系不上患者、交接未完成或出现安全顾虑）</span></label>
+      <button class="primary-button" type="submit">提交反馈并完成服务</button>
+    </form><p class="privacy-small">演示版反馈保存在本机浏览器；真实跨设备通知、身份核验与紧急联络需接入服务端。</p>`);
+}
 function showInfo(title, message) {
   openModal(`${modalHead('家庭就医助手', title, message)}<button class="primary-button" id="infoDone">知道了</button>`);
 }
@@ -1514,6 +1699,8 @@ document.addEventListener('click', async event => {
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'upload') showUpload();
   if (action === 'medications') showMedicationManager();
+  if (action === 'reminders') showReminderManager();
+  if (action === 'add-reminder') showReminderForm();
   if (action === 'add-medication') showUpload();
   if (action === 'health-card') showHealthCard();
   if (action === 'share') showShare();
@@ -1583,7 +1770,7 @@ document.addEventListener('click', async event => {
       const times = [...card.querySelectorAll('[data-med-time]')].slice(0, count).map(input => input.value);
       if (!name || !count || times.length !== count || times.some(time => !time)) { toast('请核对药名、每日次数，并为每次提醒选择时间'); return; }
       const instruction = card.querySelector('.med-source-text')?.textContent.replace('识别到的医嘱：','') || '';
-      planned.push({ id: `med-${Date.now()}-${planned.length}`, name, dose, times, frequencyLabel: `每日${count}次`, instruction });
+      planned.push({ id: `med-${Date.now()}-${planned.length}`, memberId: 'member-mom', name, dose, times, frequencyLabel: `每日${count}次`, instruction });
     }
     if (!planned.length) { toast('没有可保存的服药计划'); return; }
     const source = medicationSource || { hospital: '家属整理', date: dateOffset(0), text: '' };
@@ -1599,6 +1786,22 @@ document.addEventListener('click', async event => {
     if (!('Notification' in window)) { toast('当前浏览器不支持通知，可在康伴首页查看服药时间'); return; }
     Notification.requestPermission().then(permission => toast(permission === 'granted' ? '浏览器提醒已开启' : '未开启通知，仍可在应用内查看')).catch(() => toast('浏览器未能开启通知，请检查权限设置'));
   }
+  if (event.target.closest('#openAddReminder')) showReminderForm();
+  if (event.target.closest('#openMedicationManager')) showMedicationManager();
+  if (event.target.closest('#returnToReminderCenter')) showReminderManager();
+  const deleteReminder = event.target.closest('[data-reminder-delete]');
+  if (deleteReminder) {
+    const reminder = state.customReminders.find(item => item.id === deleteReminder.dataset.reminderDelete);
+    state.customReminders = state.customReminders.filter(item => item.id !== deleteReminder.dataset.reminderDelete);
+    saveState(); renderRecords(); showReminderManager();
+    if (reminder) toast(`已删除提醒：${reminder.title}`);
+  }
+  const completeReminder = event.target.closest('[data-reminder-complete]');
+  if (completeReminder) showReminderCompletion(completeReminder.dataset.reminderComplete, completeReminder.dataset.reminderTime);
+  const snoozeReminder = event.target.closest('[data-reminder-snooze]');
+  if (snoozeReminder) snoozeCustomReminder(snoozeReminder.dataset.reminderSnooze, snoozeReminder.dataset.reminderTime);
+  const skipReminder = event.target.closest('[data-reminder-skip]');
+  if (skipReminder) skipCustomReminder(skipReminder.dataset.reminderSkip, skipReminder.dataset.reminderTime);
   const markTaken = event.target.closest('[data-med-taken]');
   if (markTaken) {
     const key = `${dateOffset(0)}|${markTaken.dataset.medTaken}|${markTaken.dataset.medTime}`;
@@ -1723,12 +1926,13 @@ document.addEventListener('click', async event => {
         ensureExecution(order);
         const progress = executionProgress(order);
         if (!progress.all) { toast('还有履约项目未完成，请逐项执行并上传佐证'); return; }
+        showCompletionReportForm(order.id);
+        return;
       }
-      order.status = actionName === 'accept' ? 'accepted' : actionName === 'complete' ? 'completed' : 'declined';
+      order.status = actionName === 'accept' ? 'accepted' : 'declined';
       if (order.status === 'accepted') ensureExecution(order);
-      if (order.status === 'completed') order.completedAt = new Date().toISOString();
       saveState(); renderRecords();
-      toast(order.status === 'accepted' ? '已接受预约，请按履约清单逐项执行' : order.status === 'completed' ? '已完成陪诊，家庭端可查看履约记录' : '已标记暂不接单');
+      toast(order.status === 'accepted' ? '已接受预约，请按履约清单逐项执行' : '已标记暂不接单');
     }
   }
   const reviewButton = event.target.closest('[data-order-review]');
@@ -1776,6 +1980,44 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('submit', event => {
+  if (event.target.id === 'reminderForm') {
+    event.preventDefault();
+    const form = event.target;
+    const data = new FormData(form);
+    const days = data.getAll('days').map(Number).filter(day => day >= 0 && day <= 6);
+    const title = String(data.get('title') || '').trim();
+    const startDate = String(data.get('startDate') || '');
+    const endDate = String(data.get('endDate') || '');
+    if (!title) { toast('请填写提醒名称'); return; }
+    if (!days.length) { toast('至少选择一个重复日期'); return; }
+    if (endDate && endDate < startDate) { toast('结束日期不能早于开始日期'); return; }
+    const kind = String(data.get('kind') || 'custom');
+    const reminder = {
+      id: `reminder-${Date.now()}`,
+      memberId: String(data.get('memberId') || 'm1'),
+      kind: ['measurement','activity','custom'].includes(kind) ? kind : 'custom',
+      title,
+      detail: String(data.get('detail') || '').trim(),
+      time: String(data.get('time') || '08:00'),
+      days,
+      startDate,
+      endDate: endDate || '',
+      metricType: kind === 'measurement' ? String(data.get('metricType') || 'custom') : '',
+      unit: kind === 'measurement' ? String(data.get('unit') || '').trim() : '',
+      active: true
+    };
+    state.customReminders = [...(state.customReminders || []), reminder];
+    saveState(); renderRecords(); showReminderManager(); toast('提醒已保存');
+    return;
+  }
+  if (event.target.id === 'reminderCompletionForm') {
+    event.preventDefault();
+    const form = event.target;
+    const reminder = state.customReminders.find(item => item.id === form.dataset.reminderId);
+    if (!reminder) { toast('找不到这条提醒'); return; }
+    completeCustomReminder(reminder, form.dataset.reminderTime, new FormData(form));
+    return;
+  }
   if (event.target.id === 'companionForm') {
     event.preventDefault(); const data = new FormData(event.target);
     const order = {
@@ -1808,6 +2050,23 @@ document.addEventListener('submit', event => {
     const role = form.dataset.reviewRole;
     order.reviews = { ...(order.reviews || {}), [role]: { score: Number(data.get('score')), comment: data.get('comment').trim(), createdAt: new Date().toISOString() } };
     saveState(); closeModal(); renderRecords(); toast('评价已保存到本机');
+  }
+  if (event.target.id === 'serviceReportForm') {
+    event.preventDefault();
+    const form = event.target; const data = new FormData(form);
+    const order = state.companionOrders.find(item => item.id === form.dataset.orderId);
+    if (!order || order.status !== 'accepted' || !executionProgress(order).all) { toast('订单状态已变化，请重新确认'); closeModal(); return; }
+    order.serviceReport = {
+      summary: data.get('summary').trim(),
+      followUp: data.get('followUp').trim(),
+      handoff: data.get('handoff'),
+      needsFamily: data.get('needsFamily') === 'yes',
+      submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
+    };
+    order.completedAt = new Date().toISOString();
+    order.status = 'completed';
+    saveState(); closeModal(); renderRecords();
+    toast(order.serviceReport.needsFamily || order.serviceReport.handoff.includes('尚未') ? '反馈已提交，提醒家属尽快跟进' : '反馈已提交，家庭端可查看');
   }
 });
 
@@ -1881,4 +2140,6 @@ if (!state.alertsSeeded) {
 displayToday(); renderHomeAlerts(); renderRole(); renderRecords(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
 setInterval(checkMedicationReminders, 60000);
 setTimeout(checkMedicationReminders, 1500);
+setInterval(checkCustomReminders, 60000);
+setTimeout(checkCustomReminders, 1800);
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
