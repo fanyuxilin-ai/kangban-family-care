@@ -972,13 +972,123 @@ function showClaimDetail(claimId) {
       <button class="secondary-button" data-claim-del="${claim.id}">删除提醒</button>
     </div>`);
 }
-/* 录入 / 编辑保单（模拟） */
+/* ============ 录入保单：上传保单文件 → AI 识别检索条款 → 人工核实确认（原件可随时查看） ============ */
+let policyUploadFile = null;    // 待入库的保单原件（照片 / PDF）
+let policyRecognized = null;    // AI 识别生成的预填保单
+let policyConfirmCtx = null;    // 核实页上下文（查看原件后返回用）
+const POLICY_DEMO_TEXT = '电子保单 好医保 长期医疗险 20年版 人保健康 一般医疗保额200万 重疾医疗保额400万 免赔额1万 等待期90天 保证续保20年';
+/* AI 检索：识别文字 → 保单产品库（关键词匹配，命中即带出整套条款） */
+function matchPolicyTemplate(text) {
+  const content = String(text || '');
+  const rules = [
+    { keys: ['防癌'], name: '好医保·终身防癌医疗险' },
+    { keys: ['长期医疗', '20 年版', '20年版'], name: '好医保·长期医疗险（20年版）' },
+    { keys: ['健康福', '重疾'], name: '健康福·重疾险1号（一年期）' },
+    { keys: ['无忧保', '意外'], name: '无忧保·综合意外险' },
+    { keys: ['住院医疗'], name: '好医保·住院医疗（2020版）' }
+  ];
+  for (const rule of rules) {
+    if (rule.keys.some(key => content.includes(key))) {
+      const tpl = seed.insurancePolicies.find(policy => policy.name === rule.name);
+      if (tpl) return { ...tpl };
+    }
+  }
+  const social = /医保|社保/.test(content) ? seed.insurancePolicies.find(policy => policy.type === 'social') : null;
+  return { ...(social || seed.insurancePolicies.find(policy => policy.name === '好医保·长期医疗险（20年版）')) };
+}
+/* 演示电子保单：canvas 生成一张保单样式图片，作为可查看的原件 */
+function makeDemoPolicyFile() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640; canvas.height = 860;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f7f6f2'; ctx.fillRect(0, 0, 640, 860);
+  ctx.fillStyle = '#2f4a38'; ctx.fillRect(0, 0, 640, 90);
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px sans-serif'; ctx.fillText('电子保单（演示）', 30, 58);
+  ctx.fillStyle = '#333333'; ctx.font = '20px sans-serif';
+  const lines = [
+    '产品名称：好医保·长期医疗险（20年版）', '承保机构：人保健康', '保单号：DEMO-COM-2004（演示）',
+    '被保险人：（演示数据）', '保障期间：2025-01-10 至 2045-01-09', '一般医疗保额：200 万元',
+    '重疾医疗保额：400 万元', '免赔额：1 万/年（重疾 0 免赔）', '等待期：90 天',
+    '—— 保险责任 ——', '· 一般住院医疗费用', '· 121 种重大疾病住院医疗', '· 特殊门诊 / 住院前后门急诊',
+    '—— 除外责任 ——', '· 投保前已有疾病及其并发症', '· 牙科、视力矫正等非疾病治疗'
+  ];
+  lines.forEach((line, index) => ctx.fillText(line, 30, 150 + index * 36));
+  return new Promise(resolve => canvas.toBlob(blob => resolve(new File([blob], '演示电子保单.png', { type: 'image/png' })), 'image/png'));
+}
+/* 第一步：选择成员 + 上传保单文件（照片 / PDF） */
 function showPolicyEntry(memberId = '', policyId = '') {
   const policy = policyId ? (state.insurancePolicies || []).find(item => item.id === policyId) : null;
-  const editing = !!policy;
-  const current = editing ? policy : { memberId: memberId || state.currentMemberId, type: 'social', name: '', company: '', policyNo: '', coverage: '', start: dateOffset(0), end: '' };
+  if (policy) { showPolicyConfirm(policy, null, true); return; }
+  policyUploadFile = null; policyRecognized = null;
+  openModal(`${modalHead('保险档案 · 家庭成员', '录入保单 · 上传保单文件', '保单买好后保险公司会给电子保单（PDF）或凭证截图。上传后 AI 自动识别并检索条款，核对确认后入档。')}
+    <label class="extraction-row"><span>所属成员</span><select id="policyMember" class="extraction-select">${state.familyMembers.map(member => `<option value="${member.id}" ${member.id === (memberId || state.currentMemberId) ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('')}</select></label>
+    <div class="upload-choice">
+      <button class="upload-option" data-policy-source="file"><span>▤</span><strong>上传保单照片 / PDF</strong></button>
+    </div>
+    <button class="secondary-button sample-report-button" id="policyDemoScan">用演示电子保单体验 AI 识别</button>
+    <p class="privacy-small">支持图片与 PDF；识别在本机完成，原件仅保存在当前浏览器，不会上传云端。请勿上传真实保单，演示数据请脱敏。</p>`);
+}
+/* 第二步：AI 识别（图片走本机 OCR；PDF 用演示识别）→ 检索产品库 → 生成预填保单 */
+async function showPolicyRecognize(file) {
+  const memberId = document.getElementById('policyMember')?.value || state.currentMemberId;
+  openModal(`${modalHead('录入保单 · AI 识别', '正在识别保单文件…', '本机识别保单上的产品与关键信息，并自动检索对应条款，随后请你核实确认。')}
+    <div class="file-chip"><b>▤</b><span>${esc(file?.name || '保单文件')}</span><span id="policyOcrStatus" style="margin-left:auto;color:#789078">准备识别…</span></div>
+    ${file?.type?.startsWith('image/') ? '<img class="report-preview" id="policyPreview" alt="保单原件预览" />' : ''}`);
+  if (file?.type?.startsWith('image/')) {
+    const preview = document.getElementById('policyPreview');
+    if (preview) preview.src = URL.createObjectURL(file);
+  }
+  const status = document.getElementById('policyOcrStatus');
+  let text = '';
+  if (file && file.type.startsWith('image/')) {
+    try {
+      if (status) status.textContent = '正在准备本机中文识别…首次载入会稍慢。';
+      const worker = await getOcrWorker();
+      const result = await worker.recognize(file);
+      text = result.data.text || '';
+      if (status) status.textContent = `识别完成（${text.length} 字），正在检索保单产品库…`;
+    } catch {
+      if (status) status.textContent = '本机识别未完成，改用演示识别结果，请人工核实。';
+      text = POLICY_DEMO_TEXT;
+    }
+  } else if (file) {
+    if (status) status.textContent = 'PDF 解析为演示能力，已生成模拟识别结果，请人工核实。';
+    text = POLICY_DEMO_TEXT;
+  } else {
+    text = POLICY_DEMO_TEXT;
+  }
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const template = matchPolicyTemplate(text);
+  policyRecognized = {
+    memberId,
+    type: template.type,
+    category: template.category || 'medical',
+    name: template.name,
+    company: template.company,
+    policyNo: `AI-${Date.now().toString().slice(-6)}`,
+    coverage: template.coverage || '',
+    terms: template.terms || '',
+    deductible: template.deductible || '',
+    ratio: template.ratio || '',
+    waiting: template.waiting || '',
+    hospital: template.hospital || '',
+    renewal: template.renewal || '',
+    duties: [...(template.duties || [])],
+    exclusions: [...(template.exclusions || [])],
+    termsList: [],
+    start: dateOffset(0),
+    end: dateOffset(365)
+  };
+  showPolicyConfirm(policyRecognized, file, false);
+}
+/* 第三步：核实确认表单（可改）+ 底部「查看原件」按钮 */
+function showPolicyConfirm(policy, file, editing) {
+  policyConfirmCtx = { policy: editing ? policy : null, editing, file: file || policyUploadFile };
+  const current = editing ? policy : policyRecognized;
+  if (!current) { showPolicyEntry(); return; }
   const memberOptions = state.familyMembers.map(member => `<option value="${member.id}" ${member.id === current.memberId ? 'selected' : ''}>${esc(member.name)}（${esc(member.role)}）</option>`).join('');
-  openModal(`${modalHead('保险档案 · 家庭成员', editing ? `编辑保单 · ${esc(policy.name)}` : '录入保单（模拟）', '每位成员的社保医保与商业保险都归到本人名下；报销时从对应成员的保单发起，材料包与理赔进度单独记录。')}
+  openModal(`${modalHead('录入保单 · 请核实', editing ? `编辑保单 · ${esc(policy.name)}` : 'AI 已识别保单 · 请核实确认', editing ? '以下信息可修改，确认后保存到成员名下。' : `AI 从保单文件识别出以下信息，并自动从产品库检索出条款。请逐项核实（重点：保额、保障期间、条款），确认后入档。`)}
+    <div class="file-chip"><b>▤</b><span>${esc(file?.name || '保单原件（本机）')}</span><button class="text-button" id="viewPolicyFile" style="margin-left:auto">查看原件</button></div>
     <form class="member-edit-form" id="policyForm">
       <label><span class="field-label-block">所属成员</span><select class="input-field" name="memberId">${memberOptions}</select></label>
       <label><span class="field-label-block">类型</span><select class="input-field" name="type">
@@ -995,12 +1105,13 @@ function showPolicyEntry(memberId = '', policyId = '') {
       <label><span class="field-label-block">保单号（选填）</span><input class="input-field" name="policyNo" placeholder="演示数据请勿输入真实号码" value="${esc(current.policyNo)}" /></label>
       <label><span class="field-label-block">保额（选填）</span><input class="input-field" name="coverage" placeholder="例：200 万 / 按医保目录" value="${esc(current.coverage)}" /></label>
       <label><span class="field-label-block">条款摘要（选填）</span><input class="input-field" name="terms" placeholder="例：住院医疗费用经社保结算后 100% 报销" value="${esc(current.terms || '')}" /></label>
-      <label><span class="field-label-block">条款明细（选填，每行一条：标题｜内容）</span><textarea class="input-field" name="termsExtra" rows="3" placeholder="免赔额｜1 万/年${'\n'}等待期｜90 天${'\n'}除外责任｜投保前已有疾病"></textarea></label>
+      <label><span class="field-label-block">条款明细（选填，每行一条：标题｜内容）</span><textarea class="input-field" name="termsExtra" rows="3" placeholder="免赔额｜1 万/年${'\n'}等待期｜90 天${'\n'}除外责任｜投保前已有疾病">${esc((current.termsList || []).map(item => `${item.title}｜${item.text}`).join('\n'))}</textarea></label>
       <label><span class="field-label-block">生效日期</span><input class="input-field" name="start" type="date" value="${esc(current.start)}" /></label>
       <label><span class="field-label-block">到期日期</span><input class="input-field" name="end" type="date" value="${esc(current.end)}" /></label>
-      <button class="primary-button" type="submit">${editing ? '保存修改' : '保存保单'}</button>
+      <button class="primary-button" type="submit">${editing ? '保存修改' : '核实无误，确认入档'}</button>
     </form>
-    <p class="privacy-small">演示版仅在本机保存模拟数据，请勿录入真实保单号与个人信息；不做保险销售与承保判断。</p>`);
+    <p class="privacy-small">AI 识别与条款检索为演示能力（关键词匹配产品库），实际以保单合同原件为准；演示版不做承保判断。</p>`);
+  document.getElementById('viewPolicyFile')?.addEventListener('click', () => showPolicyAttachment(policyConfirmCtx.file, editing ? policy.id : null));
   document.getElementById('policyForm')?.addEventListener('submit', ev => {
     ev.preventDefault();
     const data = new FormData(ev.target);
@@ -1019,14 +1130,51 @@ function showPolicyEntry(memberId = '', policyId = '') {
     };
     if (!record.name) { toast('请填写保险名称'); return; }
     if (editing && !record.termsList.length) record.termsList = policy.termsList || []; // 编辑时未填则保留原条款明细
+    let member = state.familyMembers.find(item => item.id === record.memberId);
     if (editing) {
       Object.assign(policy, record);
+      saveState(); renderDocs(); closeModal();
+      toast(`${member?.name || '成员'} 的「${record.name}」已更新`);
     } else {
-      state.insurancePolicies.push({ id: `pol-${state.nextPolicyId++}`, ...record });
+      const saved = { id: `pol-${state.nextPolicyId++}`, ...record };
+      /* AI 识别出的结构化条款（产品库带出）随保单一并保存 */
+      ['deductible', 'ratio', 'waiting', 'hospital', 'renewal'].forEach(key => { if (current[key]) saved[key] = current[key]; });
+      if (current.duties?.length) saved.duties = [...current.duties];
+      if (current.exclusions?.length) saved.exclusions = [...current.exclusions];
+      state.insurancePolicies.push(saved);
+      saveState(); renderDocs(); closeModal();
+      if (policyUploadFile) {
+        putAttachment(saved.id, policyUploadFile)
+          .then(() => toast(`${member?.name || '成员'} 的「${record.name}」已入档，原件保存在本机`))
+          .catch(() => toast(`${member?.name || '成员'} 的「${record.name}」已入档，原件保存失败`));
+      } else {
+        toast(`${member?.name || '成员'} 的「${record.name}」已入档`);
+      }
     }
-    const member = state.familyMembers.find(item => item.id === record.memberId);
-    saveState(); renderDocs(); closeModal();
-    toast(`${member?.name || '成员'} 的「${record.name}」已${editing ? '更新' : '录入'}`);
+  });
+}
+/* 查看保单原件：新上传文件或本机已存附件（图片 / PDF 内嵌预览） */
+async function showPolicyAttachment(file, policyId) {
+  if (!file && policyId) {
+    try {
+      const item = await getAttachment(policyId);
+      if (item?.blob) file = { name: item.name, type: item.type, blob: item.blob };
+    } catch { /* 本机附件可能不存在 */ }
+  }
+  if (!file || (!file.blob && !(file instanceof File))) { toast('没有找到保单原件；可通过「上传保单文件」重新录入'); return; }
+  const url = URL.createObjectURL(file.blob || file);
+  const name = file.name || '保单原件';
+  const media = file.type?.startsWith('image/')
+    ? `<img class="report-preview" src="${url}" alt="${esc(name)}" />`
+    : file.type === 'application/pdf'
+      ? `<iframe class="policy-pdf-frame" src="${url}" title="${esc(name)}"></iframe>`
+      : `<p class="privacy-small">当前格式暂不支持内嵌预览（演示）。</p>`;
+  openModal(`${modalHead('保单原件 · 本机保存', esc(name), '原件仅保存在当前设备，用于人工核实 AI 识别结果。')}${media}
+    <button class="primary-button" id="policyFileDone">返回核实</button>`);
+  document.getElementById('policyFileDone')?.addEventListener('click', () => {
+    if (policyConfirmCtx?.editing && policyConfirmCtx.policy) showPolicyConfirm(policyConfirmCtx.policy, null, true);
+    else if (policyConfirmCtx && !policyConfirmCtx.editing) showPolicyConfirm(policyRecognized, policyUploadFile, false);
+    else closeModal();
   });
 }
 /* 条款明细 textarea（每行「标题｜内容」）→ 结构化条款列表 */
@@ -1066,7 +1214,10 @@ function showPolicyDetail(policyId) {
     </div>
     <div class="health-highlight">报销从对应成员的保单发起：上传病历 → 自动检索条款 → 命中即开启提醒 → 勾材料 → 提交。演示版不做承保与赔付金额判断。</div>
     <div class="policy-detail-ops">
+      <button class="secondary-button" data-policy-attachment="${policy.id}">查看原件</button>
       <button class="secondary-button" data-policy-edit="${policy.id}">编辑保单</button>
+    </div>
+    <div class="policy-detail-ops" style="margin-top:8px">
       <button class="secondary-button policy-del-button" data-policy-del="${policy.id}">删除</button>
     </div>
     <p class="privacy-small">演示版：条款为模拟内容（支付宝在售产品风格），实际以保单合同条款为准。</p>`);
@@ -2303,6 +2454,13 @@ document.addEventListener('click', async event => {
   }
   const policyDetailButton = event.target.closest('[data-policy-detail]');
   if (policyDetailButton) { showPolicyDetail(policyDetailButton.dataset.policyDetail); return; }
+  if (event.target.closest('[data-policy-source]')) { document.getElementById('policyFileInput')?.click(); return; }
+  if (event.target.closest('#policyDemoScan')) {
+    makeDemoPolicyFile().then(file => { policyUploadFile = file; showPolicyRecognize(file); });
+    return;
+  }
+  const policyAttachmentButton = event.target.closest('[data-policy-attachment]');
+  if (policyAttachmentButton) { showPolicyAttachment(null, policyAttachmentButton.dataset.policyAttachment); return; }
   const policyEditButton = event.target.closest('[data-policy-edit]');
   if (policyEditButton) { showPolicyEntry('', policyEditButton.dataset.policyEdit); return; }
   const policyDelButton = event.target.closest('[data-policy-del]');
@@ -2571,6 +2729,13 @@ document.addEventListener('change', event => {
 for (const id of ['fileInput','libraryInput']) document.getElementById(id).addEventListener('change', event => {
   const file = event.target.files?.[0]; if (!file) return;
   selectedFile = file; showExtraction(file);
+});
+document.getElementById('policyFileInput').addEventListener('change', event => {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+  policyUploadFile = file;
+  showPolicyRecognize(file);
 });
 document.getElementById('preVisitPhotoInput').addEventListener('change', event => {
   preVisitFiles.push(...Array.from(event.target.files || [])); event.target.value = '';
