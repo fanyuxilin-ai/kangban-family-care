@@ -1605,7 +1605,7 @@ async function renderCommunity() {
       } else {
         const mine = posts.filter(post => post.family_id === myFamilyId);
         const signupsByPost = await Promise.all(mine.map(async post => ({ post, signups: await window.KangbanAPI.select('post_signups', { filters: { post_id: post.id, status: 'applied' } }) })));
-        for (const { post, signups } of signupsByPost) post._applicants = signups.map(signup=>({...signup,display_name:profileById[signup.escort_id]?.display_name||'待核验陪诊师'}));
+        for (const { post, signups } of signupsByPost) post._applicants = signups.map(signup=>{const p=profileById[signup.escort_id]||{};return {...signup,display_name:p.display_name||'待核验陪诊师',experience:p.experience||'',service_area:p.service_area||'',bio:p.bio||''};});
         for (const booking of (bookingContext || []).filter(booking => booking.status === 'applied')) {
           const post = posts.find(item => item.id === booking.post_id);
           if (post) post._myBooking = booking;
@@ -1633,7 +1633,7 @@ async function renderCommunity() {
   if (auth?.mode === 'cloud' && !escort) {
     for (const post of posts.filter(item => item._applicants?.length)) {
       const applicantBox = host.querySelector(`[data-applicants-for="${CSS.escape(post.id)}"]`);
-      if (applicantBox) applicantBox.innerHTML = `<p class="privacy-small">${post._applicants.length} 位陪诊师报名</p>${post._applicants.map(signup => `<button class="secondary-button" data-community-confirm="${esc(signup.id)}">${esc(signup.display_name)} · 查看介绍并确认</button>`).join('')}`;
+      if (applicantBox) applicantBox.innerHTML = `<p class="privacy-small">${post._applicants.length} 位陪诊师报名</p>${post._applicants.map(signup => `<div class="applicant-row"><div class="applicant-copy"><b>${esc(signup.display_name)}</b><small>${signup.note ? esc(signup.note.length > 72 ? `${signup.note.slice(0, 72)}…` : signup.note) : '未填写自我介绍'}${signup.experience ? ` · ${esc(signup.experience)}` : ''}</small></div><div class="applicant-ops">${signup.resume_path ? `<button class="secondary-button compact" data-signup-resume="${esc(signup.resume_path)}">看简历</button>` : ''}<button class="primary-button compact" data-community-confirm="${esc(signup.id)}">查看介绍并确认</button></div></div>`).join('')}`;
     }
   }
   if (auth?.mode === 'cloud') renderCloudOrders();
@@ -1885,6 +1885,48 @@ async function showCloudEvidencePreview(path, label) {
     document.getElementById('closeCloudEvidencePreview')?.addEventListener('click', closeModal);
   } catch (error) { toast(`无权查看或附件暂不可用：${error.message || error}`); }
 }
+/* 陪诊师报名页：自我介绍（预填资料页简介）+ 简历/资质上传，家庭据此判断是否选择 */
+let demandApplyFile = null;
+async function showDemandApplyForm(postId) {
+  const post = (communityPostCache || []).find(item => item.id === postId);
+  if (!post) { toast('需求不存在或已刷新，请重试'); return; }
+  let bio = '', experience = '';
+  try { const [profile] = await window.KangbanAPI.select('escort_profiles', { filters: { user_id: window.KangbanAuth.session.user.id }, limit: 1 }); bio = profile?.bio || ''; experience = profile?.experience || ''; } catch { /* 预填失败不阻断报名 */ }
+  openModal(`${modalHead('报名陪诊需求', post.service_type || post.service || '陪诊需求', `${esc(post.hospital_name || post.hospital || '')} · ${esc(post.service_date || '')}${post.region ? ` · ${esc(post.region)}` : ''}`)}
+    <form class="order-form" id="demandApplyForm" data-post-id="${esc(postId)}">
+      <label><span class="field-label-block">自我介绍 · 家庭会据此判断是否选择你</span><textarea name="note" maxlength="500" required placeholder="介绍一下陪诊经验、擅长的服务类型、为什么适合这单…">${esc(bio)}</textarea></label>
+      <label><span class="field-label-block">简历 / 资质材料（选填 · 支持图片或 PDF）</span><input class="input-field" type="file" id="demandApplyFile" accept="image/*,application/pdf" /></label>
+      <p class="privacy-small" id="demandApplyFileLabel">未选择文件</p>
+      ${experience ? `<p class="privacy-small">资料页经验：${esc(experience)}（可到「我的介绍」修改）</p>` : ''}
+      <button class="primary-button" type="submit">提交报名</button>
+    </form>`);
+  document.getElementById('demandApplyFile')?.addEventListener('change', event => {
+    demandApplyFile = event.target.files?.[0] || null;
+    document.getElementById('demandApplyFileLabel').textContent = demandApplyFile ? `已选择：${demandApplyFile.name}` : '未选择文件';
+  });
+}
+/* 家庭端审阅报名者：完整介绍 + 资质 + 简历预览，确认后才锁定 */
+function showSignupConfirmModal(signupId) {
+  const post = (communityPostCache || []).find(item => item._applicants?.some(signup => signup.id === signupId));
+  const signup = post?._applicants?.find(item => item.id === signupId);
+  if (!signup) { toast('报名信息已刷新，请重新打开'); return; }
+  openModal(`${modalHead('审阅报名者', signup.display_name, `${esc(signup.experience || '经验待补充')}${signup.service_area ? ` · ${esc(signup.service_area)}` : ''}`)}
+    <div class="signup-review">
+      <p class="signup-review-label">报名附言</p>
+      <p>${esc(signup.note || '未填写自我介绍')}</p>
+      ${signup.bio && signup.bio !== signup.note ? `<p class="signup-review-label">资料页介绍</p><p>${esc(signup.bio)}</p>` : ''}
+      ${signup.resume_path ? `<button class="secondary-button" data-signup-resume="${esc(signup.resume_path)}">查看简历 / 资质材料</button>` : '<p class="privacy-small">该陪诊师未上传简历附件。</p>'}
+      <div class="order-actions">
+        <button class="text-button" id="signupReviewBack">返回</button>
+        <button class="primary-button" id="signupReviewConfirm">选择这位陪诊师</button>
+      </div>
+    </div>`);
+  document.getElementById('signupReviewBack')?.addEventListener('click', closeModal);
+  document.getElementById('signupReviewConfirm')?.addEventListener('click', async () => {
+    try { await window.KangbanAPI.rpc('confirm_post_signup', { p_signup_id: signupId }); closeModal(); toast('已选定陪诊师，请等待双方确认'); await refreshCloudAfterAction(); }
+    catch (error) { toast(error.message || '确认失败'); }
+  });
+}
 function renderDemandPosts() {
   const host = document.getElementById('demandPostList');
   if (!host) return;
@@ -1940,10 +1982,7 @@ function renderEscortHall() {
       </article>`).join('')}</div>` : ''}`;
 }
 function acceptDemandPost(postId) {
-  if (window.KangbanAuth?.mode === 'cloud') {
-    window.KangbanAPI.rpc('apply_to_demand', { p_post_id: postId, p_note: '' }).then(() => { toast('报名已提交，家庭确认后会生成订单'); renderCommunity(); }).catch(error => toast(error.message || '报名失败'));
-    return;
-  }
+  if (window.KangbanAuth?.mode === 'cloud') { showDemandApplyForm(postId); return; }
   const post = (state.demandPosts || []).find(item => item.id === postId);
   if (!post || post.status !== '招募中') { toast('这条需求已被处理'); return; }
   if (!state.companionProfile.available) { toast('你已暂停接单，请先在工作台恢复接单'); return; }
@@ -3434,11 +3473,9 @@ document.addEventListener('click', async event => {
     return;
   }
   const communityConfirm = event.target.closest('[data-community-confirm]');
-  if (communityConfirm) {
-    try { await window.KangbanAPI.rpc('confirm_post_signup', { p_signup_id: communityConfirm.dataset.communityConfirm }); toast('已選定陪診師，請等待雙方確認'); await refreshCloudAfterAction(); }
-    catch (error) { toast(error.message || '確認失敗'); }
-    return;
-  }
+  if (communityConfirm) { showSignupConfirmModal(communityConfirm.dataset.communityConfirm); return; }
+  const signupResume = event.target.closest('[data-signup-resume]');
+  if (signupResume) { await showCloudEvidencePreview(signupResume.dataset.signupResume, '报名简历 / 资质材料'); return; }
   const cloudOrderConfirm = event.target.closest('[data-cloud-order-confirm]');
   if (cloudOrderConfirm) {
     try { const status = await window.KangbanAPI.rpc('respond_companion_order', { p_order_id: cloudOrderConfirm.dataset.cloudOrderConfirm, p_accept: true }); toast(status === 'confirmed' ? '双方已确认，预约完成' : '你的确认已记录，等待另一方确认'); await refreshCloudAfterAction(); }
@@ -4093,6 +4130,22 @@ document.addEventListener('submit', async event => {
       await window.KangbanAPI.rpc('book_availability', { p_post_id: event.target.dataset.postId, p_note: String(data.get('note') || '').trim() });
       closeModal(); toast('预约申请已提交，等待陪诊师确认'); await refreshCloudAfterAction();
     } catch (error) { toast(`预约失败：${error.message || error}`); }
+  }
+  if (event.target.id === 'demandApplyForm') {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    const note = String(data.get('note') || '').trim();
+    try {
+      let resumePath = null;
+      if (demandApplyFile) {
+        const uid = window.KangbanAuth.session.user.id;
+        resumePath = `resumes/${uid}/${Date.now()}-${encodeURIComponent(demandApplyFile.name || 'resume')}`;
+        await window.KangbanAPI.uploadPrivateFile(demandApplyFile, resumePath);
+      }
+      demandApplyFile = null;
+      await window.KangbanAPI.rpc('apply_to_demand', { p_post_id: event.target.dataset.postId, p_note: note, p_resume_path: resumePath });
+      closeModal(); toast('报名已提交，家庭会看到你的介绍与简历'); await refreshCloudAfterAction();
+    } catch (error) { toast(`报名失败：${error.message || error}`); }
   }
   if (event.target.id === 'cloudEscortProfileForm') {
     event.preventDefault(); const data=new FormData(event.target); const auth=window.KangbanAuth.session;

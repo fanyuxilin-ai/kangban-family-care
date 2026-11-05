@@ -468,3 +468,9 @@ body:not(.authenticated) .app-shell{display:none}
 .tab.has-dot{position:relative}
 .tab.has-dot .tab-icon:after{content:'';position:absolute;width:7px;height:7px;border-radius:50%;background:#d49b74;transform:translate(14px,-4px)}
 #companionOrders[hidden]{display:none}
+/* 报名审阅：报名者行 + 审阅弹窗 */
+.applicant-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.applicant-copy small{color:#5b6a5e;font-size:9.5px;line-height:1.5}
+.applicant-ops .primary-button.compact,.applicant-ops .secondary-button.compact{min-height:32px;height:32px;padding:6px 10px;font-size:10px}
+.signup-review{display:grid;gap:10px}
+.signup-review-label{font-size:9px;font-weight:700;letter-spacing:.08em;color:#8fa093;text-transform:uppercase;margin-top:2px}
