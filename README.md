@@ -74,15 +74,15 @@ python3 -m http.server 4173
 
 1. 在 Supabase 建立项目，配置 Auth 邮箱登录及本地/部署站点的 Redirect URLs。
 2. 将 `.env.example` 复制为 `.env`，只填写 Project URL 和 publishable key。运行 `node scripts/generate-supabase-config.mjs` 生成本地忽略文件。浏览器包不读取数据库密码、access token、service-role key 或 secret key。
-3. 安装/登录 Supabase CLI 后执行：
+3. 当前统一使用 Supabase 项目 `kangban-demo`（Project ref：`sytwoulwwzfuslrgorvw`）。安装/登录 Supabase CLI 后，对该项目执行：
 
 ```sh
 npx supabase@latest login
-npx supabase@latest link --project-ref <your-project-ref>
+npx supabase@latest link --project-ref sytwoulwwzfuslrgorvw
 npx supabase@latest db push
 ```
 
-前三份迁移已部署到 Supabase 项目 `kangban`（Mumbai），Project ref 为 `vlxdgdrjbomdarrkrctc`，创建 17 张业务表、RLS、私有附件 bucket、社区/订单事务 RPC、家庭工作区快照和履约策略，并登记在 Supabase migration history。第四份迁移 `20261105160000_close_kangban_gaps.sql` 收紧订单和患者详情读取，并添加云端分享码、互评与管理员审核 RPC。优先使用 CLI `db push` 应用并登记迁移；若在 SQL Editor 手工执行，之后需用 Supabase CLI 将迁移标记为已应用，避免未来 `db push` 重复执行。详见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。应用第四份迁移后，云端订单分享码、互评与管理员审核队列才会启用。云端演示账号可用下方脚本重复初始化。
+本机 `.env` 与 Supabase CLI 链接均指向上述项目。该项目的远端迁移状态尚未核实；使用 `npx supabase@latest migration list --remote` 核对后，再通过 `db push` 应用本仓库尚未部署的迁移。不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移文件说明见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
 
 4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
 5. 配置可信管理员：在 Supabase Auth 找到受信任账号的用户 ID，在 SQL Editor 由项目所有者执行以下语句。该声明保存在 Auth `app_metadata`，普通用户不能自行修改；管理员需退出并重新登录以刷新 JWT。
@@ -104,8 +104,8 @@ where id = '<trusted-auth-user-uuid>';
 
 ## 本次里程碑与已知边界
 
-- **M1 数据层：**17 表、RLS、私有 bucket 与事务 RPC 已部署到 `kangban`。第四份迁移已在 SQL Editor 执行，收紧订单/患者详情读取并加入分享码、云端互评和管理员审核；请按 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md) 用 CLI `migration repair` 登记手工执行的版本，再继续常规 `db push`。
+- **M1 数据层：**迁移文件已在仓库；远端部署状态需针对当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）重新核对。此前旧项目 `vlxdgdrjbomdarrkrctc` 的部署记录不代表当前项目状态。
 - **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示账号仅在本浏览器使用；云端演示账号由管理员脚本创建，脚本只从环境变量读取 service-role key。
 - **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；云端支持报名、选人、双方确认、开始/完成/取消、标准清单、受分享码保护的任务详情、双方私有互评。Pink 本机大厅、分享码及收入模拟保留；收入仍是模拟金额，不涉及真实支付。
-- **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 游标与失败状态。已用云端家庭与已审核陪诊师账号验证附件读写和跨账号拒绝。导入期间中断后的真实续传仍需在云端做故障注入验证。
+- **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 游标与失败状态。附件读写、跨账号权限和导入中断续传需在当前统一项目上重新验证。
 - **Pink 能力对照：**需求大厅—保留本机实现并接入云端社区；履约清单—保留八项模板并用 RPC/佐证；任务分享码—本机实现保留，云端改由订单 RPC 校验；收入—仍为模拟；互评—本机保留且云端订单新增双方私有评价。
