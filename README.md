@@ -82,7 +82,7 @@ npx supabase@latest link --project-ref sytwoulwwzfuslrgorvw
 npx supabase@latest db push
 ```
 
-本机 `.env` 与 Supabase CLI 链接均指向上述项目。该项目的远端迁移状态尚未核实；使用 `npx supabase@latest migration list --remote` 核对后，再通过 `db push` 应用本仓库尚未部署的迁移。不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移文件说明见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
+本机 `.env` 与 Supabase CLI 链接均指向上述项目。当前六份迁移已部署并与远端迁移历史对齐；不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移记录与待完成人工步骤见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
 
 4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
 5. 配置可信管理员：在 Supabase Auth 找到受信任账号的用户 ID，在 SQL Editor 由项目所有者执行以下语句。该声明保存在 Auth `app_metadata`，普通用户不能自行修改；管理员需退出并重新登录以刷新 JWT。
@@ -104,7 +104,7 @@ where id = '<trusted-auth-user-uuid>';
 
 ## 本次里程碑与已知边界
 
-- **M1 数据层：**迁移文件已在仓库；远端部署状态需针对当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）重新核对。此前旧项目 `vlxdgdrjbomdarrkrctc` 的部署记录不代表当前项目状态。
+- **M1 数据层：**17 表、RLS、私有 bucket 与事务 RPC 已部署到当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）；六份本地迁移文件已按远端版本对齐。
 - **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示账号仅在本浏览器使用；云端演示账号由管理员脚本创建，脚本只从环境变量读取 service-role key。
 - **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；云端支持报名、选人、双方确认、开始/完成/取消、标准清单、受分享码保护的任务详情、双方私有互评。Pink 本机大厅、分享码及收入模拟保留；收入仍是模拟金额，不涉及真实支付。
 - **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 游标与失败状态。附件读写、跨账号权限和导入中断续传需在当前统一项目上重新验证。
