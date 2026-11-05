@@ -22,6 +22,8 @@ global.document = {
   visibilityState: 'visible'
 };
 global.navigator = {};
+global.setInterval = () => 0;
+global.setTimeout = () => 0;
 global.fetch = async () => ({ ok: true, blob: async () => new global.Blob() });
 global.Blob = class { constructor(parts, opts) { this.parts = parts; this.type = opts?.type || ''; } };
 global.File = class extends global.Blob { constructor(parts, name, opts) { super(parts, opts); this.name = name; this.type = opts?.type || ''; } };
@@ -33,12 +35,30 @@ URL.createObjectURL = () => 'blob:mock';
 const fs = require('fs');
 const code = fs.readFileSync('app.js', 'utf8');
 const test = `
-;(function smoke() {
+;(async function smoke() {
   const out = [];
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) process.exitCode = 1; };
 
   /* 1. 应用加载：无异常即到达此处 */
   ok('app.js 加载且初始化完成', true);
+
+  /* 1a. 云端工作区可按附件路径从私有存储取回资料，不依赖原设备 IndexedDB */
+  const remoteBlob = new Blob(['synthetic test attachment'], { type: 'image/png' });
+  let requestedPath = '';
+  let uploadedPath = '';
+  window.KangbanAuth = { mode: 'cloud', session: { familyId: 'family-demo' } };
+  window.KangbanAPI = {
+    downloadPrivateFile: async path => { requestedPath = path; return remoteBlob; },
+    uploadPrivateFile: async (_file, path) => { uploadedPath = path; }
+  };
+  window.KangbanAuth.role = 'family';
+  await putAttachment('new-record', new File(['new report'], 'report.png', { type: 'image/png' }));
+  ok('云端家庭上传时保存私有附件路径', uploadedPath === 'family-demo/attachments/new-record-report.png' && state.cloudAttachmentPaths['new-record'] === uploadedPath);
+  state.cloudAttachmentPaths = { 'cloud-record-1': 'family-demo/legacy/cloud-record-1-report.png' };
+  const cloudFile = await getAttachment('cloud-record-1');
+  ok('云端附件从私有 Storage 跨设备读取', cloudFile?.blob === remoteBlob && requestedPath === state.cloudAttachmentPaths['cloud-record-1']);
+  delete window.KangbanAuth;
+  delete window.KangbanAPI;
 
   /* 2. 标准化履约清单（FR-09-2 / 4.1 模板） */
   const order = { id: 'order-t1', service: '全程陪诊', status: 'accepted', patient: '陈兰英', patientMemberId: 'm1', hospital: '市第一人民医院', date: '2026-11-10', need: '复诊陪同', reviews: { family: null, escort: null } };
@@ -90,6 +110,52 @@ const test = `
   /* 7. 隐私隔离红线（FR-10）：陪诊师侧渲染不引用健康档案字段 */
   const escortRender = renderCompanionViews.toString();
   ok('陪诊师端渲染不含 health_profile / allergies 引用', !/allergies|conditions|medications\\s*\\(/.test(escortRender));
+
+  /* 8. 云端导入在附件上传中断后，续传应跳过已记入游标的文件 */
+  const oldAuth = window.KangbanAuth;
+  const oldApi = window.KangbanAPI;
+  const oldState = state;
+  const oldSnapshot = localStorage.getItem(STORAGE_KEY);
+  const attachments = [
+    { id: 'file-a', name: 'a.png', type: 'image/png', blob: new Blob(['a'], { type: 'image/png' }) },
+    { id: 'file-b', name: 'b.png', type: 'image/png', blob: new Blob(['b'], { type: 'image/png' }) }
+  ];
+  const db = {
+    transaction: () => ({ objectStore: () => ({ getAll: () => {
+      const request = {}; queueMicrotask(() => { request.result = attachments; request.onsuccess?.(); }); return request;
+    } }) }), close() {}
+  };
+  db.createObjectStore = () => {};
+  const idb = { open: () => { const request = { result: db }; queueMicrotask(() => { request.onupgradeneeded?.(); request.onsuccess?.(); }); return request; } };
+  window.indexedDB = idb; global.indexedDB = idb;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ familyMembers: [{ id: 'legacy-member-1', name: '虚构测试成员', role: '家属' }] }));
+  window.KangbanAuth = { mode: 'cloud', role: 'family', session: { user: { id: 'test-user' }, familyId: 'test-family' } };
+  let run = null;
+  let failedOnce = false;
+  const uploadAttempts = [];
+  window.KangbanAPI = {
+    select: async () => run ? [structuredClone(run)] : [],
+    insert: async (_table, row) => (run = { ...row, id: 'migration-run-test' }),
+    update: async (_table, _id, patch) => (run = { ...run, ...patch }),
+    upsert: async () => [],
+    uploadPrivateFile: async (_blob, path) => {
+      uploadAttempts.push(path);
+      if (path.includes('file-b') && !failedOnce) { failedOnce = true; throw new Error('synthetic Storage interruption'); }
+      return { path };
+    },
+    saveFamilyWorkspace: async () => true
+  };
+  renderRole = renderRecords = renderCommunity = () => {};
+  await importLocalWorkspace();
+  const statusAfterFailure = run.status;
+  const firstCursor = (run.cursor?.uploadedPaths || []).slice();
+  const attemptsAfterFailure = uploadAttempts.slice();
+  await importLocalWorkspace();
+  ok('模拟 Storage 中断后导入标记为 failed 并保留首个附件游标', statusAfterFailure === 'failed' && firstCursor.length === 1 && attemptsAfterFailure.length === 2);
+  ok('再次导入跳过已完成附件，只重试失败文件并完成迁移', uploadAttempts.length === 3 && uploadAttempts[0] !== uploadAttempts[1] && uploadAttempts[1] === uploadAttempts[2] && run.status === 'completed' && run.cursor.uploadedPaths.length === 2);
+  window.KangbanAuth = oldAuth; window.KangbanAPI = oldApi; state = oldState;
+  delete window.indexedDB; delete global.indexedDB;
+  if (oldSnapshot == null) localStorage.removeItem(STORAGE_KEY); else localStorage.setItem(STORAGE_KEY, oldSnapshot);
 
   console.log(out.join('\\n'));
 })();

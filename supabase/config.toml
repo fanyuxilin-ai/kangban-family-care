@@ -1,0 +1,17 @@
+project_id = "kangban-family-care"
+
+[api]
+enabled = true
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:4173"
+additional_redirect_urls = ["http://localhost:4173", "http://127.0.0.1:4173"]
+enable_signup = true
+
+[storage]
+enabled = true
+file_size_limit = "20MiB"
