@@ -103,6 +103,13 @@
       if (error) throw Object.assign(new Error(error.message || '文件上传失败'), { code: error.code });
       return data;
     },
+    async downloadPrivateFile(path) {
+      if (!client) throw new Error('本机演示模式不支持读取云端私有附件。');
+      if (!path) throw new Error('附件路径不能为空。');
+      const { data, error } = await client.storage.from('kangban-private').download(path);
+      if (error) throw Object.assign(new Error(error.message || '附件读取失败'), { code: error.code });
+      return data;
+    },
     async loadFamilyWorkspace(familyId) {
       if (!client) return null;
       const row = await runCloud(client.from('families').select('demo_state').eq('id', familyId).single());

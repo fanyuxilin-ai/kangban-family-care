@@ -75,3 +75,18 @@ test('cloud mode routes CRUD and surfaces Supabase errors without local fallback
   await assert.rejects(api.insert('medical_records', {}), /RLS denied/);
   assert.equal(storage.get('kangban-demo-v7'), '{}', 'failed cloud writes must not modify local data');
 });
+
+test('private file downloads use the authenticated private bucket and surface access errors', async () => {
+  const calls = [];
+  const blob = new Blob(['synthetic image'], { type: 'image/png' });
+  let result = { data: blob, error: null };
+  const client = {
+    storage: { from: bucket => ({ download: async path => { calls.push([bucket, path]); return result; } }) }
+  };
+  const config = { url: 'https://example.supabase.co', publishableKey: 'sb_publishable_demo' };
+  const { api } = boot({ config, client });
+  assert.equal(await api.downloadPrivateFile('family-1/attachments/report.png'), blob);
+  assert.deepEqual(calls, [['kangban-private', 'family-1/attachments/report.png']]);
+  result = { data: null, error: { message: 'Object not found', code: '404' } };
+  await assert.rejects(api.downloadPrivateFile('other-family/secret.png'), /Object not found/);
+});

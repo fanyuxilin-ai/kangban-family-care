@@ -265,15 +265,37 @@ function attachmentDb() {
   });
 }
 async function putAttachment(id, file) {
-  if (!file || !('indexedDB' in window)) return;
-  const db = await attachmentDb();
-  await new Promise((resolve, reject) => {
-    const request = db.transaction('files', 'readwrite').objectStore('files').put({ id, name: file.name, type: file.type, blob: file, savedAt: new Date().toISOString() });
-    request.onsuccess = resolve; request.onerror = () => reject(request.error);
-  });
-  db.close();
+  if (!file) return;
+  const auth = window.KangbanAuth;
+  if (auth?.mode === 'cloud') {
+    const familyId = auth.session?.familyId;
+    if (auth.role !== 'family' || !familyId) throw new Error('只有已登录的家庭账号可以上传家庭附件。');
+    const path = `${familyId}/attachments/${encodeURIComponent(id)}-${encodeURIComponent(file.name || 'attachment')}`;
+    await window.KangbanAPI.uploadPrivateFile(file, path);
+    state.cloudAttachmentPaths = { ...(state.cloudAttachmentPaths || {}), [id]: path };
+    saveState();
+  }
+  if ('indexedDB' in window) {
+    const db = await attachmentDb();
+    await new Promise((resolve, reject) => {
+      const request = db.transaction('files', 'readwrite').objectStore('files').put({ id, name: file.name, type: file.type, blob: file, savedAt: new Date().toISOString() });
+      request.onsuccess = resolve; request.onerror = () => reject(request.error);
+    });
+    db.close();
+  }
 }
 async function getAttachment(id) {
+  const auth = window.KangbanAuth;
+  if (auth?.mode === 'cloud') {
+    const path = state.cloudAttachmentPaths?.[id];
+    if (!path) return null;
+    const blob = await window.KangbanAPI.downloadPrivateFile(path);
+    let name = path.split('/').pop() || '云端附件';
+    const prefix = `${encodeURIComponent(id)}-`;
+    if (name.startsWith(prefix)) name = name.slice(prefix.length);
+    try { name = decodeURIComponent(name); } catch { /* keep the stored filename */ }
+    return { id, name, type: blob.type || '', blob, cloud: true };
+  }
   if (!('indexedDB' in window)) return null;
   const db = await attachmentDb();
   const file = await new Promise((resolve, reject) => {
@@ -1235,7 +1257,8 @@ async function showPolicyAttachment(file, policyId) {
     : file.type === 'application/pdf'
       ? `<iframe class="policy-pdf-frame" src="${url}" title="${esc(name)}"></iframe>`
       : `<p class="privacy-small">当前格式暂不支持内嵌预览（演示）。</p>`;
-  openModal(`${modalHead('保单原件 · 本机保存', esc(name), '原件仅保存在当前设备，用于人工核实 AI 识别结果。')}${media}
+  const locationLabel = file.cloud ? '康伴私有云端' : '本机保存';
+  openModal(`${modalHead(`保单原件 · ${locationLabel}`, esc(name), '原件保存在家庭私有空间，用于人工核实 AI 识别结果。')}${media}
     <button class="primary-button" id="policyFileDone">返回核实</button>`);
   document.getElementById('policyFileDone')?.addEventListener('click', () => {
     if (policyConfirmCtx?.editing && policyConfirmCtx.policy) showPolicyConfirm(policyConfirmCtx.policy, null, true);
@@ -1462,14 +1485,26 @@ async function renderCloudOrders() {
     const html = `<section class="section-block"><div class="section-heading"><div><p class="eyebrow">云端订单</p><h2>我的陪诊安排</h2></div></div><div class="demand-post-list">${orders.map(order => {
       const items = order.execution?.items || [];
       const checklist = order.status === 'in_service' && isEscort ? `<div class="exec-list">${items.map(item => `<div class="exec-row ${item.done?'is-done':''}">${item.done?'✓':'○'}<div class="exec-copy"><strong>${esc(item.label)}</strong><small>${item.done?'已完成':item.evidence_required?'需上传佐证照片':'待执行'}</small></div>${!item.done ? item.evidence_required ? `<button class="exec-evidence" data-cloud-evidence="${esc(item.key)}" data-order-id="${esc(order.id)}">上传佐证</button>` : `<button class="exec-toggle" data-cloud-task="${esc(item.key)}" data-order-id="${esc(order.id)}">完成</button>` : ''}</div>`).join('')}</div>` : '';
+      const evidenceLinks = items.filter(item => item.evidence_path).map(item => `<button class="text-button" data-cloud-evidence-view="${esc(item.evidence_path)}" data-evidence-label="${esc(item.label)}">查看履约佐证：${esc(item.label)}</button>`).join('');
       const actions = order.status === 'pending_escort_confirmation' ? `<button class="primary-button" data-cloud-order-confirm="${esc(order.id)}">确认订单</button>`
         : order.status === 'confirmed' && isEscort ? `<button class="primary-button" data-cloud-order-transition="start" data-order-id="${esc(order.id)}">开始服务</button>`
         : order.status === 'in_service' && isEscort ? `${items.every(item=>item.done) ? `<button class="primary-button" data-cloud-order-transition="complete" data-order-id="${esc(order.id)}">完成服务</button>` : '<small class="privacy-small">请按 Pink 的八项标准履约清单完成服务记录。</small>'}` : '';
       const cancel = ['pending_escort_confirmation','confirmed','in_service'].includes(order.status) ? `<button class="text-button" data-cloud-order-transition="cancel" data-order-id="${esc(order.id)}">取消订单</button>` : '';
-      return `<article class="demand-post-card"><div class="family-order-top"><strong>${esc(order.service_type)} · ${esc(POST_STATUS_LABEL[order.status] || order.status)}</strong></div><p>${esc(order.hospital_name)} · ${esc(order.service_date)}<br>${esc(order.need_summary || '')}</p>${checklist}${actions}${cancel}</article>`;
+      return `<article class="demand-post-card"><div class="family-order-top"><strong>${esc(order.service_type)} · ${esc(POST_STATUS_LABEL[order.status] || order.status)}</strong></div><p>${esc(order.hospital_name)} · ${esc(order.service_date)}<br>${esc(order.need_summary || '')}</p>${checklist}${evidenceLinks}${actions}${cancel}</article>`;
     }).join('')}</div></section>`;
     host.innerHTML = html;
   } catch (error) { toast(`订单加载失败：${error.message || error}`); }
+}
+async function showCloudEvidencePreview(path, label) {
+  try {
+    const blob = await window.KangbanAPI.downloadPrivateFile(path);
+    const url = URL.createObjectURL(blob);
+    const media = blob.type?.startsWith('image/') ? `<img class="report-preview" src="${url}" alt="${esc(label)}">`
+      : blob.type === 'application/pdf' ? `<iframe class="policy-pdf-frame" src="${url}" title="${esc(label)}"></iframe>`
+      : '<p class="privacy-small">此格式暂不支持内嵌预览。</p>';
+    openModal(`${modalHead('云端履约佐证', esc(label), '文件来自本次订单的私有云端空间；只有家庭成员和已选陪诊师可查看。')}${media}<button class="primary-button" id="closeCloudEvidencePreview">返回订单</button>`);
+    document.getElementById('closeCloudEvidencePreview')?.addEventListener('click', closeModal);
+  } catch (error) { toast(`无权查看或附件暂不可用：${error.message || error}`); }
 }
 function renderDemandPosts() {
   const host = document.getElementById('demandPostList');
@@ -2668,23 +2703,24 @@ async function savePreVisitDescription() {
       const byMember = state.appointmentChecksByMember || (state.appointmentChecksByMember = {});
       byMember[appointmentMemberId] = { ...(byMember[appointmentMemberId] || {}), selfDescription: true };
     }
-    saveState(); preVisitFiles = []; closeModal(); showAppointment(appointmentMemberId); toast('诊前描述和附件已保存在本机');
-  } catch (error) { if (saveButton) saveButton.disabled = false; toast('保存失败，请检查本机存储空间后重试'); }
+    saveState(); preVisitFiles = []; closeModal(); showAppointment(appointmentMemberId); toast(window.KangbanAuth?.mode === 'cloud' ? '诊前描述和附件已保存到家庭云端' : '诊前描述和附件已保存在本机');
+  } catch (error) { if (saveButton) saveButton.disabled = false; toast(`保存失败：${error.message || '请检查存储空间后重试'}`); }
 }
 async function showPreVisitAttachment(id, type) {
   const item = await getAttachment(id);
-  if (!item?.blob) { toast('没有找到本机附件'); return; }
+  if (!item?.blob) { toast('没有找到这份附件，或当前账号无权查看'); return; }
   const url = URL.createObjectURL(item.blob); preVisitAttachmentUrl = url;
-  const media = type.startsWith('image/') ? `<img class="previsit-preview" src="${url}" alt="诊前描述附件">` : type.startsWith('audio/') ? `<audio class="previsit-audio" controls src="${url}"></audio>` : '<p class="privacy-small">当前设备无法预览此附件格式。</p>';
-  openModal(`${modalHead('诊前附件', esc(item.name), '附件保存在当前设备。')}${media}<button class="primary-button" id="closePreVisitAttachment">返回诊前描述</button>`);
+  const media = type.startsWith('image/') ? `<img class="previsit-preview" src="${url}" alt="诊前描述附件">` : type.startsWith('audio/') ? `<audio class="previsit-audio" controls src="${url}"></audio>` : type === 'application/pdf' ? `<iframe class="policy-pdf-frame" src="${url}" title="${esc(item.name)}"></iframe>` : '<p class="privacy-small">当前设备无法预览此附件格式。</p>';
+  openModal(`${modalHead('诊前附件', esc(item.name), item.cloud ? '从家庭私有云端读取，可在其他已授权设备查看。' : '附件保存在当前设备。')}${media}<button class="primary-button" id="closePreVisitAttachment">返回诊前描述</button>`);
   document.getElementById('closePreVisitAttachment')?.addEventListener('click', () => { closeModal(); showPreVisitDescription(preVisitMemberId); });
 }
 async function showRecord(recordId) {
   const record = state.records.find(item => item.id === recordId); if (!record) return;
   let attachment = null;
   try { attachment = await getAttachment(recordId); } catch { /* local attachment storage may be unavailable */ }
-  const preview = attachment?.type?.startsWith('image/') ? `<img class="report-preview" src="${URL.createObjectURL(attachment.blob)}" alt="${esc(attachment.name)}" />` : '';
-  const fileLine = attachment ? `<div class="file-chip"><b>▤</b><span>${esc(attachment.name)}</span><span style="margin-left:auto;color:#789078">本机附件</span></div>` : '<p class="privacy-small">此演示条目没有原始文件附件。</p>';
+  const attachmentUrl = attachment ? URL.createObjectURL(attachment.blob) : '';
+  const preview = attachment?.type?.startsWith('image/') ? `<img class="report-preview" src="${attachmentUrl}" alt="${esc(attachment.name)}" />` : attachment?.type === 'application/pdf' ? `<iframe class="policy-pdf-frame" src="${attachmentUrl}" title="${esc(attachment.name)}"></iframe>` : '';
+  const fileLine = attachment ? `<div class="file-chip"><b>▤</b><span>${esc(attachment.name)}</span><span style="margin-left:auto;color:#789078">${attachment.cloud ? '家庭私有云端' : '本机附件'}</span></div>` : '<p class="privacy-small">此演示条目没有原始文件附件。</p>';
   const recognized = record.ocrText ? `<section class="saved-ocr" id="savedOcrBlock"><div class="saved-ocr-head"><strong>本机识别文字</strong><button class="text-button" id="editOcrText">编辑</button></div><p id="savedOcrText">${esc(record.ocrText)}</p></section>` : '';
   openModal(`${modalHead(esc(record.type), esc(record.title), `${esc(record.hospital)} · ${formatDate(record.date)}`)}${fileLine}${preview}${recognized}<div class="health-highlight">资料为家庭自行整理的信息。文字识别仅作录入辅助，不构成诊断意见；识别文字可编辑修正。</div><button class="primary-button" id="recordDone">返回家庭档案</button>`);
   document.getElementById('editOcrText')?.addEventListener('click', () => {
@@ -2868,6 +2904,8 @@ document.addEventListener('click', async event => {
     catch (error) { toast(error.message || '订单确认失败'); }
     return;
   }
+  const cloudEvidenceView = event.target.closest('[data-cloud-evidence-view]');
+  if (cloudEvidenceView) { await showCloudEvidencePreview(cloudEvidenceView.dataset.cloudEvidenceView, cloudEvidenceView.dataset.evidenceLabel || '陪诊履约佐证'); return; }
   const cloudTask = event.target.closest('[data-cloud-task]');
   if (cloudTask) {
     try { await window.KangbanAPI.rpc('update_order_checklist',{p_order_id:cloudTask.dataset.orderId,p_item_key:cloudTask.dataset.cloudTask,p_evidence_path:null}); await renderCommunity(); }

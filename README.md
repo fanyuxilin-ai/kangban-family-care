@@ -64,7 +64,7 @@ python3 -m http.server 4173
 
 1. Node.js 18+；仓库根目录运行 `node scripts/generate-supabase-config.mjs`。
 2. 运行 `python3 -m http.server 4173`，打开 `http://localhost:4173`。
-3. 登录页可选择游客、家庭演示或陪诊师演示。演示入口映射 `family-demo@kangban.local` / `escort-demo@kangban.local`，**只保存在当前浏览器，不是可登录 Supabase 的账号**。游客只能看脱敏虚构社区帖。
+3. 登录页可选择游客、家庭演示或陪诊师演示。本机演示入口映射 `family-demo@kangban.local` / `escort-demo@kangban.local`，只保存在当前浏览器。另已在云端创建专用演示账号：`kangban-family-demo@example.com`、`kangban-escort-demo@example.com`；两者使用同一份仅供演示的口令，见交付说明。陪诊师账号已由管理员审核通过。游客只能看脱敏虚构社区帖。
 
 ### Supabase 配置与迁移
 
@@ -78,7 +78,7 @@ npx supabase@latest link --project-ref <your-project-ref>
 npx supabase@latest db push
 ```
 
-迁移已部署到 Supabase 项目 `kangban`（Mumbai），Project ref 为 `vlxdgdrjbomdarrkrctc`。三份迁移按顺序创建 17 张业务表、RLS、私有附件 bucket、社区/订单事务 RPC、家庭工作区快照和履约策略，并登记在 Supabase migration history。详见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。Auth 用户仍需注册；陪诊师需要管理员审核。
+迁移已部署到 Supabase 项目 `kangban`（Mumbai），Project ref 为 `vlxdgdrjbomdarrkrctc`。三份迁移按顺序创建 17 张业务表、RLS、私有附件 bucket、社区/订单事务 RPC、家庭工作区快照和履约策略，并登记在 Supabase migration history。详见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。已创建云端家庭与陪诊师演示账号；陪诊师账号已管理员审核通过。新注册陪诊师仍需管理员审核。
 
 4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
 5. 管理员审核陪诊师：先在 Supabase Auth 找到对应用户 ID，再在 SQL Editor 以管理员权限更新两处状态：
@@ -102,5 +102,5 @@ update public.profiles set account_status = 'active', updated_at = now() where i
 - **M1 数据层：**17 表、RLS、私有 bucket 与报名/确认 RPC，API 门面和本机回退。迁移已部署到 `kangban` 项目，并记录版本历史。
 - **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示入口映射专用演示邮箱但不创建真实云账号。
 - **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；后端实现报名、选人、双方确认、开始/完成/取消及标准清单事务。Pink 的本机需求大厅、分享码和收入模拟代码保留；真实云端任务分享码尚未接入，收入/评价目前仍属本机演示。
-- **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 进度记录。真实跨账号附件读写、跨设备预览与中断恢复尚未端到端验证；当前 Supabase 项目尚无用户或导入数据。
+- **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 进度记录。已用云端家庭与已审核陪诊师演示账号验证私有附件上传、同账号新会话读取、家庭医疗附件对未关联陪诊师拒绝访问、订单佐证仅对订单双方可读、匿名访问拒绝。验证写入了虚构演示订单和合成图片；迁移任务的断点续传尚未用真实导入中断场景端到端验证。
 - **Pink 能力对照：**需求大厅—保留并将云端社区作为唯一真实接单入口；履约清单—保留八项模板并在云端订单使用事务 RPC/佐证；任务分享码—保留本机实现，云端分享授权待接；收入与互评—保留本机模拟，真实支付/评价表与流程未实现。

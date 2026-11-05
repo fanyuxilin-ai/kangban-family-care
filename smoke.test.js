@@ -35,12 +35,30 @@ URL.createObjectURL = () => 'blob:mock';
 const fs = require('fs');
 const code = fs.readFileSync('app.js', 'utf8');
 const test = `
-;(function smoke() {
+;(async function smoke() {
   const out = [];
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) process.exitCode = 1; };
 
   /* 1. 应用加载：无异常即到达此处 */
   ok('app.js 加载且初始化完成', true);
+
+  /* 1a. 云端工作区可按附件路径从私有存储取回资料，不依赖原设备 IndexedDB */
+  const remoteBlob = new Blob(['synthetic test attachment'], { type: 'image/png' });
+  let requestedPath = '';
+  let uploadedPath = '';
+  window.KangbanAuth = { mode: 'cloud', session: { familyId: 'family-demo' } };
+  window.KangbanAPI = {
+    downloadPrivateFile: async path => { requestedPath = path; return remoteBlob; },
+    uploadPrivateFile: async (_file, path) => { uploadedPath = path; }
+  };
+  window.KangbanAuth.role = 'family';
+  await putAttachment('new-record', new File(['new report'], 'report.png', { type: 'image/png' }));
+  ok('云端家庭上传时保存私有附件路径', uploadedPath === 'family-demo/attachments/new-record-report.png' && state.cloudAttachmentPaths['new-record'] === uploadedPath);
+  state.cloudAttachmentPaths = { 'cloud-record-1': 'family-demo/legacy/cloud-record-1-report.png' };
+  const cloudFile = await getAttachment('cloud-record-1');
+  ok('云端附件从私有 Storage 跨设备读取', cloudFile?.blob === remoteBlob && requestedPath === state.cloudAttachmentPaths['cloud-record-1']);
+  delete window.KangbanAuth;
+  delete window.KangbanAPI;
 
   /* 2. 标准化履约清单（FR-09-2 / 4.1 模板） */
   const order = { id: 'order-t1', service: '全程陪诊', status: 'accepted', patient: '陈兰英', patientMemberId: 'm1', hospital: '市第一人民医院', date: '2026-11-10', need: '复诊陪同', reviews: { family: null, escort: null } };
