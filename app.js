@@ -2843,6 +2843,7 @@ document.addEventListener('click', async event => {
     window.authRegisterMode = !window.authRegisterMode;
     const form = document.getElementById('authForm');
     form.querySelector('.auth-name-field').hidden = !window.authRegisterMode;
+    document.getElementById('authForgotPassword').hidden = window.authRegisterMode;
     document.getElementById('authSubmit').textContent = window.authRegisterMode ? '注册并继续' : '登录';
     document.getElementById('authRegister').textContent = window.authRegisterMode ? '返回登录' : '创建账号';
     form.querySelector('[name="password"]').autocomplete = window.authRegisterMode ? 'new-password' : 'current-password';
@@ -3539,6 +3540,44 @@ if (!state.alertsSeeded) {
   }
   saveState();
 }
+function setPasswordRecoveryView(enabled) {
+  const isRecovery = !!enabled;
+  const form = document.getElementById('authForm');
+  const emailLabel = form?.querySelector('label:nth-of-type(1)');
+  const emailInput = form?.querySelector('[name="email"]');
+  const passwordLabel = form?.querySelector('label:nth-of-type(2) span');
+  const passwordInput = form?.querySelector('[name="password"]');
+  if (!form || !passwordInput) return;
+  emailLabel.hidden = isRecovery;
+  emailInput.required = !isRecovery;
+  emailInput.disabled = isRecovery;
+  document.getElementById('authRoleSwitch').hidden = isRecovery;
+  document.getElementById('authRegister').hidden = isRecovery || !!window.authRegisterMode;
+  document.getElementById('authForgotPassword').hidden = isRecovery || !!window.authRegisterMode;
+  document.getElementById('authDivider').hidden = isRecovery;
+  document.getElementById('authGuest').hidden = isRecovery;
+  document.getElementById('authDemos').hidden = isRecovery;
+  document.getElementById('authDisclaimer').hidden = isRecovery;
+  form.querySelector('.auth-name-field').hidden = isRecovery || !window.authRegisterMode;
+  passwordLabel.textContent = isRecovery ? '新密码' : '密码';
+  passwordInput.autocomplete = isRecovery ? 'new-password' : window.authRegisterMode ? 'new-password' : 'current-password';
+  passwordInput.placeholder = isRecovery ? '请设置至少 8 位新密码' : '至少 8 位';
+  passwordInput.value = '';
+  document.getElementById('authSubmit').textContent = isRecovery ? '保存新密码' : window.authRegisterMode ? '注册并继续' : '登录';
+}
+
+document.getElementById('authForgotPassword')?.addEventListener('click', async event => {
+  const button = event.currentTarget;
+  const email = document.querySelector('#authForm [name="email"]')?.value || '';
+  const message = document.getElementById('authMessage');
+  button.disabled = true; message.textContent = '正在发送重置邮件…';
+  try {
+    await window.KangbanAuth.requestPasswordReset(email);
+    message.textContent = '如果该邮箱已注册，密码重置邮件已发送。请在能打开本机康伴页面的电脑上打开邮件链接。';
+  } catch (error) { message.textContent = error.message || '重置邮件发送失败，请稍后重试。'; }
+  finally { button.disabled = false; }
+});
+
 document.getElementById('authForm')?.addEventListener('submit', async event => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -3546,9 +3585,15 @@ document.getElementById('authForm')?.addEventListener('submit', async event => {
   const button = document.getElementById('authSubmit');
   message.textContent = '正在连接…'; button.disabled = true;
   try {
-    if (window.authRegisterMode) {
+    if (window.KangbanAuth.isPasswordRecovery) {
+      await window.KangbanAuth.updatePassword(String(form.get('password') || ''));
+      window.authRegisterMode = false;
+      setPasswordRecoveryView(false);
+      event.currentTarget.reset();
+      message.textContent = '密码已更新，请使用新密码登录。';
+    } else if (window.authRegisterMode) {
       const result = await window.KangbanAuth.signUp({ email:String(form.get('email')||'').trim(), password:String(form.get('password')||''), displayName:String(form.get('displayName')||'康伴用户').trim(), role:window.selectedAuthRole||'family' });
-      if (result.pendingEmailConfirmation) message.textContent = '注册成功。请到邮箱完成验证，再返回此处登录。';
+      if (result.pendingEmailConfirmation) message.textContent = '注册成功。请到邮箱完成验证，再返回本机页面登录；若链接跳转页被拦截，请回到这里检查账号状态并登录。';
     } else {
       await window.KangbanAuth.signIn(String(form.get('email')||'').trim(),String(form.get('password')||''),window.selectedAuthRole||'family');
     }
@@ -3557,6 +3602,14 @@ document.getElementById('authForm')?.addEventListener('submit', async event => {
 });
 async function applyAuthSession(session) {
   const gate = document.getElementById('authGate');
+  if (window.KangbanAuth?.isPasswordRecovery) {
+    document.body.classList.remove('authenticated','guest-mode');
+    gate.hidden = false;
+    window.authRegisterMode = false;
+    setPasswordRecoveryView(true);
+    document.getElementById('authMessage').textContent = '请输入新密码并保存。';
+    return;
+  }
   if (!session) {
     document.body.classList.remove('authenticated','guest-mode'); gate.hidden = false;
     document.getElementById('familyTabs').hidden = false; document.getElementById('escortTabs').hidden = true;

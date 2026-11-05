@@ -8,6 +8,7 @@
   };
   let session = null;
   let mode = 'guest';
+  let passwordRecovery = false;
   function readLocal() {
     try { return JSON.parse(root.localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
   }
@@ -28,17 +29,29 @@
     get session() { return session; },
     get mode() { return mode; },
     get role() { return session?.role || 'guest'; },
+    get isPasswordRecovery() { return passwordRecovery; },
     get demoUsers() { return DEMO_USERS; },
     async initialize() {
       if (root.KangbanAPI?.isCloudEnabled()) {
+        const hashParams = new URLSearchParams(root.location.hash.replace(/^#/, ''));
+        const recoveryFromUrl = hashParams.get('type') === 'recovery' || new URLSearchParams(root.location.search).get('type') === 'recovery';
         const { data, error } = await root.KangbanAPI.client.auth.getSession();
         if (error) throw error;
         const user = data?.session?.user;
+        if (recoveryFromUrl && user) {
+          passwordRecovery = true; mode = 'cloud'; session = null;
+          root.KangbanAPI.client.auth.onAuthStateChange((event, next) => {
+            if (event === 'PASSWORD_RECOVERY') { passwordRecovery = true; mode = 'cloud'; session = null; emit(); }
+            else if (event === 'SIGNED_OUT' && !passwordRecovery) { session = null; mode = 'guest'; root.localStorage.removeItem(SESSION_KEY); emit(); }
+          });
+          emit(); return null;
+        }
         if (user) {
           session = await loadProfile(user, user.user_metadata?.role);
           mode = 'cloud';
-          root.KangbanAPI.client.auth.onAuthStateChange((_event, next) => {
-            if (!next) { session = null; mode = 'guest'; root.localStorage.removeItem(SESSION_KEY); emit(); }
+          root.KangbanAPI.client.auth.onAuthStateChange((event, next) => {
+            if (event === 'PASSWORD_RECOVERY') { passwordRecovery = true; session = null; mode = 'cloud'; emit(); }
+            else if (!next) { session = null; mode = 'guest'; root.localStorage.removeItem(SESSION_KEY); emit(); }
           });
           emit(); return session;
         }
@@ -51,7 +64,10 @@
     async signIn(email, password, requestedRole) {
       if (!root.KangbanAPI?.isCloudEnabled()) throw new Error('尚未配置 Supabase，当前不能使用真实账号登录；请选“游客体验”或本机演示账号。');
       const { data, error } = await root.KangbanAPI.client.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (error) {
+        if (error.message === 'Invalid login credentials') throw new Error('邮箱或密码不正确。若邮箱已确认，请核对注册密码，或使用“忘记密码”重置。');
+        throw error;
+      }
       const profile = await loadProfile(data.user, requestedRole);
       if (requestedRole && profile.role !== requestedRole) { await root.KangbanAPI.client.auth.signOut(); throw new Error('该账号角色与当前入口不符。'); }
       session = profile;
@@ -65,6 +81,26 @@
       if (!data.session) return { pendingEmailConfirmation: true };
       session = await loadProfile(data.user, role);
       mode = 'cloud'; emit(); return session;
+    },
+    async requestPasswordReset(email) {
+      if (!root.KangbanAPI?.isCloudEnabled()) throw new Error('尚未配置 Supabase，无法发送密码重置邮件。');
+      const address = String(email || '').trim();
+      if (!address) throw new Error('请先填写注册邮箱。');
+      const redirectTo = `${root.location.origin}${root.location.pathname}`;
+      const { error } = await root.KangbanAPI.client.auth.resetPasswordForEmail(address, { redirectTo });
+      if (error) throw error;
+      return true;
+    },
+    async updatePassword(newPassword) {
+      if (!passwordRecovery || !root.KangbanAPI?.isCloudEnabled()) throw new Error('请先通过密码重置邮件打开此页面。');
+      const { error } = await root.KangbanAPI.client.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      passwordRecovery = false;
+      await root.KangbanAPI.client.auth.signOut();
+      session = null; mode = 'guest';
+      root.history.replaceState({}, '', `${root.location.origin}${root.location.pathname}`);
+      emit();
+      return true;
     },
     enterGuest() {
       session = { mode: 'guest', role: 'guest', status: 'active', label: '游客体验' }; mode = 'guest';
