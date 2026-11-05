@@ -2601,19 +2601,32 @@ function showDailyLog(memberId) {
     <p class="privacy-small">正式版中血糖仪、血压计、体温计、手表各自通过厂商接口接入，数据自动归到对应家庭成员名下。</p>`);
 }
 
-function navigate(tab) {
+function navigate(tab, fromPop = false) {
   if (window.KangbanAuth?.role === 'guest' && tab !== 'community') tab = 'community';
   if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'escort' && tab !== 'community') tab = 'community';
   if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family' && tab.startsWith('escort')) tab = 'home';
   if (state.currentRole === 'escort' && !tab.startsWith('escort')) tab = 'escort';
   if (state.currentRole !== 'escort' && tab.startsWith('escort')) tab = 'home';
+  const changed = currentTab !== tab;
   currentTab = tab;
   document.body.classList?.toggle('guest-mode', window.KangbanAuth?.role === 'guest');
   document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === `view-${tab}`));
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (tab === 'community') renderCommunity();
+  /* 页面切换进历史栈：浏览器/手机返回手势可回上一层 */
+  if (!fromPop && changed) { try { history.pushState({ kangbanTab: tab }, ''); } catch { /* 历史接口不可用时静默降级 */ } }
 }
+/* 返回上一层：浏览器历史统一接管（页面 Tab + 弹窗） */
+let modalHistoryActive = false;
+window.addEventListener('popstate', event => {
+  if (modalHistoryActive) { closeModal(true); return; }
+  const tab = event.state?.kangbanTab;
+  if (tab && tab !== currentTab) navigate(tab, true);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && modalHistoryActive) closeModal();
+});
 function toast(message) {
   const el = document.getElementById('toast'); el.textContent = message; el.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2300);
@@ -2622,13 +2635,23 @@ function openModal(content) {
   document.getElementById('modalContent').innerHTML = content;
   document.getElementById('modalBackdrop').hidden = false;
   document.body.style.overflow = 'hidden';
+  /* 弹窗也进历史栈：手机返回手势 / 浏览器后退 = 关闭当前弹窗回到上一层 */
+  if (!modalHistoryActive) { try { history.pushState({ kangbanModal: true }, ''); } catch { /* 忽略 */ } }
+  modalHistoryActive = true;
 }
-function closeModal() {
+function closeModal(fromPop = false) {
+  const wasOpen = modalHistoryActive;
   document.getElementById('modalBackdrop').hidden = true;
   document.body.style.overflow = '';
   stopListening();
   if (preVisitRecorder?.state === 'recording') preVisitRecorder.stop();
   if (preVisitAttachmentUrl) { URL.revokeObjectURL(preVisitAttachmentUrl); preVisitAttachmentUrl = null; }
+  if (wasOpen && !fromPop && history.state?.kangbanModal) {
+    modalHistoryActive = false;
+    history.back(); /* 触发 popstate 后由 closeModal(true) 收尾 */
+    return;
+  }
+  modalHistoryActive = false;
 }
 async function showLocalImportPreview() {
   const raw = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; } })();
@@ -4128,6 +4151,8 @@ async function applyAuthSession(session) {
   renderRole();
   if (session.role === 'guest') navigate('community');
   else navigate(session.role === 'escort' ? 'escort' : 'home');
+  /* 登录后重置历史栈基线：从这里开始记录返回层级 */
+  try { history.replaceState({ kangbanTab: currentTab }, ''); } catch { /* 忽略 */ }
 }
 window.addEventListener('kangban:auth-change', event => { applyAuthSession(event.detail.session); });
 if (window.KangbanAuth) window.KangbanAuth.initialize().then(applyAuthSession).catch(error => {
