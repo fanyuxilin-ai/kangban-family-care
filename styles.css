@@ -404,3 +404,4 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 body:not(.authenticated) .app-shell{display:none}
 .import-count-list{display:grid;gap:8px;margin:18px 0}.import-count-list>div{display:flex;justify-content:space-between;padding:11px 12px;border-radius:10px;background:#f5f5ef;font-size:12px}.import-count-list strong{color:var(--deep)}
 .cloud-escort-mode #familyTabs [data-tab]:not([data-tab=community]){display:none}
+.migration-status{margin:12px 0;padding:12px 14px;border-radius:12px;background:#edf2eb;color:var(--deep);font-size:11px}.migration-status>strong{display:block;margin-bottom:6px}.migration-status>div{display:grid;gap:3px;padding-top:7px}.migration-status small{color:var(--muted);line-height:1.5}

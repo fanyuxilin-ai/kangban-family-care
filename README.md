@@ -23,7 +23,7 @@
 
 ## 技术与数据说明
 
-康伴为静态网页应用，可作为 PWA 添加到手机主屏幕。资料、提醒、预约和附件保存在当前设备浏览器本机，不会自动同步到云端或进入 Git 仓库。陪诊角色、预约和授权界面为本机模拟，没有真实账号、跨设备同步、服务人员核验或线上派单。
+康伴为静态网页应用，可作为 PWA 添加到手机主屏幕。未配置 Supabase 时，现有家庭与陪诊师演示仍保存在当前浏览器。配置后支持 Supabase Auth、家庭云端工作区、社区报名/订单工作流和私有附件存储；云端订单基于真实账号与 RLS。陪诊师资质审核仍由项目管理员在 Supabase 管理端完成。
 
 OCR 在本机浏览器运行。首次使用时需要加载并缓存识别组件，之后可离线识别。清晰印刷体通常更适合自动识别；医生手写中文无法保证准确，识别结果必须人工核对。可信度较低时不会自动填充资料字段或开放用药提醒生成。PDF 目前作为附件保存，字段需手动录入。
 
@@ -57,3 +57,50 @@ python3 -m http.server 4173
 ## 共同开发
 
 请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。仓库尚未选择开源许可证；公开仓库便于查看与协作，若要允许公众按特定条件复用代码，需要由项目维护者另行选择许可证。
+
+## 登录、社区与 Supabase 云端
+
+### 本机演示模式
+
+1. Node.js 18+；仓库根目录运行 `node scripts/generate-supabase-config.mjs`。
+2. 运行 `python3 -m http.server 4173`，打开 `http://localhost:4173`。
+3. 登录页可选择游客、家庭演示或陪诊师演示。演示入口映射 `family-demo@kangban.local` / `escort-demo@kangban.local`，**只保存在当前浏览器，不是可登录 Supabase 的账号**。游客只能看脱敏虚构社区帖。
+
+### Supabase 配置与迁移
+
+1. 在 Supabase 建立项目，配置 Auth 邮箱登录及本地/部署站点的 Redirect URLs。
+2. 将 `.env.example` 复制为 `.env`，只填写 Project URL 和 publishable key。运行 `node scripts/generate-supabase-config.mjs` 生成本地忽略文件。浏览器包不读取数据库密码、access token、service-role key 或 secret key。
+3. 安装/登录 Supabase CLI 后执行：
+
+```sh
+npx supabase@latest login
+npx supabase@latest link --project-ref <your-project-ref>
+npx supabase@latest db push
+```
+
+迁移按顺序建立 17 张业务表、RLS 与私有 Storage、社区事务 RPC，以及家庭工作区快照和订单履约 RPC。当前开发环境未登录 Supabase CLI、没有项目数据库密码，因此尚未对远程项目执行迁移或创建云端账号。
+
+4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
+5. 管理员审核陪诊师：先在 Supabase Auth 找到对应用户 ID，再在 SQL Editor 以管理员权限更新两处状态：
+
+```sql
+update public.escort_profiles set review_status = 'approved', updated_at = now() where user_id = '<auth-user-uuid>';
+update public.profiles set account_status = 'active', updated_at = now() where id = '<auth-user-uuid>';
+```
+
+普通用户更新资料的权限不包括 `role` 或审核状态。当前没有单独的审核管理页面。
+
+### 数据导入与社区边界
+
+- 登录家庭账号后进入「社区」，点「导入本机演示数据」先查看类别/数量；确认后导入成员和云端工作区快照，将 IndexedDB 附件上传到私有 bucket，并用 `migration_runs` 保存进度和重试游标。
+- 云端社区公开卡片只放医院、日期、服务类型和通用摘要；患者称呼、成员 ID 和详细需求放在 `community_post_details`，由家庭成员及已选订单的陪诊师授权读取。
+- 家庭在「社区」发布需求；陪诊师在同一社区报名并发布可约时段；家庭选人后生成订单，再由双方确认。订单区提供开始服务、Pink 的八项标准履约清单与必传佐证、完成/取消状态。`Companion → 需求大厅` 保留原本机演示；登录云端后该入口引导到共用云端社区，避免本地数据与云端订单混在一起。
+- 云端家庭页面的数据写入该家庭受 RLS 保护的工作区快照；社区、成员索引、订单和迁移记录另有关系表。访客数据不写入云端。
+
+## 本次里程碑与已知边界
+
+- **M1 数据层：**17 表、RLS、私有 bucket 与报名/确认 RPC，API 门面和本机回退。尚未连接 Supabase 项目实际执行迁移。
+- **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示入口映射专用演示邮箱但不创建真实云账号。
+- **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；后端实现报名、选人、双方确认、开始/完成/取消及标准清单事务。Pink 的本机需求大厅、分享码和收入模拟代码保留；真实云端任务分享码尚未接入，收入/评价目前仍属本机演示。
+- **M4 迁移：**列出类别数量、确认后导入、附件上传私有 Storage、migration_runs 进度记录。跨设备附件预览链接和中断恢复尚未在真实 Supabase 项目上端到端验证。
+- **Pink 能力对照：**需求大厅—保留并将云端社区作为唯一真实接单入口；履约清单—保留八项模板并在云端订单使用事务 RPC/佐证；任务分享码—保留本机实现，云端分享授权待接；收入与互评—保留本机模拟，真实支付/评价表与流程未实现。

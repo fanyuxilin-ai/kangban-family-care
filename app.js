@@ -1425,6 +1425,17 @@ async function renderCommunity() {
     }
   }
   if (auth?.mode === 'cloud') renderCloudOrders();
+  if (auth?.mode === 'cloud' && !escort) renderMigrationSummary();
+}
+async function renderMigrationSummary() {
+  const host=document.getElementById('migrationStatus'); if(!host) return;
+  try {
+    const runs=await window.KangbanAPI.select('migration_runs',{filters:{user_id:window.KangbanAuth.session.user.id},order:{column:'created_at',ascending:false},limit:3});
+    if(!runs.length){host.hidden=true;host.innerHTML='';return;}
+    const labels={pending:'等待导入',running:'正在导入',failed:'上次导入中断，可续传',completed:'最近一次导入已完成'};
+    host.hidden=false;
+    host.innerHTML=`<strong>本机数据迁移记录</strong>${runs.map(run=>`<div><span>${esc(labels[run.status]||run.status)} · ${esc(new Date(run.created_at).toLocaleString('zh-CN'))}</span><small>${Object.entries(run.category_counts||{}).map(([key,count])=>`${esc(key)} ${Number(count)||0}`).join(' · ')}</small></div>`).join('')}`;
+  } catch(error) { host.hidden=false; host.textContent=`迁移记录暂不可用：${error.message||error}`; }
 }
 async function renderCloudEscortProfile() {
   const host=document.getElementById('cloudEscortProfile'); if(!host) return;
