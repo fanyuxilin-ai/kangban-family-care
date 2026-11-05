@@ -57,6 +57,7 @@
     async select(table, options = {}) {
       assertTable(table);
       if (client) {
+        if (table === 'companion_orders') throw new Error('云端订单须通过权限受限的 list_my_companion_orders 接口读取。');
         let query = client.from(table).select(options.columns || '*');
         if (options.filters) for (const [column, value] of Object.entries(options.filters)) query = query.eq(column, value);
         if (options.order) query = query.order(options.order.column, { ascending: options.order.ascending !== false });
@@ -76,6 +77,36 @@
       const inserted = { id: row.id || (root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : `local-${Date.now()}-${Math.random().toString(16).slice(2)}`), ...row };
       state[key] = [...rows, inserted]; writeState(state); return inserted;
     },
+    async upsert(table, rows, options = {}) {
+      assertTable(table);
+      const batch = Array.isArray(rows) ? rows : [rows];
+      if (client) return runCloud(client.from(table).upsert(rows, options).select());
+      const { state, key, rows: current } = localRows(table);
+      const conflictColumns = String(options.onConflict || '').split(',').map(value => value.trim()).filter(Boolean);
+      const next = current.slice();
+      const saved = batch.map(row => {
+        const index = conflictColumns.length ? next.findIndex(existing => conflictColumns.every(column => row[column] != null && existing[column] === row[column])) : -1;
+        if (index < 0) {
+          const inserted = { id: row.id || (root.crypto && root.crypto.randomUUID ? root.crypto.randomUUID() : `local-${Date.now()}`), ...row };
+          next.push(inserted); return inserted;
+        }
+        next[index] = { ...next[index], ...row }; return next[index];
+      });
+      state[key] = next; writeState(state); return saved;
+    },
+    async updateWhere(table, filters, patch) {
+      assertTable(table);
+      if (!filters || !Object.keys(filters).length) throw new Error('批量更新必须指定筛选条件。');
+      if (client) {
+        let query = client.from(table).update(patch);
+        for (const [column, value] of Object.entries(filters)) query = query.eq(column, value);
+        return runCloud(query.select());
+      }
+      const { state, key, rows } = localRows(table);
+      const matched = rows.filter(row => Object.entries(filters).every(([column, value]) => row[column] === value));
+      for (const row of matched) Object.assign(row, patch);
+      state[key] = rows; writeState(state); return matched;
+    },
     async update(table, id, patch) {
       assertTable(table);
       if (client) return runCloud(client.from(table).update(patch).eq('id', id).select().single());
@@ -92,7 +123,7 @@
       state[key] = next; writeState(state); return { removed: rows.length - next.length };
     },
     async rpc(name, args = {}) {
-      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
+      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user','list_my_companion_orders','create_order_task_share','revoke_order_task_share','lookup_order_task_share','submit_companion_order_review','list_pending_escorts','review_escort_account'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
       if (!client) throw new Error('本机演示模式不执行云端事务 RPC。');
       return runCloud(client.rpc(name, args));
     },

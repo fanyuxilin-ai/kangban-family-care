@@ -23,7 +23,7 @@
       familyId = memberships[0]?.family_id || null;
       if (!familyId) familyId = await root.KangbanAPI.rpc('ensure_family_for_current_user');
     }
-    return { user, role: profile.role || fallbackRole || 'family', status: profile.account_status || 'active', familyId, displayName: profile.display_name };
+    return { user, role: profile.role || fallbackRole || 'family', status: profile.account_status || 'active', familyId, displayName: profile.display_name, isAdmin: user.app_metadata?.kangban_admin === true };
   }
   const api = {
     get session() { return session; },
