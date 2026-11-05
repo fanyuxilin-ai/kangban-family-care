@@ -12,6 +12,8 @@
 
 康伴是一个手机优先的家庭就医协同原型，包含 Supabase 云端登录、社区订单及私有附件演示。没有接入真实医院、支付或医疗服务；内置病例与公开演示订单均为虚构样例。
 
+**公开体验：**[打开当前 main 版本](https://fanyuxilin-ai.github.io/kangban-family-care/)。代码合并到 `main` 后，GitHub Actions 会自动更新该页面；无需选择旧功能分支预览。
+
 ## 当前功能
 
 - **家庭端五 Tab 分区：**家庭端按功能域分为「首页 / 健康档案 / 医疗资料 / 陪诊 / 我的」五个 Tab——首页只放状态与入口，健康档案承载档案概览、日常记录与健康趋势，医疗资料承载就医信息卡、就诊准备、分享码、资料库与保险报销入口，陪诊承载陪诊服务全流程，我的承载家庭成员、AI 助手与设备管理入口。
@@ -90,7 +92,7 @@ npx supabase@latest link --project-ref sytwoulwwzfuslrgorvw
 npx supabase@latest db push
 ```
 
-本机 `.env` 与 Supabase CLI 链接均指向上述项目。当前六份迁移已部署并与远端迁移历史对齐；不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移记录与待完成人工步骤见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
+本机 `.env` 与 Supabase CLI 链接均指向上述项目。仓库当前有十份迁移文件；其中前七份曾通过 Management API 确认部署，后三份新增迁移的远端状态需先核对再决定是否部署。不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移记录与待办见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
 
 4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
 5. 配置可信管理员：在 Supabase Auth 找到受信任账号的用户 ID，在 SQL Editor 由项目所有者执行以下语句。该声明保存在 Auth `app_metadata`，普通用户不能自行修改；管理员需退出并重新登录以刷新 JWT。
@@ -112,7 +114,7 @@ where id = '<trusted-auth-user-uuid>';
 
 ## 本次里程碑与已知边界
 
-- **M1 数据层：**17 表、RLS、私有 bucket 与事务 RPC 已部署到当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）；六份本地迁移文件已按远端版本对齐。
+- **M1 数据层：**核心 17 表、RLS、私有 bucket 与事务 RPC 已部署到当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）；仓库有十份迁移文件，后三份相对既有远端记录的应用状态待核对。
 - **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示账号仅在本浏览器使用；云端演示账号由管理员脚本创建，脚本只从环境变量读取 service-role key。
 - **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；云端支持报名、选人、双方确认、开始/完成/取消、标准清单、受分享码保护的任务详情、双方私有互评。Pink 本机大厅、分享码及收入模拟保留；收入仍是模拟金额，不涉及真实支付。
 - **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 游标与失败状态。附件读写、跨账号权限和导入中断续传需在当前统一项目上重新验证。
