@@ -479,7 +479,7 @@ function renderHealth() {
       return `<article class="member-archive ${open ? 'is-open' : ''}">
         <button class="member-archive-head" data-member-toggle="${member.id}" aria-expanded="${open}">
           <span class="member-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span>
-          <div class="member-archive-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age}岁 · ${entries.length} 条指标${tracking.length ? ` · <b class="member-alert-count">${tracking.length} 项异常跟踪</b>` : ' · 无异常'}</small></div>
+          <div class="member-archive-title"><strong>${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age != null && member.age !== '' ? `${member.age}岁` : '年龄未填写'} · ${entries.length} 条指标${tracking.length ? ` · <b class="member-alert-count">${tracking.length} 项异常跟踪</b>` : ' · 无异常'}</small></div>
           <span class="member-chevron">${open ? '⌃' : '⌄'}</span>
         </button>
         ${open ? `<div class="member-archive-body">
@@ -502,6 +502,82 @@ function renderHealth() {
       </article>`;
     }).join('');
   }
+}
+
+function showFamilyMemberAdd() {
+  openModal(`${modalHead('家庭健康档案', '新增家庭成员', '新成员加入后，可单独维护健康档案，并在医疗资料和陪诊预约中选择。年龄与健康信息可稍后补充。')}
+    <form class="member-edit-form" id="familyMemberAddForm">
+      <label><span class="field-label-block">姓名</span><input class="input-field" name="name" maxlength="40" required placeholder="请输入姓名" /></label>
+      <label><span class="field-label-block">与家庭关系</span><input class="input-field" name="role" maxlength="20" required placeholder="例如：父亲、女儿" /></label>
+      <label><span class="field-label-block">年龄（选填）</span><input class="input-field" name="age" type="number" min="0" max="120" inputmode="numeric" placeholder="请输入年龄" /></label>
+      <label><span class="field-label-block">慢病情况（选填）</span><input class="input-field" name="conditions" maxlength="200" placeholder="例如：高血压" /></label>
+      <label><span class="field-label-block">过敏史（选填）</span><input class="input-field" name="allergies" maxlength="200" placeholder="例如：青霉素过敏；不清楚可填写未知" /></label>
+      <label><span class="field-label-block">长期用药（选填）</span><input class="input-field" name="medications" maxlength="300" placeholder="药名及用法，按医嘱填写" /></label>
+      <label><span class="field-label-block">手术史（选填）</span><input class="input-field" name="surgeries" maxlength="200" placeholder="无手术史可填写无" /></label>
+      <button class="primary-button" type="submit">保存并加入家庭</button>
+    </form><p class="privacy-small">只填写你愿意在家庭档案中共同维护的信息。演示数据保存在当前浏览器；登录家庭账号后保存至该家庭空间。</p>`);
+  const form = document.getElementById('familyMemberAddForm');
+  form?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    const values = new FormData(form);
+    const name = String(values.get('name') || '').trim();
+    const role = String(values.get('role') || '').trim();
+    const ageText = String(values.get('age') || '').trim();
+    const age = ageText ? Number(ageText) : null;
+    if (!name || !role || (age !== null && (!Number.isInteger(age) || age < 0 || age > 120))) {
+      toast('请填写姓名和家庭关系；年龄须为 0–120 的整数。');
+      if (submit) submit.disabled = false;
+      return;
+    }
+    const id = `member-${rootCryptoId()}`;
+    const member = {
+      id, name, role, age,
+      conditions: String(values.get('conditions') || '').trim(),
+      allergies: String(values.get('allergies') || '').trim(),
+      medications: String(values.get('medications') || '').trim(),
+      surgeries: String(values.get('surgeries') || '').trim(),
+      avatarClass: `member-avatar-${(state.familyMembers.length % 4) + 1}`
+    };
+    const auth = window.KangbanAuth;
+    let cloudRow = null;
+    try {
+      if (auth?.mode === 'cloud') {
+        if (!auth.session?.familyId) throw new Error('家庭空间尚未建立，请重新登录后再试。');
+        cloudRow = await window.KangbanAPI.insert('family_members', {
+          family_id: auth.session.familyId,
+          legacy_id: member.id,
+          name: member.name,
+          relationship: member.role,
+          age: member.age,
+          health_profile: { conditions: member.conditions, allergies: member.allergies, medications: member.medications, surgeries: member.surgeries },
+          display_order: state.familyMembers.length
+        });
+      }
+      state.familyMembers.push(member);
+      state.currentMemberId = member.id;
+      expandedMembers.add(member.id);
+      saveState();
+      if (auth?.mode === 'cloud' && auth.session?.familyId) {
+        clearTimeout(workspaceSaveTimer);
+        await window.KangbanAPI.saveFamilyWorkspace(auth.session.familyId, state);
+      }
+      renderHealth(); renderDocs(); renderRole(); closeModal();
+      toast(`${name}已加入家庭`);
+    } catch (error) {
+      state.familyMembers = state.familyMembers.filter(item => item.id !== member.id);
+      expandedMembers.delete(member.id);
+      saveState();
+      if (cloudRow?.id) window.KangbanAPI.remove('family_members', cloudRow.id).catch(() => {});
+      if (submit) submit.disabled = false;
+      toast(`添加失败：${error.message || error}`);
+    }
+  });
+}
+
+function rootCryptoId() {
+  return window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function showMemberEdit(memberId) {
@@ -2866,7 +2942,7 @@ function showRoleSwitcher() {
     <div class="role-choice-list">
       ${state.familyMembers.map(member => {
         const isCurrent = state.currentRole === 'family' && state.currentMemberId === member.id;
-        return `<button class="role-choice" data-member="${member.id}"><span class="role-choice-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span><span><strong>家庭端 · ${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age}岁 · ${esc(member.conditions)}</small></span><b>${isCurrent ? '当前' : '进入 →'}</b></button>`;
+        return `<button class="role-choice" data-member="${member.id}"><span class="role-choice-avatar ${member.avatarClass}">${esc(member.name.slice(0, 1))}</span><span><strong>家庭端 · ${esc(member.name)}</strong><small>${esc(member.role)} · ${member.age != null && member.age !== '' ? `${member.age}岁` : '年龄未填写'} · ${esc(member.conditions || '健康信息待补充')}</small></span><b>${isCurrent ? '当前' : '进入 →'}</b></button>`;
       }).join('')}
       <button class="role-choice" data-role="escort"><span class="role-choice-avatar escort-choice-avatar">${esc(state.companionProfile.name.slice(0,1))}</span><span><strong>陪诊员端 · ${esc(state.companionProfile.name)}</strong><small>编辑介绍、回应预约、完成陪诊、评价家庭</small></span><b>${state.currentRole === 'escort' ? '当前' : '进入 →'}</b></button>
     </div><p class="privacy-small">家庭端内切换成员只改变操作视角（操作留痕显示当前成员）；数据仍全体家人共享。预约数据保存在这台设备的浏览器中。</p>`);
@@ -3013,6 +3089,7 @@ document.addEventListener('click', async event => {
   const nav = event.target.closest('[data-nav]');
   if (nav) { navigate(nav.dataset.nav); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
+  if (action === 'family-member-add') { showFamilyMemberAdd(); return; }
   if (action === 'availability-form') showAvailabilityForm();
   if (action === 'upload') { uploadMemberId = event.target.closest('[data-upload-member]')?.dataset.uploadMember || ''; showUpload(); }
   if (action === 'medications') showMedicationManager();
