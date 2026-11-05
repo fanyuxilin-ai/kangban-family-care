@@ -1,11 +1,12 @@
-name: Deploy three branch previews
+name: Deploy current branch previews
 
 on:
   push:
     branches:
       - main
-      - feat/family-tab-restructure
+      - feat/docs-by-member
       - feat/family-member-management
+      - codex/fix-pages-preview
   workflow_dispatch:
 
 permissions:
@@ -29,11 +30,11 @@ jobs:
         with:
           ref: main
           path: sources/main
-      - name: Check out family tab branch
+      - name: Check out docs by member branch
         uses: actions/checkout@v4
         with:
-          ref: feat/family-tab-restructure
-          path: sources/family-tab-restructure
+          ref: feat/docs-by-member
+          path: sources/docs-by-member
       - name: Check out family member branch
         uses: actions/checkout@v4
         with:
@@ -42,12 +43,12 @@ jobs:
       - name: Assemble previews
         shell: bash
         run: |
-          mkdir -p _site/main _site/family-tab-restructure _site/family-member-management
+          mkdir -p _site/main _site/docs-by-member _site/family-member-management
           rsync -a --exclude='.git' sources/main/ _site/main/
-          rsync -a --exclude='.git' sources/family-tab-restructure/ _site/family-tab-restructure/
+          rsync -a --exclude='.git' sources/docs-by-member/ _site/docs-by-member/
           rsync -a --exclude='.git' sources/family-member-management/ _site/family-member-management/
           sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-main-v1';/" _site/main/app.js
-          sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-family-tab-v1';/" _site/family-tab-restructure/app.js
+          sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-docs-by-member-v1';/" _site/docs-by-member/app.js
           sed -E -i "s/const STORAGE_KEY = '[^']*';/const STORAGE_KEY = 'kangban-preview-family-member-v1';/" _site/family-member-management/app.js
           cat > _site/index.html <<'HTML'
           <!doctype html>
@@ -73,7 +74,7 @@ jobs:
             <p>选择一个版本查看。分支更新后，预览会自动刷新。</p>
             <ul>
               <li><a href="main/"><span>主线版本<small>main</small></span><span>打开 →</span></a></li>
-              <li><a href="family-tab-restructure/"><span>家庭端改版<small>feat/family-tab-restructure</small></span><span>打开 →</span></a></li>
+              <li><a href="docs-by-member/"><span>资料与分享改进<small>feat/docs-by-member</small></span><span>打开 →</span></a></li>
               <li><a href="family-member-management/"><span>我的改动<small>feat/family-member-management</small></span><span>打开 →</span></a></li>
             </ul>
           </main>
