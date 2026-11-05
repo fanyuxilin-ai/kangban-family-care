@@ -395,3 +395,5 @@ button.panel-head{width:100%;text-align:left;background:transparent;border:0;pad
 .task-share-scope{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px}
 .task-share-code{font-size:30px!important;letter-spacing:10px;text-align:center;color:#3d4f42;margin:10px 0 4px!important}
 .task-share-scope .share-toggle small{font-size:8.5px}
+.api-mode-notice{position:fixed;z-index:50;top:env(safe-area-inset-top,0px);left:50%;transform:translateX(-50%);width:min(680px,calc(100% - 24px));padding:8px 12px;border-radius:0 0 12px 12px;background:#fff1d9;color:#77531f;font-size:11px;line-height:1.45;text-align:center;box-shadow:0 3px 12px rgba(30,40,30,.08)}
+.api-mode-notice.api-mode-cloud{background:#e8f1e8;color:#48634d}

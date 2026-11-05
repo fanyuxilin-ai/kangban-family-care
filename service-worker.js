@@ -1,5 +1,5 @@
-const CACHE_NAME = 'kangban-iteration-baseline-16';
-const CORE_ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg', './vendor/tesseract.min.js', './vendor/worker.min.js', './vendor/tesseract-core-simd-lstm.wasm.js', './vendor/tesseract-core-simd-lstm.wasm', './vendor/lang/chi_sim.traineddata.gz', './vendor/lang/eng.traineddata.gz', './samples/虚构血常规报告.png', './samples/虚构服药医嘱.png'];
+const CACHE_NAME = 'kangban-m1-data-layer-17';
+const CORE_ASSETS = ['./', './index.html', './styles.css', './app.js', './api.js', './manifest.webmanifest', './icon.svg', './vendor/tesseract.min.js', './vendor/worker.min.js', './vendor/tesseract-core-simd-lstm.wasm.js', './vendor/tesseract-core-simd-lstm.wasm', './vendor/lang/chi_sim.traineddata.gz', './vendor/lang/eng.traineddata.gz', './samples/虚构血常规报告.png', './samples/虚构服药医嘱.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS)));
   self.skipWaiting();

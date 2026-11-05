@@ -3,6 +3,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+supabase-config.js
+supabase/.temp/
 node_modules/
 dist/
 *.log
