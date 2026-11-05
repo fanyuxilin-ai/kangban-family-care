@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=22" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -15,20 +15,42 @@
       <a class="brand" href="#home" aria-label="康伴"><span class="brand-mark"><i></i><b></b></span><span>康伴</span></a>
       <p class="eyebrow">家庭就医协同</p><h1 id="authTitle">和家人一起，把就医准备做好</h1>
       <p class="subtle">登录后使用家庭资料与社区。游客只能浏览脱敏的虚构内容。</p>
-      <div class="auth-role-switch" id="authRoleSwitch"><button type="button" data-auth-role="family" class="selected">家属登录</button><button type="button" data-auth-role="escort">陪诊师登录</button></div>
       <form id="authForm" class="auth-form">
-        <label><span>邮箱</span><input class="input-field" name="email" type="email" autocomplete="username" required placeholder="name@example.com"></label>
-        <label><span>密码</span><input class="input-field" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label>
-        <label class="auth-name-field" hidden><span>称呼</span><input class="input-field" name="displayName" maxlength="24" placeholder="怎么称呼你"></label>
+        <div class="auth-login-panel" id="authLoginPanel">
+          <label><span>邮箱</span><input class="input-field" name="email" type="email" autocomplete="username" required placeholder="name@example.com"></label>
+          <label><span>密码</span><input class="input-field" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label>
+        </div>
+        <div class="auth-register-panel" id="authRegisterPanel" hidden>
+          <div class="auth-register-step" id="authRegisterRoleStep">
+            <p class="auth-step-label">第一步 · 选择账号类型</p>
+            <div class="role-choice-list">
+              <button class="role-choice selected" type="button" data-auth-role="family"><span class="role-choice-avatar">家</span><span><strong>家庭账号</strong><small>整理家庭就医资料与陪诊需求</small></span><b>选择</b></button>
+              <button class="role-choice" type="button" data-auth-role="escort"><span class="role-choice-avatar escort-choice-avatar">陪</span><span><strong>陪诊师账号</strong><small>接收家庭需求并管理陪诊服务</small></span><b>选择</b></button>
+            </div>
+            <button class="text-button auth-register-back" id="authRegisterCancel" type="button">返回登录</button>
+          </div>
+          <div class="auth-register-step" id="authRegisterCredentials" hidden>
+            <p class="auth-step-label">第二步 · 创建登录信息</p>
+            <label><span>邮箱</span><input class="input-field" name="registerEmail" type="email" autocomplete="email" placeholder="name@example.com"></label>
+            <label><span>密码</span><input class="input-field" name="registerPassword" type="password" autocomplete="new-password" minlength="8" placeholder="至少 8 位"></label>
+            <label><span>确认密码</span><input class="input-field" name="passwordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="再次输入密码"></label>
+            <button class="text-button auth-register-back" id="authRegisterBack" type="button">返回选择账号类型</button>
+          </div>
+        </div>
         <p class="auth-message" id="authMessage" role="status"></p>
         <button class="primary-button" id="authSubmit" type="submit">登录</button>
-        <button class="text-button auth-register" id="authForgotPassword" type="button">忘记密码？发送重置邮件</button>
-        <button class="text-button auth-register" id="authRegister" type="button">创建账号</button>
+        <button class="secondary-button auth-register" id="authRegister" type="button">创建账号</button>
+        <p class="auth-reset-notice" id="authResetNotice">演示版密码重置请联系管理员</p>
+        <button class="text-button" id="authForgotPassword" type="button" hidden>发送重置邮件</button>
       </form>
-      <div class="auth-divider" id="authDivider"><span>也可以先体验演示</span></div>
-      <button type="button" class="secondary-button auth-guest" id="authGuest" data-auth-guest>游客体验（脱敏社区）</button>
-      <div class="auth-demos" id="authDemos"><p>本机演示账号（不登录云端）</p><button type="button" data-auth-demo="family">家庭演示</button><button type="button" data-auth-demo="escort">陪诊师演示</button></div>
-      <p class="demo-disclaimer" id="authDisclaimer">演示账号仅保存在本机；云端数据需真实账号登录。</p>
+      <details class="auth-experience" id="authExperience">
+        <summary>先逛逛 <span>⌄</span></summary>
+        <div class="auth-experience-actions">
+          <button type="button" data-auth-guest>游客体验（脱敏社区）</button>
+          <button type="button" data-auth-cloud-demo="family">家庭演示账号一键登录</button>
+          <button type="button" data-auth-cloud-demo="escort">陪诊师演示账号一键登录</button>
+        </div>
+      </details>
     </div>
   </section>
   <div class="app-shell">
@@ -50,31 +72,35 @@
           <button class="icon-button" id="bellButton" aria-label="通知">♧<span class="notify-dot"></span></button>
         </div>
 
-        <div class="hero-card">
-          <div class="hero-top"><span class="pill pill-light"><span class="status-dot"></span> 家庭档案已就绪</span><span class="hero-spark">✳</span></div>
-          <p class="hero-kicker">下一次就诊</p>
-          <h2>市第一人民医院</h2>
-          <div class="appointment-meta"><span>心内科 · 复诊</span><span class="meta-divider"></span><span id="nextVisitDate">即将复诊</span></div>
-          <button class="hero-action" data-action="appointment">查看就诊准备 <span>→</span></button>
+        <div id="homeTodayBar"></div>
+        <div id="homeTodoQueue"></div>
+
+        <div class="hero-card" id="homeHeroCard">
+          <div id="homeHeroBody"></div>
           <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
         </div>
 
+        <section class="section-block" id="homeMemberSection" hidden>
+          <div class="section-heading"><div><p class="eyebrow">家人今天怎么样</p><h2>成员状态</h2></div><button class="text-button" data-nav="health">健康档案 <span>→</span></button></div>
+          <div id="homeMemberStrip" class="member-strip"></div>
+        </section>
+
         <section class="section-block alerts-section collapsible" data-panel="home-alerts">
-          <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测</p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-alerts" aria-label="折叠或展开">▾</button></div>
+          <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测 <span class="local-data-badge" hidden>⌂ 本机数据</span></p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-alerts" aria-label="折叠或展开">▾</button></div>
           <div class="section-body"><div id="homeAlerts"></div></div>
         </section>
 
         <section class="section-block quick-section">
           <div class="section-heading"><div><p class="eyebrow">现在可以做</p><h2>常用服务</h2></div></div>
           <div class="quick-grid">
-            <button class="quick-item" data-action="upload"><span class="quick-icon icon-upload">↥</span><strong>整理资料</strong><small>拍照或语音补充</small></button>
-            <button class="quick-item" data-action="share"><span class="quick-icon icon-share">⌁</span><strong>就诊分享</strong><small>由妈妈授权查看</small></button>
-            <button class="quick-item" data-action="companion"><span class="quick-icon icon-heart">♡</span><strong>预约陪诊</strong><small>需要时有人陪伴</small></button>
+            <button class="quick-item" data-action="add-reading"><span class="quick-icon icon-upload">↥</span><strong>录入读数</strong><small>手动 / 语音 / 拍照</small></button>
+            <button class="quick-item" data-action="home-share"><span class="quick-icon icon-share">⌁</span><strong>生成分享码</strong><small>给陪诊师临时授权</small></button>
+            <button class="quick-item" data-action="home-demand"><span class="quick-icon icon-heart">♡</span><strong>发布陪诊需求</strong><small>社区发单等报名</small></button>
           </div>
         </section>
 
         <section class="section-block medication-section collapsible" data-panel="home-medication">
-          <div class="section-heading"><div><p class="eyebrow">服药、测量、活动与自定义事项</p><h2>今日提醒</h2></div><button class="text-button" data-action="reminders">查看全部 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-medication" aria-label="折叠或展开">▾</button></div>
+          <div class="section-heading"><div><p class="eyebrow">服药、测量、活动与自定义事项 <span class="local-data-badge" hidden>⌂ 本机数据</span></p><h2>今日提醒</h2></div><button class="text-button" data-action="reminders">查看全部 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-medication" aria-label="折叠或展开">▾</button></div>
           <div class="section-body"><div id="homeMedicationReminders"></div><button class="secondary-button reminder-add-home" data-action="add-reminder">＋ 新增自定义提醒</button></div>
         </section>
         <div class="privacy-note"><span>✳</span><span>健康资料仅在你授权后分享，你可以随时撤回。</span></div>
@@ -94,6 +120,7 @@
 
       <section class="view" id="view-companion">
         <div class="page-heading"><p class="eyebrow">有人同行，心里更踏实</p><h1>陪诊服务</h1><p class="subtle">先把需要说清楚，服务人员会与你确认安排。</p></div>
+        <div id="companionLiveOrders" hidden></div>
         <div class="companion-intro"><div class="companion-art"><span class="sun"></span><span class="person person-a"></span><span class="person person-b"></span><span class="bench"></span><span class="leaf leaf-a">✦</span><span class="leaf leaf-b">✳</span></div><div class="companion-intro-copy"><strong>就诊当天，安心有人陪</strong><p>陪同取号、院内引导、检查陪同和就诊后信息交接。</p></div></div>
         <section class="section-block collapsible" data-panel="companion-profile">
           <div class="section-heading"><div><p class="eyebrow">演示陪诊员</p><h2>认识服务人员</h2></div><button class="section-collapse" data-panel-toggle="companion-profile" aria-label="折叠或展开">▾</button></div>
@@ -101,7 +128,7 @@
         </section>
         <div id="companionOrders"></div>
         <section class="section-block collapsible" data-panel="demand-posts">
-          <div class="section-heading"><div><p class="eyebrow">社区需求区 · 招募陪诊</p><h2>陪诊需求大厅</h2></div><button class="text-button" data-action="demand-form">发布需求 →</button><button class="section-collapse" data-panel-toggle="demand-posts" aria-label="折叠或展开">▾</button></div>
+          <div class="section-heading"><div><p class="eyebrow">社区需求区 · 招募陪诊</p><h2>陪诊需求大厅</h2></div><div class="community-publish-group"><button class="text-button compact-button" data-action="my-posts" id="familyMyPostsButton" hidden>我的发布</button><button class="text-button" data-action="demand-form">发布需求 →</button></div><button class="section-collapse" data-panel-toggle="demand-posts" aria-label="折叠或展开">▾</button></div>
           <div class="section-body"><div id="demandPostList"></div></div>
         </section>
         <section class="section-block collapsible" data-panel="companion-services">
@@ -119,17 +146,18 @@
 
       <section class="view" id="view-community">
         <div class="page-heading"><p class="eyebrow">康伴社区 · 隐私优先</p><h1>社区</h1><p class="subtle">家庭发布陪诊需求，审核通过的陪诊师报名；患者资料仅在家庭选定并确认后开放。</p></div>
-        <div class="community-toolbar"><div class="community-filters"><button class="selected" data-community-filter="all">全部</button><button data-community-filter="demand">陪诊需求</button><button data-community-filter="availability">可预约时段</button></div><button class="secondary-button compact-button" data-action="demand-form">＋ 发布需求</button></div>
+        <div class="community-toolbar"><div class="community-filters"><button class="selected" data-community-filter="all">全部</button><button data-community-filter="demand">陪诊需求</button><button data-community-filter="availability">可预约时段</button><select id="communityRegion" class="community-region-select"><option value="all">全部区域</option></select></div></div>
       <div class="community-status" id="communityStatus"></div>
       <div id="migrationStatus" class="migration-status" hidden></div>
-      <div id="cloudEscortProfile"></div>
       <div class="community-cloud-orders" id="communityOrders"></div>
       <div id="communityFeed"></div>
-        <div class="boundary-note"><strong>与陪诊员端需求大厅的分工</strong><p>本页是家庭与陪诊师共用的社区入口；Pink 的「需求大厅」保留为陪诊师接单工作台，继续承接需求应征、订单和履约，不另建平行接单功能。</p></div>
+        <div class="boundary-note"><strong>社区与工作台的分工</strong><p>社区负责「撮合」：发需求、发时段、报名与预约。成单之后，家庭在「陪诊」Tab、陪诊师在「工作台」跟踪进度与回传状态。</p></div>
       </section>
 
       <section class="view" id="view-escort">
-        <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 演示角色</p><h1>预约与服务</h1><p class="subtle">查看预约、回应需求，并记录陪诊完成情况。</p></div>
+        <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 云端</p><h1>今天的服务</h1><p class="subtle">接单、回传进度，一切同步给发单家庭。</p></div>
+        <div id="escortWorkbenchCloud" hidden></div>
+        <div id="escortWorkbenchLocal">
         <div class="escort-status-card"><div><span class="eyebrow">当前接单状态</span><strong id="escortAvailabilityLabel">可预约</strong><small id="escortAvailabilityText">家庭可以向你提交预约申请</small></div><button class="secondary-button compact-button" data-action="toggle-availability" id="availabilityButton">暂停接单</button></div>        <div class="escort-stat-grid"><div><strong id="escortPendingCount">0</strong><span>待确认</span></div><div><strong id="escortAcceptedCount">0</strong><span>待服务</span></div><div><strong id="escortCompletedCount">0</strong><span>已完成</span></div></div>
         <div class="income-strip" id="escortIncomeStrip"></div>
         <div class="task-share-card" id="escortTaskShareCard">
@@ -139,6 +167,7 @@
         </div>
         <div id="escortOrders" class="escort-order-list"></div>
         <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。只查看家属明确分享的本次预约信息。</p></div>
+        </div>
       </section>
 
       <section class="view" id="view-escort-hall">
@@ -148,7 +177,9 @@
       </section>
 
       <section class="view" id="view-escort-profile">
-        <div class="page-heading"><p class="eyebrow">陪诊员个人资料 · 演示角色</p><h1>自我介绍</h1><p class="subtle">让家庭了解你的陪诊经验、服务范围和可预约时间。</p></div>
+        <div class="page-heading"><p class="eyebrow">陪诊员个人资料</p><h1>自我介绍</h1><p class="subtle">让家庭了解你的陪诊经验、服务范围和可预约时间。</p></div>
+        <div id="cloudEscortProfileView" hidden></div>
+        <div id="escortProfileLocal">
         <div class="escort-stat-grid escort-stat-grid-bio"><div><strong id="escortBioCompleted">0</strong><span>已完成订单</span></div><div><strong id="escortBioIncome">¥0</strong><span>累计收入（模拟）</span></div><div><strong id="escortBioRating">新加入</strong><span>家庭评分</span></div></div>
         <form class="escort-profile-form" id="escortProfileForm">
           <label><span class="field-label-block">姓名 / 称呼</span><input class="input-field" name="name" id="escortNameInput" maxlength="24" required /></label>
@@ -159,6 +190,7 @@
           <button class="primary-button" type="submit">保存演示资料</button>
         </form>
         <div class="boundary-note"><strong>资料说明</strong><p>当前内容保存在本机浏览器，仅用于演示角色切换，不代表真实服务资质核验。</p></div>
+        </div>
       </section>
 
       <section class="view" id="view-me">
@@ -187,6 +219,11 @@
       <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
       <button class="tab" data-tab="escort-hall"><span class="tab-icon">☁</span><span>需求大厅</span></button>
       <button class="tab" data-tab="escort-profile"><span class="tab-icon">◉</span><span>我的介绍</span></button>
+    </nav>
+    <nav class="tabbar" aria-label="云端陪诊师主导航" id="cloudEscortTabs" hidden>
+      <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
+      <button class="tab" data-tab="community"><span class="tab-icon">◎</span><span>社区</span></button>
+      <button class="tab" data-tab="escort-profile"><span class="tab-icon">◉</span><span>我的</span></button>
     </nav>
   </div>
 
@@ -218,7 +255,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="api.js?v=4"></script>
-  <script src="auth.js?v=4"></script>
-  <script src="app.js?v=22"></script>
+  <script src="auth.js?v=5"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

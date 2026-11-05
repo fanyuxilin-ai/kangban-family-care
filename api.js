@@ -123,7 +123,7 @@
       state[key] = next; writeState(state); return { removed: rows.length - next.length };
     },
     async rpc(name, args = {}) {
-      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user','list_my_companion_orders','create_order_task_share','revoke_order_task_share','lookup_order_task_share','submit_companion_order_review','list_pending_escorts','review_escort_account'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
+      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user','list_my_companion_orders','create_order_task_share','revoke_order_task_share','lookup_order_task_share','submit_companion_order_review','list_pending_escorts','review_escort_account','book_availability','respond_availability_booking','cancel_my_booking','cancel_my_post','update_availability','list_my_availability_bookings'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
       if (!client) throw new Error('本机演示模式不执行云端事务 RPC。');
       return runCloud(client.rpc(name, args));
     },
