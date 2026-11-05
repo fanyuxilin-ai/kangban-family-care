@@ -474,3 +474,6 @@ body:not(.authenticated) .app-shell{display:none}
 .applicant-ops .primary-button.compact,.applicant-ops .secondary-button.compact{min-height:32px;height:32px;padding:6px 10px;font-size:10px}
 .signup-review{display:grid;gap:10px}
 .signup-review-label{font-size:9px;font-weight:700;letter-spacing:.08em;color:#8fa093;text-transform:uppercase;margin-top:2px}
+/* 发布与管理操作归位：我的页/需求大厅的操作行 */
+.profile-action-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
+.profile-action-row .primary-button,.profile-action-row .secondary-button{margin:0;min-height:40px}

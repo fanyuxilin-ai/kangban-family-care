@@ -1564,21 +1564,7 @@ async function renderCommunity() {
   const guest = auth?.role === 'guest';
   const escort = auth?.role === 'escort';
   const status = document.getElementById('communityStatus');
-  const publishButton = document.getElementById('communityPublishButton');
-  const myPostsButton = document.querySelector('.community-toolbar [data-action="my-posts"]');
-  if (myPostsButton) myPostsButton.hidden = guest || auth?.mode !== 'cloud';
-  if (publishButton) {
-    const canPublishAvailability = auth?.mode === 'cloud' && escort && auth.session?.status === 'active';
-    if (guest) {
-      publishButton.dataset.action = 'logout';
-      publishButton.textContent = '登录后可发布';
-      publishButton.hidden = false;
-    } else {
-      publishButton.dataset.action = canPublishAvailability ? 'availability-form' : 'demand-form';
-      publishButton.textContent = canPublishAvailability ? '＋ 发布可约时段' : '＋ 发布需求';
-      publishButton.hidden = auth?.mode === 'cloud' && escort && auth.session?.status !== 'active';
-    }
-  }
+  /* 发布与管理操作已归位：家庭在「陪诊·需求大厅」，陪诊师在「我的」页；社区只负责浏览与筛选 */
   const reviewNotice = escort && auth?.mode === 'cloud' && auth.session?.status === 'pending_review' ? '陪诊师账号正在等待审核；审核通过前不能发布时段或报名。' : '';
   if (status) status.innerHTML = guest ? '游客模式 · 仅展示脱敏虚构社区内容 <button class="text-button" data-action="logout">切换登录 →</button>' : auth?.mode === 'cloud' ? '正在加载云端社区…' : '本机演示社区 · 数据保存在当前浏览器';
   let posts = [];
@@ -1656,7 +1642,7 @@ async function renderCloudEscortProfile() {
     if(!profile){host.innerHTML='<div class="empty-hint">陪诊师资料尚未初始化，请重新登录。</div>';return;}
     const approved=profile.review_status==='approved';
     const paused=profile.available===false;
-    host.innerHTML=`<div class="escort-status-card"><div><span class="eyebrow">接单状态 · 云端</span><strong>${paused?'暂停接单':'可预约'}</strong><small>${paused?'家庭暂时不能预约你的可约时段':'社区页可被家庭预约你的可约时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused?'1':'0'}">${paused?'恢复接单':'暂停接单'}</button></div><section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍 · ${approved?'已审核':'待审核'}</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">可约时段在「社区」页发布与管理。审核通过前不能报名或发布时段。</p></section>`;
+    host.innerHTML=`<div class="escort-status-card"><div><span class="eyebrow">接单状态 · 云端</span><strong>${paused?'暂停接单':'可预约'}</strong><small>${paused?'家庭暂时不能预约你的可约时段':'恢复后家庭可预约你的可约时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused?'1':'0'}">${paused?'恢复接单':'暂停接单'}</button></div><div class="profile-action-row"><button class="primary-button" data-action="availability-form">＋ 发布可约时段</button><button class="secondary-button" data-action="my-posts">我的发布</button></div>${approved?'':'<p class="privacy-small">账号审核通过后才能发布时段或报名需求。</p>'}<section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍 · ${approved?'已审核':'待审核'}</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">可约时段与发布的帖子都在本页管理；社区页供家庭浏览与预约。</p></section>`;
   } catch(error){host.innerHTML=`<div class="empty-hint">陪诊师资料加载失败：${esc(error.message||error)}</div>`;}
 }
 function showAvailabilityForm(post = null) {
@@ -2156,6 +2142,8 @@ function createVisitReminderFromReport(order, nextVisitDate, nextVisitNote) {
 async function renderCompanionViews() {
   /* 云端模式：陪诊师 → 云端工作台；家庭 → 陪诊 Tab 实时动态。本地演示 DOM 全部让位 */
   const cloudAuth = window.KangbanAuth;
+  const familyMyPosts = document.getElementById('familyMyPostsButton');
+  if (familyMyPosts) familyMyPosts.hidden = cloudAuth?.mode !== 'cloud' || cloudAuth?.role === 'escort';
   if (cloudAuth?.mode === 'cloud') {
     const localOrders = document.getElementById('companionOrders');
     if (localOrders) localOrders.hidden = true;
