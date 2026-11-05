@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'kangban-demo-v7';
+let activeStorageKey = STORAGE_KEY;
 function dateOffset(days) {
   const date = new Date(); date.setHours(12,0,0,0); date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -198,10 +199,12 @@ let preVisitRecordingStream = null;
 let preVisitAudioChunks = [];
 let preVisitAttachmentUrl = null;
 let evidenceTarget = null;
+let communityFilter = 'all';
+let cloudEvidenceTarget = null;
 
 function loadState() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const saved = JSON.parse(localStorage.getItem(activeStorageKey) || '{}');
     const loaded = { ...seed, ...saved };
     loaded.currentRole = saved.currentRole === 'escort' ? 'escort' : 'family';
     loaded.companionProfile = { ...seed.companionProfile, ...(saved.companionProfile || {}) };
@@ -243,7 +246,16 @@ function loadState() {
     return loaded;
   } catch { return structuredClone(seed); }
 }
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+let workspaceSaveTimer = null;
+function saveState() {
+  const snapshot = JSON.stringify(state);
+  localStorage.setItem(activeStorageKey, snapshot);
+  const auth = window.KangbanAuth;
+  if (auth?.mode === 'cloud' && auth.session?.familyId) {
+    clearTimeout(workspaceSaveTimer);
+    workspaceSaveTimer = setTimeout(() => window.KangbanAPI.saveFamilyWorkspace(auth.session.familyId, state).catch(error => toast(`云端保存失败：${error.message || error}`)), 300);
+  }
+}
 function attachmentDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('kangban-demo-attachments', 1);
@@ -1353,13 +1365,109 @@ function demandPostStatusChip(status) {
   const map = { '招募中': 'record-status', '已接单': 'record-status', '服务中': 'record-status', '已完成': 'record-status', '已取消': 'record-status' };
   return `<span class="${map[status] || 'record-status'}">${esc(status)}</span>`;
 }
+const GUEST_COMMUNITY_FEED = [
+  { id: 'guest-post-1', type: 'demand', status: 'open', service_type: '检查陪同', hospital_name: '市第一人民医院', service_date: dateOffset(6), summary: '需要一位陪诊员协助完成检查流程与院内引导', author_label: '家庭用户', region: '本地' },
+  { id: 'guest-post-2', type: 'demand', status: 'open', service_type: '取药与报告', hospital_name: '市中医院', service_date: dateOffset(9), summary: '希望协助取药、领取报告并整理就诊材料', author_label: '家庭用户', region: '本地' }
+];
+const POST_STATUS_LABEL = { open: '招募中', has_applicants: '有人报名', awaiting_confirmation: '待双方确认', confirmed: '已确认', in_service: '服务中', completed: '服务完成', cancelled: '已取消', closed: '已关闭' };
+function renderCommunityPost(post, { guest = false, escort = false } = {}) {
+  const status = POST_STATUS_LABEL[post.status] || post.status;
+  const isDemand = post.type === 'demand' || !post.type;
+  const summary = guest ? (post.type === 'availability' ? '陪诊员提供就医流程协助，可预约咨询' : post.summary || '家庭发布陪诊需求') : (post.summary || post.need || '陪诊服务信息');
+  const privateActions = !guest && post.id && !String(post.id).startsWith('guest-');
+  return `<article class="demand-post-card community-post" data-community-type="${isDemand ? 'demand' : 'availability'}">
+    <div class="family-order-top"><strong>${esc(post.service_type || post.service || (isDemand ? '陪诊需求' : '可预约时段'))} · ${esc(guest ? '家庭用户' : (post.author_label || post.requester || '家庭用户'))}</strong>${demandPostStatusChip(status)}</div>
+    <p>${esc(post.hospital_name || post.hospital || post.region || '本地')} · ${esc(post.service_date || post.date || '时间待沟通')}<br>${esc(summary)}${post.budget_min || post.budget ? `<br>预算：${esc(post.budget || `¥${post.budget_min}${post.budget_max ? `–${post.budget_max}` : ''}`)}` : ''}</p>
+    ${guest ? '<small class="privacy-small">游客仅查看脱敏虚构内容，登录后可发布或报名。</small>' : ''}
+    ${privateActions && escort && isDemand && ['open','has_applicants'].includes(post.status) ? `<button class="primary-button" data-community-apply="${esc(post.id)}">报名陪诊需求</button>` : ''}
+    ${privateActions && !escort && post.status === 'has_applicants' ? `<div class="community-applicants" data-applicants-for="${esc(post.id)}"><small>加载报名信息…</small></div>` : ''}
+    ${privateActions && !escort && ['awaiting_confirmation','confirmed','in_service'].includes(post.status) ? `<small class="privacy-small">家庭确认陪诊员后，患者资料只对家庭成员和已选陪诊员开放。</small>` : ''}
+  </article>`;
+}
+async function renderCommunity() {
+  const host = document.getElementById('communityFeed');
+  if (!host) return;
+  const auth = window.KangbanAuth;
+  const guest = auth?.role === 'guest';
+  const escort = auth?.role === 'escort';
+  const status = document.getElementById('communityStatus');
+  const publishButton = document.querySelector('.community-toolbar [data-action]');
+  if (publishButton) {
+    const canPublishAvailability = auth?.mode === 'cloud' && escort && auth.session?.status === 'active';
+    publishButton.dataset.action = canPublishAvailability ? 'availability-form' : 'demand-form';
+    publishButton.textContent = canPublishAvailability ? '＋ 发布可约时段' : '＋ 发布需求';
+    publishButton.hidden = guest || (auth?.mode === 'cloud' && escort);
+  }
+  const reviewNotice = escort && auth?.mode === 'cloud' && auth.session?.status === 'pending_review' ? '陪诊师账号正在等待审核；审核通过前不能发布时段或报名。' : '';
+  if (status) status.innerHTML = guest ? '游客模式 · 仅展示脱敏虚构社区内容 <button class="text-button" data-action="logout">切换登录 →</button>' : auth?.mode === 'cloud' ? '正在加载云端社区…' : '本机演示社区 · 数据保存在当前浏览器';
+  let posts = [];
+  try {
+    if (guest) posts = GUEST_COMMUNITY_FEED;
+    else if (auth?.mode === 'cloud') {
+      if (escort) await renderCloudEscortProfile();
+      posts = await window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 });
+      if (!escort) {
+        const mine = posts.filter(post => post.family_id === auth.session?.familyId);
+        const signupsByPost = await Promise.all(mine.map(async post => ({ post, signups: await window.KangbanAPI.select('post_signups', { filters: { post_id: post.id, status: 'applied' } }) })));
+        const profiles = await window.KangbanAPI.select('escort_profiles');
+        const profileById = Object.fromEntries(profiles.map(profile=>[profile.user_id,profile]));
+        for (const { post, signups } of signupsByPost) post._applicants = signups.map(signup=>({...signup,display_name:profileById[signup.escort_id]?.display_name||'待核验陪诊师'}));
+      }
+    } else posts = (state.demandPosts || []).map(post => ({ ...post, type: 'demand', status: ({ '招募中':'open','已接单':'confirmed','服务中':'in_service','已完成':'completed','已取消':'cancelled' })[post.status] || post.status }));
+  } catch (error) { if (status) status.textContent = `社区加载失败：${error.message || error}`; }
+  if (auth?.mode === 'cloud' && status && !status.textContent.startsWith('社区加载失败')) status.innerHTML = `${reviewNotice || `云端社区 · ${escort ? '陪诊师' : '家庭'}账号`}${!escort ? ' <button class="text-button" data-action="local-import">导入本机演示数据 →</button>' : ''}`;
+  posts = posts.filter(post => communityFilter === 'all' || (communityFilter === 'demand' ? (post.type === 'demand' || !post.type) : post.type === 'availability'));
+  host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => renderCommunityPost(post, { guest, escort })).join('')}</div>` : '<div class="empty-hint">目前没有社区内容。你可以发布陪诊需求。</div>';
+  if (auth?.mode === 'cloud' && !escort) {
+    for (const post of posts.filter(item => item._applicants?.length)) {
+      const applicantBox = host.querySelector(`[data-applicants-for="${CSS.escape(post.id)}"]`);
+      if (applicantBox) applicantBox.innerHTML = `<p class="privacy-small">${post._applicants.length} 位陪诊师报名</p>${post._applicants.map(signup => `<button class="secondary-button" data-community-confirm="${esc(signup.id)}">${esc(signup.display_name)} · 查看介绍并确认</button>`).join('')}`;
+    }
+  }
+  if (auth?.mode === 'cloud') renderCloudOrders();
+}
+async function renderCloudEscortProfile() {
+  const host=document.getElementById('cloudEscortProfile'); if(!host) return;
+  try {
+    const [profile]=await window.KangbanAPI.select('escort_profiles',{filters:{user_id:window.KangbanAuth.session.user.id},limit:1});
+    if(!profile){host.innerHTML='<div class="empty-hint">陪诊师资料尚未初始化，请重新登录。</div>';return;}
+    const approved=profile.review_status==='approved';
+    host.innerHTML=`<section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍 · ${approved?'已审核':'待审核'}</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">可约时间通过下方「发布可约时段」管理。审核通过前不能报名或发布时段。</p></section>`;
+  } catch(error){host.innerHTML=`<div class="empty-hint">陪诊师资料加载失败：${esc(error.message||error)}</div>`;}
+}
+function showAvailabilityForm() {
+  if (window.KangbanAuth?.mode !== 'cloud' || window.KangbanAuth?.role !== 'escort' || window.KangbanAuth.session?.status !== 'active') { toast('陪诊师账号审核通过后才可发布可约时段'); return; }
+  openModal(`${modalHead('陪诊师社区', '发布可预约时段', '只展示服务区域、日期与服务类型，不发布个人证件或患者信息。')}
+    <form class="order-form" id="availabilityForm"><label><span class="field-label-block">服务区域</span><input class="input-field" name="region" maxlength="100" required placeholder="例如：深圳南山区"></label><label><span class="field-label-block">可约日期</span><input class="input-field" name="date" type="date" value="${dateOffset(3)}" required></label><label><span class="field-label-block">开始时间</span><input class="input-field" name="start" type="time" value="09:00" required></label><label><span class="field-label-block">结束时间</span><input class="input-field" name="end" type="time" value="12:00" required></label><button class="primary-button" type="submit">发布时段</button></form>`);
+}
+async function renderCloudOrders() {
+  const host = document.getElementById('communityOrders');
+  if (!host || window.KangbanAuth?.mode !== 'cloud') return;
+  const session = window.KangbanAuth.session;
+  const filters = window.KangbanAuth.role === 'escort' ? { escort_id: session.user.id } : { family_id: session.familyId };
+  try {
+    const orders = await window.KangbanAPI.select('companion_orders', { filters, order: { column: 'created_at', ascending: false }, limit: 50 });
+    if (!orders.length) { host.innerHTML = ''; return; }
+    const html = `<section class="section-block"><div class="section-heading"><div><p class="eyebrow">云端订单</p><h2>我的陪诊安排</h2></div></div><div class="demand-post-list">${orders.map(order => {
+      const items = order.execution?.items || [];
+      const checklist = order.status === 'in_service' && isEscort ? `<div class="exec-list">${items.map(item => `<div class="exec-row ${item.done?'is-done':''}">${item.done?'✓':'○'}<div class="exec-copy"><strong>${esc(item.label)}</strong><small>${item.done?'已完成':item.evidence_required?'需上传佐证照片':'待执行'}</small></div>${!item.done ? item.evidence_required ? `<button class="exec-evidence" data-cloud-evidence="${esc(item.key)}" data-order-id="${esc(order.id)}">上传佐证</button>` : `<button class="exec-toggle" data-cloud-task="${esc(item.key)}" data-order-id="${esc(order.id)}">完成</button>` : ''}</div>`).join('')}</div>` : '';
+      const actions = order.status === 'pending_escort_confirmation' ? `<button class="primary-button" data-cloud-order-confirm="${esc(order.id)}">确认订单</button>`
+        : order.status === 'confirmed' && isEscort ? `<button class="primary-button" data-cloud-order-transition="start" data-order-id="${esc(order.id)}">开始服务</button>`
+        : order.status === 'in_service' && isEscort ? `${items.every(item=>item.done) ? `<button class="primary-button" data-cloud-order-transition="complete" data-order-id="${esc(order.id)}">完成服务</button>` : '<small class="privacy-small">请按 Pink 的八项标准履约清单完成服务记录。</small>'}` : '';
+      const cancel = ['pending_escort_confirmation','confirmed','in_service'].includes(order.status) ? `<button class="text-button" data-cloud-order-transition="cancel" data-order-id="${esc(order.id)}">取消订单</button>` : '';
+      return `<article class="demand-post-card"><div class="family-order-top"><strong>${esc(order.service_type)} · ${esc(POST_STATUS_LABEL[order.status] || order.status)}</strong></div><p>${esc(order.hospital_name)} · ${esc(order.service_date)}<br>${esc(order.need_summary || '')}</p>${checklist}${actions}${cancel}</article>`;
+    }).join('')}</div></section>`;
+    host.innerHTML = html;
+  } catch (error) { toast(`订单加载失败：${error.message || error}`); }
+}
 function renderDemandPosts() {
   const host = document.getElementById('demandPostList');
   if (!host) return;
+  if (window.KangbanAuth?.mode === 'cloud') { host.innerHTML='<div class="empty-hint">云端陪诊需求统一在「社区」发布、报名与确认，避免本地演示数据和云端订单混用。<button class="text-button" data-nav="community">打开云端社区 →</button></div>'; return; }
   const posts = state.demandPosts || [];
   host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => `
     <article class="demand-post-card">
-      <div class="family-order-top"><strong>${esc(post.service)} · ${esc(post.patient)}</strong>${demandPostStatusChip(post.status)}</div>
+      <div class="family-order-top"><strong>${esc(post.service)} · ${window.KangbanAuth?.role === 'guest' ? '家庭用户' : esc(post.patient)}</strong>${demandPostStatusChip(post.status)}</div>
       <p>${esc(post.hospital)} · ${esc(post.date)}<br>需求：${esc(post.need || '未补充')}${post.budget ? `<br>预算：${esc(post.budget)}` : ''}</p>
       <small class="privacy-small">发布人：${esc(post.requester || '家庭成员')} · 需求帖不含任何健康档案信息。</small>
       ${post.status === '招募中' ? `<div class="order-actions"><button class="secondary-button" data-demand-cancel="${esc(post.id)}">取消需求</button></div>` : ''}
@@ -1386,6 +1494,7 @@ function showDemandForm() {
 function renderEscortHall() {
   const host = document.getElementById('escortHallList');
   if (!host) return;
+  if (window.KangbanAuth?.mode === 'cloud') { host.innerHTML='<div class="empty-hint">需求大厅已与云端社区合并。Pink 的需求、报名、确认、履约清单和订单状态都在社区的「云端订单」区处理。<button class="text-button" data-nav="community">打开云端社区 →</button></div>'; return; }
   const posts = state.demandPosts || [];
   const recruiting = posts.filter(post => post.status === '招募中');
   const others = posts.filter(post => post.status !== '招募中');
@@ -1405,6 +1514,10 @@ function renderEscortHall() {
       </article>`).join('')}</div>` : ''}`;
 }
 function acceptDemandPost(postId) {
+  if (window.KangbanAuth?.mode === 'cloud') {
+    window.KangbanAPI.rpc('apply_to_demand', { p_post_id: postId, p_note: '' }).then(() => { toast('报名已提交，家庭确认后会生成订单'); renderCommunity(); }).catch(error => toast(error.message || '报名失败'));
+    return;
+  }
   const post = (state.demandPosts || []).find(item => item.id === postId);
   if (!post || post.status !== '招募中') { toast('这条需求已被处理'); return; }
   if (!state.companionProfile.available) { toast('你已暂停接单，请先在工作台恢复接单'); return; }
@@ -1634,18 +1747,26 @@ function renderCompanionViews() {
 }
 
 function renderRole() {
+  if (window.KangbanAuth?.mode === 'cloud') state.currentRole = window.KangbanAuth.role;
   const isEscort = state.currentRole === 'escort';
+  const cloudEscort = window.KangbanAuth?.mode === 'cloud' && isEscort;
   const member = currentMember();
   document.getElementById('roleAvatar').textContent = isEscort ? state.companionProfile.name.slice(0, 1) : (member?.name.slice(0, 1) || '家');
   document.getElementById('roleLabel').textContent = isEscort ? `陪诊员端 · ${state.companionProfile.name}` : `家庭端 · ${member?.name || '家人'}`;
-  document.getElementById('familyTabs').hidden = isEscort;
-  document.getElementById('escortTabs').hidden = !isEscort;
+  document.getElementById('familyTabs').hidden = isEscort && !cloudEscort;
+  document.getElementById('escortTabs').hidden = !isEscort || cloudEscort;
+  document.body.classList?.toggle('cloud-escort-mode',cloudEscort);
+  const guest = window.KangbanAuth?.role === 'guest';
+  document.getElementById('familyTabs').hidden = guest || isEscort;
+  document.querySelector('#profileSwitch')?.classList.toggle('auth-hidden', guest || window.KangbanAuth?.mode === 'cloud');
+  document.querySelector('#logoutButton')?.classList.toggle('auth-hidden', !window.KangbanAuth?.session || guest);
   const greetName = document.querySelector('#view-home .greeting-row h1 span');
   if (greetName && member) greetName.textContent = member.name;
   renderCompanionViews();
 }
 
 function setRole(role) {
+  if (window.KangbanAuth?.mode === 'cloud') { toast('云端账号角色由注册身份确定，不能在这里切换'); return; }
   state.currentRole = role === 'escort' ? 'escort' : 'family';
   saveState();
   renderRole();
@@ -2169,12 +2290,17 @@ function showDailyLog(memberId) {
 }
 
 function navigate(tab) {
+  if (window.KangbanAuth?.role === 'guest' && tab !== 'community') tab = 'community';
+  if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'escort' && tab !== 'community') tab = 'community';
+  if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family' && tab.startsWith('escort')) tab = 'home';
   if (state.currentRole === 'escort' && !tab.startsWith('escort')) tab = 'escort';
   if (state.currentRole !== 'escort' && tab.startsWith('escort')) tab = 'home';
   currentTab = tab;
+  document.body.classList?.toggle('guest-mode', window.KangbanAuth?.role === 'guest');
   document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === `view-${tab}`));
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (tab === 'community') renderCommunity();
 }
 function toast(message) {
   const el = document.getElementById('toast'); el.textContent = message; el.classList.add('show');
@@ -2191,6 +2317,66 @@ function closeModal() {
   stopListening();
   if (preVisitRecorder?.state === 'recording') preVisitRecorder.stop();
   if (preVisitAttachmentUrl) { URL.revokeObjectURL(preVisitAttachmentUrl); preVisitAttachmentUrl = null; }
+}
+async function showLocalImportPreview() {
+  const raw = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; } })();
+  const attachments = await getAllAttachments().catch(() => []);
+  const rows = [
+    ['家庭成员', raw.familyMembers?.length || 0], ['医疗资料', raw.records?.length || 0], ['体检指标', raw.bodyMetrics?.length || 0],
+    ['保单与报销', (raw.insurancePolicies?.length || 0) + (raw.reimbursements?.length || 0)], ['服药与自定义提醒', (raw.medications?.length || 0) + (raw.customReminders?.length || 0)],
+    ['陪诊预约与需求', (raw.companionOrders?.length || 0) + (raw.demandPosts?.length || 0)], ['本机附件', attachments.length]
+  ];
+  openModal(`${modalHead('数据迁移 · 可续传', '导入本机演示数据', '先核对类别和数量。确认后会把本机资料写入当前家庭云空间，并将 IndexedDB 附件上传到私有 Storage。只导入虚构演示资料。')}
+    <div class="import-count-list">${rows.map(([label,count]) => `<div><span>${esc(label)}</span><strong>${count}</strong></div>`).join('')}</div>
+    <p class="privacy-small">导入记录会保存在 migration_runs；中断后可以重新点击导入并从已完成的附件继续。当前账号的云端空间会被本机状态快照更新。</p>
+    <button class="primary-button" id="confirmLocalImport">确认导入并继续</button><button class="secondary-button" id="cancelLocalImport">取消</button>`);
+}
+async function getAllAttachments() {
+  if (!('indexedDB' in window)) return [];
+  const db = await attachmentDb();
+  const rows = await new Promise((resolve,reject) => { const request=db.transaction('files','readonly').objectStore('files').getAll(); request.onsuccess=()=>resolve(request.result||[]); request.onerror=()=>reject(request.error); });
+  db.close(); return rows;
+}
+async function importLocalWorkspace() {
+  const auth = window.KangbanAuth.session;
+  const source = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; } })();
+  const attachments=await getAllAttachments();
+  const fingerprint=JSON.stringify({state:source,files:attachments.map(file=>({id:file.id,name:file.name,type:file.type,size:file.blob?.size||0,savedAt:file.savedAt||''}))});
+  const digest = crypto.subtle ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fingerprint)))).map(byte=>byte.toString(16).padStart(2,'0')).join('') : `length-${fingerprint.length}`;
+  const sourceVersion = 'kangban-demo-v7';
+  let run = (await window.KangbanAPI.select('migration_runs', { filters: { user_id: auth.user.id, source_version: sourceVersion, source_hash: digest }, limit: 1 }))[0];
+  const counts = { members: source.familyMembers?.length||0, records: source.records?.length||0, metrics: source.bodyMetrics?.length||0, daily_entries: (source.customReminders?.length||0)+(source.medications?.length||0)+(source.reminderLogs?Object.keys(source.reminderLogs).length:0), policies: source.insurancePolicies?.length||0, reimbursements: source.reimbursements?.length||0, orders: source.companionOrders?.length||0, posts: source.demandPosts?.length||0, attachments: attachments.length };
+  if (run?.status === 'completed') { toast('这份本机资料已导入'); return; }
+  if (!run) run = await window.KangbanAPI.insert('migration_runs', { user_id: auth.user.id, source_version: sourceVersion, source_hash: digest, status: 'running', category_counts: counts, cursor: { uploadedPaths: [] }, started_at: new Date().toISOString() });
+  else await window.KangbanAPI.update('migration_runs', run.id, { status: 'running', error_message: '' });
+  let cursor = run.cursor || { uploadedPaths: [] };
+  try {
+    const members = source.familyMembers || [];
+    if (members.length) {
+      const payload = members.map((member,index)=>({ family_id:auth.familyId, legacy_id:String(member.id||`member-${index}`), name:String(member.name||'家庭成员'), relationship:String(member.role||member.relationship||'家庭成员'), age:Number.isFinite(Number(member.age))?Number(member.age):null, health_profile:{ conditions:member.conditions||'', allergies:member.allergies||'', medications:member.medications||'', surgeries:member.surgeries||'' }, display_order:index }));
+      const { error } = await window.KangbanAPI.client.from('family_members').upsert(payload,{onConflict:'family_id,legacy_id'});
+      if (error) throw error;
+    }
+    source.cloudAttachmentPaths=source.cloudAttachmentPaths||{};
+    for (const attachment of attachments) {
+      if (!attachment.blob) continue;
+      const path = `${auth.familyId}/legacy/${encodeURIComponent(attachment.id)}-${encodeURIComponent(attachment.name||'attachment')}`;
+      if ((cursor.uploadedPaths||[]).includes(path)) { source.cloudAttachmentPaths[attachment.id]=path; continue; }
+      await window.KangbanAPI.uploadPrivateFile(attachment.blob, path);
+      source.cloudAttachmentPaths[attachment.id]=path;
+      cursor = { ...cursor, uploadedPaths: [...(cursor.uploadedPaths||[]),path] };
+      run.cursor = cursor;
+      await window.KangbanAPI.update('migration_runs',run.id,{cursor,status:'running'});
+    }
+    await window.KangbanAPI.saveFamilyWorkspace(auth.familyId, source);
+    await window.KangbanAPI.update('migration_runs',run.id,{cursor,status:'completed',completed_at:new Date().toISOString(),error_message:''});
+    localStorage.setItem(`kangban-cloud-${auth.user.id}`,JSON.stringify(source));
+    state = loadState();
+    closeModal(); renderRole(); renderRecords(); renderCommunity(); toast('本机数据已导入云端家庭空间');
+  } catch (error) {
+    await window.KangbanAPI.update('migration_runs',run.id,{status:'failed',error_message:String(error.message||error),cursor}).catch(()=>{});
+    toast(`导入中断，已记录续传位置：${error.message||error}`);
+  }
 }
 function modalHead(eyebrow, title, text) {
   return `<p class="eyebrow modal-eyebrow">${eyebrow}</p><h2 id="modalTitle">${title}</h2><p class="modal-lead">${text}</p>`;
@@ -2635,6 +2821,60 @@ function startListening() {
 function stopListening() { try { window.activeRecognition?.stop(); } catch {} window.activeRecognition = null; }
 
 document.addEventListener('click', async event => {
+  if (event.target.closest('[data-auth-role]')) {
+    window.selectedAuthRole = event.target.closest('[data-auth-role]').dataset.authRole;
+    document.querySelectorAll('[data-auth-role]').forEach(button => button.classList.toggle('selected', button.dataset.authRole === window.selectedAuthRole));
+  }
+  if (event.target.closest('[data-auth-guest]')) { window.KangbanAuth.enterGuest(); return; }
+  const demoRole = event.target.closest('[data-auth-demo]')?.dataset.authDemo;
+  if (demoRole) { window.KangbanAuth.enterLocalDemo(demoRole); return; }
+  if (event.target.closest('#authRegister')) {
+    window.authRegisterMode = !window.authRegisterMode;
+    const form = document.getElementById('authForm');
+    form.querySelector('.auth-name-field').hidden = !window.authRegisterMode;
+    document.getElementById('authSubmit').textContent = window.authRegisterMode ? '注册并继续' : '登录';
+    document.getElementById('authRegister').textContent = window.authRegisterMode ? '返回登录' : '创建账号';
+    form.querySelector('[name="password"]').autocomplete = window.authRegisterMode ? 'new-password' : 'current-password';
+    return;
+  }
+  if (event.target.closest('[data-community-filter]')) {
+    communityFilter = event.target.closest('[data-community-filter]').dataset.communityFilter;
+    document.querySelectorAll('[data-community-filter]').forEach(button => button.classList.toggle('selected', button.dataset.communityFilter === communityFilter));
+    renderCommunity(); return;
+  }
+  const communityApply = event.target.closest('[data-community-apply]');
+  if (communityApply) { acceptDemandPost(communityApply.dataset.communityApply); return; }
+  const communityConfirm = event.target.closest('[data-community-confirm]');
+  if (communityConfirm) {
+    try { await window.KangbanAPI.rpc('confirm_post_signup', { p_signup_id: communityConfirm.dataset.communityConfirm }); toast('已選定陪診師，請等待雙方確認'); await renderCommunity(); }
+    catch (error) { toast(error.message || '確認失敗'); }
+    return;
+  }
+  const cloudOrderConfirm = event.target.closest('[data-cloud-order-confirm]');
+  if (cloudOrderConfirm) {
+    try { const status = await window.KangbanAPI.rpc('respond_companion_order', { p_order_id: cloudOrderConfirm.dataset.cloudOrderConfirm, p_accept: true }); toast(status === 'confirmed' ? '双方已确认，预约完成' : '你的确认已记录，等待另一方确认'); await renderCommunity(); }
+    catch (error) { toast(error.message || '订单确认失败'); }
+    return;
+  }
+  const cloudTask = event.target.closest('[data-cloud-task]');
+  if (cloudTask) {
+    try { await window.KangbanAPI.rpc('update_order_checklist',{p_order_id:cloudTask.dataset.orderId,p_item_key:cloudTask.dataset.cloudTask,p_evidence_path:null}); await renderCommunity(); }
+    catch(error) { toast(error.message||'履约记录更新失败'); }
+    return;
+  }
+  const cloudEvidence = event.target.closest('[data-cloud-evidence]');
+  if (cloudEvidence) { cloudEvidenceTarget={orderId:cloudEvidence.dataset.orderId,key:cloudEvidence.dataset.cloudEvidence}; document.getElementById('cloudEvidenceInput')?.click(); return; }
+  const cloudTransition = event.target.closest('[data-cloud-order-transition]');
+  if (cloudTransition) {
+    try { await window.KangbanAPI.rpc('transition_companion_order',{p_order_id:cloudTransition.dataset.orderId,p_action:cloudTransition.dataset.cloudOrderTransition}); toast('订单状态已更新'); await renderCommunity(); }
+    catch(error) { toast(error.message||'订单状态更新失败'); }
+    return;
+  }
+  if (event.target.closest('[data-action="logout"]')) { try { await window.KangbanAuth.signOut(); } catch (error) { toast(error.message || '退出失败'); } return; }
+  if (event.target.closest('[data-action="local-import"]')) { showLocalImportPreview(); return; }
+  if (event.target.closest('#confirmLocalImport')) { importLocalWorkspace(); return; }
+  if (event.target.closest('#cancelLocalImport')) { closeModal(); return; }
+  if (window.KangbanAuth?.role === 'guest') { if (event.target.closest('[data-action]')) toast('游客模式只可浏览脱敏社区，请登录后继续'); return; }
   const panelToggle = event.target.closest('[data-panel-toggle]');
   if (panelToggle) {
     const key = panelToggle.dataset.panelToggle;
@@ -2657,6 +2897,7 @@ document.addEventListener('click', async event => {
   const nav = event.target.closest('[data-nav]');
   if (nav) { navigate(nav.dataset.nav); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
+  if (action === 'availability-form') showAvailabilityForm();
   if (action === 'upload') { uploadMemberId = event.target.closest('[data-upload-member]')?.dataset.uploadMember || ''; showUpload(); }
   if (action === 'medications') showMedicationManager();
   if (action === 'reminders') showReminderManager();
@@ -3031,7 +3272,7 @@ document.addEventListener('input', event => {
   host.innerHTML = renderHistBody(member, memberMetricEntries(memberId));
 });
 
-document.addEventListener('submit', event => {
+document.addEventListener('submit', async event => {
   if (event.target.id === 'reminderForm') {
     event.preventDefault();
     const form = event.target;
@@ -3133,6 +3374,22 @@ document.addEventListener('submit', event => {
   }
   if (event.target.id === 'demandForm') {
     event.preventDefault(); const data = new FormData(event.target);
+    if (window.KangbanAuth?.mode === 'cloud') {
+      const auth = window.KangbanAuth.session;
+      try {
+        if (!auth?.familyId) throw new Error('家庭空间尚未建立，请重新登录。');
+        const service = String(data.get('service') || '全程陪诊');
+        const { error } = await window.KangbanAPI.client.rpc('create_demand_post', {
+          p_family_id: auth.familyId, p_patient_member_id: null, p_author_label: '家庭用户',
+          p_region: '本地', p_hospital_name: String(data.get('hospital') || '').trim(), p_service_date: String(data.get('date') || ''),
+          p_service_type: service, p_summary: `需要${service}服务，协助院内就医流程`, p_need_text: String(data.get('need') || '').trim() || '具体需求待家庭与陪诊师沟通',
+          p_budget_min: null, p_budget_max: Number.parseFloat(String(data.get('budget') || '').match(/[0-9]+(?:\.[0-9]+)?/)?.[0] || '') || null
+        });
+        if (error) throw error;
+        closeModal(); toast('需求已发布到云端社区，公开摘要未包含患者资料'); await renderCommunity();
+      } catch (error) { toast(`发布失败：${error.message || error}`); }
+      return;
+    }
     const patientMemberId = String(data.get('patientMemberId') || 'm1');
     const patientMember = state.familyMembers.find(member => member.id === patientMemberId);
     const post = {
@@ -3152,6 +3409,27 @@ document.addEventListener('submit', event => {
     saveState(); renderRecords(); closeModal();
     toast('需求已发布，陪诊员在需求大厅可见');
   }
+  if (event.target.id === 'availabilityForm') {
+    event.preventDefault();
+    const data = new FormData(event.target); const auth = window.KangbanAuth.session;
+    try {
+      const { error } = await window.KangbanAPI.client.from('community_posts').insert({
+        type:'availability', author_id:auth.user.id, family_id:null, author_label:auth.displayName||'陪诊师',
+        region:String(data.get('region')||'').trim(), hospital_name:'', service_date:String(data.get('date')||''),
+        start_time:String(data.get('start')||''), end_time:String(data.get('end')||''), service_type:'陪诊服务',
+        summary:'可预约陪诊时段，服务范围由陪诊师本人确认', status:'open'
+      });
+      if (error) throw error;
+      closeModal(); toast('可预约时段已发布'); await renderCommunity();
+    } catch(error) { toast(`发布失败：${error.message||error}`); }
+  }
+  if (event.target.id === 'cloudEscortProfileForm') {
+    event.preventDefault(); const data=new FormData(event.target); const auth=window.KangbanAuth.session;
+    try {
+      const {error}=await window.KangbanAPI.client.from('escort_profiles').update({display_name:String(data.get('display_name')||'').trim(),experience:String(data.get('experience')||'').trim(),service_area:String(data.get('service_area')||'').trim(),bio:String(data.get('bio')||'').trim(),updated_at:new Date().toISOString()}).eq('user_id',auth.user.id);
+      if(error) throw error; toast('陪诊师介绍已保存'); await renderCommunity();
+    } catch(error){toast(`保存失败：${error.message||error}`);}
+  }
   if (event.target.id === 'taskShareForm') {
     event.preventDefault();
     const orderId = event.target.dataset.orderId;
@@ -3161,7 +3439,21 @@ document.addEventListener('submit', event => {
   }
 });
 
-document.addEventListener('change', event => {
+document.addEventListener('change', async event => {
+  if (event.target.id === 'cloudEvidenceInput') {
+    const file=event.target.files?.[0], target=cloudEvidenceTarget; event.target.value=''; cloudEvidenceTarget=null;
+    if (!file||!target) return;
+    try {
+      const [order]=await window.KangbanAPI.select('companion_orders',{filters:{id:target.orderId},limit:1});
+      if (!order) throw new Error('找不到云端订单');
+      const fileName=`${Date.now()}-${encodeURIComponent(file.name||'evidence')}`;
+      const path=`${order.family_id}/${order.id}/${fileName}`;
+      await window.KangbanAPI.uploadPrivateFile(file,path);
+      await window.KangbanAPI.rpc('update_order_checklist',{p_order_id:order.id,p_item_key:target.key,p_evidence_path:path});
+      toast('佐证已上传，履约项已完成'); await renderCommunity();
+    } catch(error) { toast(`上传失败：${error.message||error}`); }
+    return;
+  }
   const select = event.target.closest('[data-med-count]');
   if (!select) return;
   const count = Number(select.value || 0);
@@ -3236,6 +3528,57 @@ if (!state.alertsSeeded) {
   }
   saveState();
 }
+document.getElementById('authForm')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const message = document.getElementById('authMessage');
+  const button = document.getElementById('authSubmit');
+  message.textContent = '正在连接…'; button.disabled = true;
+  try {
+    if (window.authRegisterMode) {
+      const result = await window.KangbanAuth.signUp({ email:String(form.get('email')||'').trim(), password:String(form.get('password')||''), displayName:String(form.get('displayName')||'康伴用户').trim(), role:window.selectedAuthRole||'family' });
+      if (result.pendingEmailConfirmation) message.textContent = '注册成功。请到邮箱完成验证，再返回此处登录。';
+    } else {
+      await window.KangbanAuth.signIn(String(form.get('email')||'').trim(),String(form.get('password')||''),window.selectedAuthRole||'family');
+    }
+  } catch (error) { message.textContent = error.message || '操作失败，请稍后重试。'; }
+  finally { button.disabled = false; }
+});
+async function applyAuthSession(session) {
+  const gate = document.getElementById('authGate');
+  if (!session) {
+    document.body.classList.remove('authenticated','guest-mode'); gate.hidden = false;
+    document.getElementById('familyTabs').hidden = false; document.getElementById('escortTabs').hidden = true;
+    return;
+  }
+  document.body.classList.add('authenticated'); gate.hidden = true;
+  if (window.KangbanAuth.mode === 'cloud') {
+    activeStorageKey = `kangban-cloud-${session.user.id}`;
+    if (session.role === 'family' && session.familyId) {
+      try {
+        const cloudState = await window.KangbanAPI.loadFamilyWorkspace(session.familyId);
+        if (cloudState) {
+          const cloudText = JSON.stringify(cloudState);
+          if (localStorage.getItem(activeStorageKey) !== cloudText) { localStorage.setItem(activeStorageKey,cloudText); window.location.reload(); return; }
+        }
+      } catch (error) { toast(`云端家庭资料加载失败：${error.message||error}`); }
+    }
+    state = loadState(); state.currentRole = session.role;
+  } else if (window.KangbanAuth.mode === 'local-demo') {
+    activeStorageKey = STORAGE_KEY; state = loadState(); state.currentRole = session.role;
+  } else {
+    state.currentRole = 'family';
+  }
+  renderRole();
+  if (session.role === 'guest') navigate('community');
+  else if (window.KangbanAuth.mode === 'cloud') navigate('community');
+  else navigate(session.role === 'escort' ? 'escort' : 'home');
+}
+window.addEventListener('kangban:auth-change', event => { applyAuthSession(event.detail.session); });
+if (window.KangbanAuth) window.KangbanAuth.initialize().then(applyAuthSession).catch(error => {
+  const message = document.getElementById('authMessage'); if (message) message.textContent = `登录状态读取失败：${error.message||error}`;
+  const gate = document.getElementById('authGate'); if (gate) gate.hidden = false;
+});
 displayToday(); renderHomeAlerts(); renderRole(); renderRecords(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
 setInterval(checkMedicationReminders, 60000);
 setTimeout(checkMedicationReminders, 1500);

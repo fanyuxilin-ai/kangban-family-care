@@ -10,6 +10,26 @@
   <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
+  <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <a class="brand" href="#home" aria-label="康伴"><span class="brand-mark"><i></i><b></b></span><span>康伴</span></a>
+      <p class="eyebrow">家庭就医协同</p><h1 id="authTitle">和家人一起，把就医准备做好</h1>
+      <p class="subtle">登录后使用家庭资料与社区。游客只能浏览脱敏的虚构内容。</p>
+      <div class="auth-role-switch"><button type="button" data-auth-role="family" class="selected">家属登录</button><button type="button" data-auth-role="escort">陪诊师登录</button></div>
+      <form id="authForm" class="auth-form">
+        <label><span>邮箱</span><input class="input-field" name="email" type="email" autocomplete="username" required placeholder="name@example.com"></label>
+        <label><span>密码</span><input class="input-field" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label>
+        <label class="auth-name-field" hidden><span>称呼</span><input class="input-field" name="displayName" maxlength="24" placeholder="怎么称呼你"></label>
+        <p class="auth-message" id="authMessage" role="status"></p>
+        <button class="primary-button" id="authSubmit" type="submit">登录</button>
+        <button class="text-button auth-register" id="authRegister" type="button">创建账号</button>
+      </form>
+      <div class="auth-divider"><span>也可以先体验演示</span></div>
+      <button type="button" class="secondary-button auth-guest" data-auth-guest>游客体验（脱敏社区）</button>
+      <div class="auth-demos"><p>本机演示账号（不登录云端）</p><button type="button" data-auth-demo="family">家庭演示</button><button type="button" data-auth-demo="escort">陪诊师演示</button></div>
+      <p class="demo-disclaimer">演示账号仅保存在本机；云端数据需真实账号登录。</p>
+    </div>
+  </section>
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="#home" aria-label="康伴首页">
@@ -19,6 +39,7 @@
       <button class="profile-switch" id="profileSwitch" aria-label="切换演示角色">
         <span class="avatar avatar-lilac" id="roleAvatar">陈</span><span id="roleLabel">家庭端 · 小林</span><span class="chevron">⌄</span>
       </button>
+      <button class="text-button auth-hidden" id="logoutButton" data-action="logout">退出登录</button>
     </header>
 
     <main id="appMain">
@@ -95,6 +116,16 @@
         <div class="boundary-note"><strong>服务边界说明</strong><p>陪诊人员提供流程协助，不提供诊断或治疗建议。涉及病情的问题请咨询医生。</p></div>
       </section>
 
+      <section class="view" id="view-community">
+        <div class="page-heading"><p class="eyebrow">康伴社区 · 隐私优先</p><h1>社区</h1><p class="subtle">家庭发布陪诊需求，审核通过的陪诊师报名；患者资料仅在家庭选定并确认后开放。</p></div>
+        <div class="community-toolbar"><div class="community-filters"><button class="selected" data-community-filter="all">全部</button><button data-community-filter="demand">陪诊需求</button><button data-community-filter="availability">可预约时段</button></div><button class="secondary-button compact-button" data-action="demand-form">＋ 发布需求</button></div>
+      <div class="community-status" id="communityStatus"></div>
+      <div id="cloudEscortProfile"></div>
+      <div class="community-cloud-orders" id="communityOrders"></div>
+      <div id="communityFeed"></div>
+        <div class="boundary-note"><strong>与陪诊员端需求大厅的分工</strong><p>本页是家庭与陪诊师共用的社区入口；Pink 的「需求大厅」保留为陪诊师接单工作台，继续承接需求应征、订单和履约，不另建平行接单功能。</p></div>
+      </section>
+
       <section class="view" id="view-escort">
         <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 演示角色</p><h1>预约与服务</h1><p class="subtle">查看预约、回应需求，并记录陪诊完成情况。</p></div>
         <div class="escort-status-card"><div><span class="eyebrow">当前接单状态</span><strong id="escortAvailabilityLabel">可预约</strong><small id="escortAvailabilityText">家庭可以向你提交预约申请</small></div><button class="secondary-button compact-button" data-action="toggle-availability" id="availabilityButton">暂停接单</button></div>        <div class="escort-stat-grid"><div><strong id="escortPendingCount">0</strong><span>待确认</span></div><div><strong id="escortAcceptedCount">0</strong><span>待服务</span></div><div><strong id="escortCompletedCount">0</strong><span>已完成</span></div></div>
@@ -148,6 +179,7 @@
       <button class="tab" data-tab="docs"><span class="tab-icon">▤</span><span>医疗资料</span></button>
       <button class="tab" data-tab="companion"><span class="tab-icon">♡</span><span>陪诊</span></button>
       <button class="tab" data-tab="me"><span class="tab-icon">◉</span><span>我的</span></button>
+      <button class="tab" data-tab="community"><span class="tab-icon">◎</span><span>社区</span></button>
     </nav>
     <nav class="tabbar" aria-label="陪诊员端主导航" id="escortTabs" hidden>
       <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
@@ -167,6 +199,7 @@
   <input type="file" id="preVisitPhotoInput" accept="image/*" capture="environment" multiple hidden />
   <input type="file" id="preVisitAudioInput" accept="audio/*" multiple hidden />
   <input type="file" id="evidenceInput" accept="image/*" capture="environment" hidden />
+  <input type="file" id="cloudEvidenceInput" accept="image/*" capture="environment" hidden />
   <input type="file" id="policyFileInput" accept="image/*,.pdf" hidden />
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="api-mode-notice" id="apiModeNotice" role="status" hidden></div>
@@ -180,9 +213,10 @@
     });
   </script>
   <script src="vendor/tesseract.min.js"></script>
-  <script src="supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="api.js?v=1"></script>
+  <script src="supabase-config.js"></script>
+  <script src="api.js?v=2"></script>
+  <script src="auth.js?v=1"></script>
   <script src="app.js?v=18"></script>
 </body>
 </html>

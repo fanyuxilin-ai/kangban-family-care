@@ -22,6 +22,8 @@ global.document = {
   visibilityState: 'visible'
 };
 global.navigator = {};
+global.setInterval = () => 0;
+global.setTimeout = () => 0;
 global.fetch = async () => ({ ok: true, blob: async () => new global.Blob() });
 global.Blob = class { constructor(parts, opts) { this.parts = parts; this.type = opts?.type || ''; } };
 global.File = class extends global.Blob { constructor(parts, name, opts) { super(parts, opts); this.name = name; this.type = opts?.type || ''; } };

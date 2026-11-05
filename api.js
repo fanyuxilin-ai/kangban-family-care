@@ -52,6 +52,7 @@
   }
   const api = {
     get mode() { return mode; },
+    get client() { return client; },
     isCloudEnabled() { return mode === 'supabase'; },
     async select(table, options = {}) {
       assertTable(table);
@@ -91,16 +92,26 @@
       state[key] = next; writeState(state); return { removed: rows.length - next.length };
     },
     async rpc(name, args = {}) {
-      if (!['apply_to_demand','confirm_post_signup','respond_companion_order'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
+      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
       if (!client) throw new Error('本机演示模式不执行云端事务 RPC。');
       return runCloud(client.rpc(name, args));
     },
     async uploadPrivateFile(file, path) {
       if (!client) throw new Error('本机演示模式不支持上传到私有云端存储。');
       if (!file || !path) throw new Error('上传文件和路径不能为空。');
-      const { data, error } = await client.storage.from('kangban-private').upload(path, file, { upsert: false, contentType: file.type });
+      const { data, error } = await client.storage.from('kangban-private').upload(path, file, { upsert: true, contentType: file.type });
       if (error) throw Object.assign(new Error(error.message || '文件上传失败'), { code: error.code });
       return data;
+    },
+    async loadFamilyWorkspace(familyId) {
+      if (!client) return null;
+      const row = await runCloud(client.from('families').select('demo_state').eq('id', familyId).single());
+      return row?.demo_state && Object.keys(row.demo_state).length ? row.demo_state : null;
+    },
+    async saveFamilyWorkspace(familyId, state) {
+      if (!client) return false;
+      await runCloud(client.from('families').update({ demo_state: state, updated_at: new Date().toISOString() }).eq('id', familyId).select('id').single());
+      return true;
     },
     async withLoading(label, fn) {
       announce(mode, `${label}…`);
