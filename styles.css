@@ -437,3 +437,34 @@ body:not(.authenticated) .app-shell{display:none}
 .my-post-row strong{font-size:12px}
 .my-post-row small{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.5}
 .form-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* 陪诊师工作台归一：时间线 + 云端状态卡 + 家庭实时动态 + 首页入口 */
+.order-timeline{margin-top:12px;display:flex;flex-direction:column}
+.otl-row{display:grid;grid-template-columns:22px 1fr auto;gap:9px;align-items:flex-start;position:relative;padding:6px 0}
+.otl-row:not(:last-child):before{content:'';position:absolute;left:10px;top:24px;bottom:-6px;width:2px;background:#e4e9e0}
+.otl-row.done:not(:last-child):before{background:#a9c3ad}
+.otl-dot{width:20px;height:20px;border-radius:50%;background:#eef1ea;display:grid;place-items:center;font-size:10px;color:#a5b0a6;position:relative;z-index:1;margin-top:1px}
+.otl-row.done .otl-dot{background:#739078;color:#fff}
+.otl-row.now .otl-dot{background:#527259;color:#fff;box-shadow:0 0 0 4px #dce9de}
+.otl-copy strong{font-size:10.5px;color:#46564a;display:block}
+.otl-copy small{font-size:9px;color:#949d96;display:block;margin-top:2px;line-height:1.5}
+.otl-side{font-size:8.5px;color:#8fa093;white-space:nowrap;margin-top:4px}
+.cloud-pill{display:inline-flex;align-items:center;gap:5px;font-size:8.5px;font-weight:700;color:#3c6350;background:rgba(255,254,250,.75);border-radius:20px;padding:3px 8px;width:fit-content;margin-bottom:4px}
+.cloud-pill:before{content:'';width:6px;height:6px;border-radius:50%;background:#5f9c68}
+.status-btn{background:#fffefa;border-radius:9px;padding:8px 12px;font-size:10.5px;font-weight:700;color:#a15d4c;flex:none;box-shadow:0 3px 9px rgba(62,92,68,.08)}
+.invite-card{background:#fffefa;border:1px solid #e9eae2;border-radius:14px;padding:13px 14px;margin-top:9px}
+.invite-card .supply-status-chip{flex:none}
+.order-actions-2{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:10px}
+.order-actions-2 .primary-button,.order-actions-2 .secondary-button{margin:0;min-height:38px;height:auto}
+.empty-link{background:#fffefa;border:1px dashed #cfd8cc;border-radius:12px;padding:14px;text-align:center;font-size:10.5px;color:#718174;line-height:1.7}
+.empty-link b{color:#3c6350;font-weight:700}
+.cloud-order-card.is-active{border-color:#cfe0d2;box-shadow:0 6px 20px rgba(69,101,74,.08)}
+.companion-live-strip{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:#fffefa;border:1px solid #d5e2ee;border-radius:13px;padding:12px 14px;margin-top:6px;box-shadow:0 4px 16px rgba(52,64,55,.05)}
+.companion-live-strip .cls-dot{width:9px;height:9px;flex:none;border-radius:50%;background:#4d84b8;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.companion-live-strip .cls-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.companion-live-strip strong{font-size:11px;color:#2c4a63}
+.companion-live-strip small{font-size:9px;color:#7b93ab}
+.companion-live-strip .cls-arrow{color:#7b93ab;font-size:15px}
+.tab.has-dot{position:relative}
+.tab.has-dot .tab-icon:after{content:'';position:absolute;width:7px;height:7px;border-radius:50%;background:#d49b74;transform:translate(14px,-4px)}
+#companionOrders[hidden]{display:none}

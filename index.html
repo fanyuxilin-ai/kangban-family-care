@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=21" />
+  <link rel="stylesheet" href="styles.css?v=22" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -81,6 +81,8 @@
           <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
         </div>
 
+        <div id="homeCompanionLive" hidden></div>
+
         <section class="section-block alerts-section collapsible" data-panel="home-alerts">
           <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测</p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-alerts" aria-label="折叠或展开">▾</button></div>
           <div class="section-body"><div id="homeAlerts"></div></div>
@@ -116,6 +118,7 @@
 
       <section class="view" id="view-companion">
         <div class="page-heading"><p class="eyebrow">有人同行，心里更踏实</p><h1>陪诊服务</h1><p class="subtle">先把需要说清楚，服务人员会与你确认安排。</p></div>
+        <div id="companionLiveOrders" hidden></div>
         <div class="companion-intro"><div class="companion-art"><span class="sun"></span><span class="person person-a"></span><span class="person person-b"></span><span class="bench"></span><span class="leaf leaf-a">✦</span><span class="leaf leaf-b">✳</span></div><div class="companion-intro-copy"><strong>就诊当天，安心有人陪</strong><p>陪同取号、院内引导、检查陪同和就诊后信息交接。</p></div></div>
         <section class="section-block collapsible" data-panel="companion-profile">
           <div class="section-heading"><div><p class="eyebrow">演示陪诊员</p><h2>认识服务人员</h2></div><button class="section-collapse" data-panel-toggle="companion-profile" aria-label="折叠或展开">▾</button></div>
@@ -144,14 +147,15 @@
         <div class="community-toolbar"><div class="community-filters"><button class="selected" data-community-filter="all">全部</button><button data-community-filter="demand">陪诊需求</button><button data-community-filter="availability">可预约时段</button><select id="communityRegion" class="community-region-select"><option value="all">全部区域</option></select></div><div class="community-publish-group"><button class="text-button compact-button" data-action="my-posts" hidden>我的发布</button><button class="secondary-button compact-button" id="communityPublishButton" data-action="demand-form">＋ 发布需求</button></div></div>
       <div class="community-status" id="communityStatus"></div>
       <div id="migrationStatus" class="migration-status" hidden></div>
-      <div id="cloudEscortProfile"></div>
       <div class="community-cloud-orders" id="communityOrders"></div>
       <div id="communityFeed"></div>
-        <div class="boundary-note"><strong>与陪诊员端需求大厅的分工</strong><p>本页是家庭与陪诊师共用的社区入口；Pink 的「需求大厅」保留为陪诊师接单工作台，继续承接需求应征、订单和履约，不另建平行接单功能。</p></div>
+        <div class="boundary-note"><strong>社区与工作台的分工</strong><p>社区负责「撮合」：发需求、发时段、报名与预约。成单之后，家庭在「陪诊」Tab、陪诊师在「工作台」跟踪进度与回传状态。</p></div>
       </section>
 
       <section class="view" id="view-escort">
-        <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 演示角色</p><h1>预约与服务</h1><p class="subtle">查看预约、回应需求，并记录陪诊完成情况。</p></div>
+        <div class="page-heading"><p class="eyebrow">陪诊员工作台 · 云端</p><h1>今天的服务</h1><p class="subtle">接单、回传进度，一切同步给发单家庭。</p></div>
+        <div id="escortWorkbenchCloud" hidden></div>
+        <div id="escortWorkbenchLocal">
         <div class="escort-status-card"><div><span class="eyebrow">当前接单状态</span><strong id="escortAvailabilityLabel">可预约</strong><small id="escortAvailabilityText">家庭可以向你提交预约申请</small></div><button class="secondary-button compact-button" data-action="toggle-availability" id="availabilityButton">暂停接单</button></div>        <div class="escort-stat-grid"><div><strong id="escortPendingCount">0</strong><span>待确认</span></div><div><strong id="escortAcceptedCount">0</strong><span>待服务</span></div><div><strong id="escortCompletedCount">0</strong><span>已完成</span></div></div>
         <div class="income-strip" id="escortIncomeStrip"></div>
         <div class="task-share-card" id="escortTaskShareCard">
@@ -161,6 +165,7 @@
         </div>
         <div id="escortOrders" class="escort-order-list"></div>
         <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。只查看家属明确分享的本次预约信息。</p></div>
+        </div>
       </section>
 
       <section class="view" id="view-escort-hall">
@@ -170,7 +175,9 @@
       </section>
 
       <section class="view" id="view-escort-profile">
-        <div class="page-heading"><p class="eyebrow">陪诊员个人资料 · 演示角色</p><h1>自我介绍</h1><p class="subtle">让家庭了解你的陪诊经验、服务范围和可预约时间。</p></div>
+        <div class="page-heading"><p class="eyebrow">陪诊员个人资料</p><h1>自我介绍</h1><p class="subtle">让家庭了解你的陪诊经验、服务范围和可预约时间。</p></div>
+        <div id="cloudEscortProfileView" hidden></div>
+        <div id="escortProfileLocal">
         <div class="escort-stat-grid escort-stat-grid-bio"><div><strong id="escortBioCompleted">0</strong><span>已完成订单</span></div><div><strong id="escortBioIncome">¥0</strong><span>累计收入（模拟）</span></div><div><strong id="escortBioRating">新加入</strong><span>家庭评分</span></div></div>
         <form class="escort-profile-form" id="escortProfileForm">
           <label><span class="field-label-block">姓名 / 称呼</span><input class="input-field" name="name" id="escortNameInput" maxlength="24" required /></label>
@@ -181,6 +188,7 @@
           <button class="primary-button" type="submit">保存演示资料</button>
         </form>
         <div class="boundary-note"><strong>资料说明</strong><p>当前内容保存在本机浏览器，仅用于演示角色切换，不代表真实服务资质核验。</p></div>
+        </div>
       </section>
 
       <section class="view" id="view-me">
@@ -209,6 +217,11 @@
       <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
       <button class="tab" data-tab="escort-hall"><span class="tab-icon">☁</span><span>需求大厅</span></button>
       <button class="tab" data-tab="escort-profile"><span class="tab-icon">◉</span><span>我的介绍</span></button>
+    </nav>
+    <nav class="tabbar" aria-label="云端陪诊师主导航" id="cloudEscortTabs" hidden>
+      <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
+      <button class="tab" data-tab="community"><span class="tab-icon">◎</span><span>社区</span></button>
+      <button class="tab" data-tab="escort-profile"><span class="tab-icon">◉</span><span>我的</span></button>
     </nav>
   </div>
 
@@ -241,6 +254,6 @@
   <script src="supabase-config.js"></script>
   <script src="api.js?v=4"></script>
   <script src="auth.js?v=5"></script>
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>
