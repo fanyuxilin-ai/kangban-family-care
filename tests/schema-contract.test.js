@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const migrationPath = path.join(__dirname, '..', 'supabase', 'migrations', '202611050001_kangban_cloud_core.sql');
+const migrationDirectory = path.join(__dirname, '..', 'supabase', 'migrations');
 const expectedTables = [
   'profiles', 'families', 'family_memberships', 'family_members', 'escort_profiles',
   'body_metrics', 'daily_entries', 'medical_encounters', 'medical_records',
@@ -12,7 +12,11 @@ const expectedTables = [
 ];
 
 function migrationText() {
-  return fs.readFileSync(migrationPath, 'utf8');
+  const migrationName = fs.readdirSync(migrationDirectory).find(name =>
+    name === '202611050001_kangban_cloud_core.sql' || name.endsWith('_202611050001_kangban_cloud_core.sql')
+  );
+  assert.ok(migrationName, 'core migration must retain its canonical migration name');
+  return fs.readFileSync(path.join(migrationDirectory, migrationName), 'utf8');
 }
 
 test('Supabase migration defines exactly the 17 approved business tables', () => {

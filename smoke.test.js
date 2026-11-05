@@ -111,6 +111,52 @@ const test = `
   const escortRender = renderCompanionViews.toString();
   ok('陪诊师端渲染不含 health_profile / allergies 引用', !/allergies|conditions|medications\\s*\\(/.test(escortRender));
 
+  /* 8. 云端导入在附件上传中断后，续传应跳过已记入游标的文件 */
+  const oldAuth = window.KangbanAuth;
+  const oldApi = window.KangbanAPI;
+  const oldState = state;
+  const oldSnapshot = localStorage.getItem(STORAGE_KEY);
+  const attachments = [
+    { id: 'file-a', name: 'a.png', type: 'image/png', blob: new Blob(['a'], { type: 'image/png' }) },
+    { id: 'file-b', name: 'b.png', type: 'image/png', blob: new Blob(['b'], { type: 'image/png' }) }
+  ];
+  const db = {
+    transaction: () => ({ objectStore: () => ({ getAll: () => {
+      const request = {}; queueMicrotask(() => { request.result = attachments; request.onsuccess?.(); }); return request;
+    } }) }), close() {}
+  };
+  db.createObjectStore = () => {};
+  const idb = { open: () => { const request = { result: db }; queueMicrotask(() => { request.onupgradeneeded?.(); request.onsuccess?.(); }); return request; } };
+  window.indexedDB = idb; global.indexedDB = idb;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ familyMembers: [{ id: 'legacy-member-1', name: '虚构测试成员', role: '家属' }] }));
+  window.KangbanAuth = { mode: 'cloud', role: 'family', session: { user: { id: 'test-user' }, familyId: 'test-family' } };
+  let run = null;
+  let failedOnce = false;
+  const uploadAttempts = [];
+  window.KangbanAPI = {
+    select: async () => run ? [structuredClone(run)] : [],
+    insert: async (_table, row) => (run = { ...row, id: 'migration-run-test' }),
+    update: async (_table, _id, patch) => (run = { ...run, ...patch }),
+    upsert: async () => [],
+    uploadPrivateFile: async (_blob, path) => {
+      uploadAttempts.push(path);
+      if (path.includes('file-b') && !failedOnce) { failedOnce = true; throw new Error('synthetic Storage interruption'); }
+      return { path };
+    },
+    saveFamilyWorkspace: async () => true
+  };
+  renderRole = renderRecords = renderCommunity = () => {};
+  await importLocalWorkspace();
+  const statusAfterFailure = run.status;
+  const firstCursor = (run.cursor?.uploadedPaths || []).slice();
+  const attemptsAfterFailure = uploadAttempts.slice();
+  await importLocalWorkspace();
+  ok('模拟 Storage 中断后导入标记为 failed 并保留首个附件游标', statusAfterFailure === 'failed' && firstCursor.length === 1 && attemptsAfterFailure.length === 2);
+  ok('再次导入跳过已完成附件，只重试失败文件并完成迁移', uploadAttempts.length === 3 && uploadAttempts[0] !== uploadAttempts[1] && uploadAttempts[1] === uploadAttempts[2] && run.status === 'completed' && run.cursor.uploadedPaths.length === 2);
+  window.KangbanAuth = oldAuth; window.KangbanAPI = oldApi; state = oldState;
+  delete window.indexedDB; delete global.indexedDB;
+  if (oldSnapshot == null) localStorage.removeItem(STORAGE_KEY); else localStorage.setItem(STORAGE_KEY, oldSnapshot);
+
   console.log(out.join('\\n'));
 })();
 `;
