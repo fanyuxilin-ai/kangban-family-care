@@ -1,5 +1,13 @@
 # 康伴 · 家庭就医助手
 
+## 新队友快速开始
+
+克隆仓库后，在项目目录运行 `python3 -m http.server 4173`，再打开 `http://localhost:4173`；Mac 也可以双击 **启动康伴.command**。Supabase 浏览器配置（Project URL 与 publishable key）已随仓库提供，克隆后默认连接当前云端项目；如需重新生成，运行 `node scripts/generate-supabase-config.mjs`。`.env` 仅用于本机覆盖配置，不要提交。
+
+自检云端连接：打开浏览器开发者工具（F12）→ **Network**，刷新页面并查看请求域名是否为 `sytwoulwwzfuslrgorvw.supabase.co`。若没有 Supabase 请求，页面处于本机演示模式，使用的是当前浏览器内的虚构样例数据；检查 `supabase-config.js` 是否存在并运行 `node scripts/generate-supabase-config.mjs` 后刷新。
+
+日常协作流程：开工前先 `git pull`，从当前分支创建 `feat/你的名字-模块` 分支进行修改，然后提交 `commit`、推送 `push` 并发起 PR；`main` 只通过 PR 合并。
+
 **项目简介：**帮助家庭把分散的就医资料整理成一张由患者确认、可按需授权的就医信息卡，让重要信息在就诊时更容易交接。
 
 康伴是一个手机优先的家庭就医协同原型，包含 Supabase 云端登录、社区订单及私有附件演示。没有接入真实医院、支付或医疗服务；内置病例与公开演示订单均为虚构样例。
