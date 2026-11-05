@@ -475,6 +475,28 @@ create policy orders_read_participants on public.companion_orders for select to 
 create policy migration_runs_owner on public.migration_runs for all to authenticated
   using (user_id=(select auth.uid())) with check (user_id=(select auth.uid()));
 
+-- Create public summary and private patient details in one transaction. The
+-- public summary must not contain a patient name or medical information.
+create or replace function public.create_demand_post(
+  p_family_id uuid, p_patient_member_id uuid, p_author_label text, p_region text,
+  p_hospital_name text, p_service_date date, p_service_type text, p_summary text,
+  p_need_text text, p_budget_min numeric default null, p_budget_max numeric default null
+) returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_post uuid;
+begin
+  if not public.can_manage_family(p_family_id) or public.current_profile_role() <> 'family' then raise exception '无权发布该家庭需求'; end if;
+  if length(btrim(coalesce(p_summary,''))) < 2 or length(btrim(coalesce(p_need_text,''))) < 2 then raise exception '请填写需求摘要和服务说明'; end if;
+  if p_patient_member_id is not null and not exists(select 1 from public.family_members m where m.id=p_patient_member_id and m.family_id=p_family_id) then raise exception '就诊成员不属于当前家庭'; end if;
+  insert into public.community_posts(type,author_id,family_id,author_label,region,hospital_name,service_date,service_type,summary,budget_min,budget_max)
+  values('demand',(select auth.uid()),p_family_id,left(btrim(p_author_label),48),left(btrim(p_region),100),left(btrim(p_hospital_name),160),p_service_date,left(btrim(p_service_type),60),left(btrim(p_summary),200),p_budget_min,p_budget_max)
+  returning id into v_post;
+  insert into public.community_post_details(post_id,patient_member_id,patient_label,need_text,created_by)
+  select v_post,p_patient_member_id,coalesce(m.name,''),left(btrim(p_need_text),2000),(select auth.uid())
+  from (select 1) seed left join public.family_members m on m.id=p_patient_member_id;
+  return v_post;
+end;
+$$;
+
 -- Order creation is serialized by locking the post and signup; only a family
 -- caregiver can select one applicant and create the single order for a post.
 create or replace function public.apply_to_demand(p_post_id uuid,p_note text default '')
@@ -542,9 +564,11 @@ end;
 $$;
 
 revoke all on function public.apply_to_demand(uuid,text) from public,anon;
+revoke all on function public.create_demand_post(uuid,uuid,text,text,text,date,text,text,text,numeric,numeric) from public,anon;
 revoke all on function public.confirm_post_signup(uuid) from public,anon;
 revoke all on function public.respond_companion_order(uuid,boolean) from public,anon;
 grant execute on function public.apply_to_demand(uuid,text) to authenticated;
+grant execute on function public.create_demand_post(uuid,uuid,text,text,text,date,text,text,text,numeric,numeric) to authenticated;
 grant execute on function public.confirm_post_signup(uuid) to authenticated;
 grant execute on function public.respond_companion_order(uuid,boolean) to authenticated;
 
