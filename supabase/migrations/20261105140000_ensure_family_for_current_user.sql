@@ -37,7 +37,9 @@ begin
   values (v_user_id, coalesce(nullif(v_display_name, ''), '我的') || '的家庭')
   returning id into v_family_id;
 
-  -- family_owner_after_insert creates the owner's active membership automatically.
+  insert into public.family_memberships (family_id, user_id, membership_role, status, created_by)
+  values (v_family_id, v_user_id, 'owner', 'active', v_user_id);
+
   return v_family_id;
 end;
 $function$;
