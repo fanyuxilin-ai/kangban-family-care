@@ -405,3 +405,35 @@ body:not(.authenticated) .app-shell{display:none}
 .import-count-list{display:grid;gap:8px;margin:18px 0}.import-count-list>div{display:flex;justify-content:space-between;padding:11px 12px;border-radius:10px;background:#f5f5ef;font-size:12px}.import-count-list strong{color:var(--deep)}
 .cloud-escort-mode #familyTabs [data-tab]:not([data-tab=community]){display:none}
 .migration-status{margin:12px 0;padding:12px 14px;border-radius:12px;background:#edf2eb;color:var(--deep);font-size:11px}.migration-status>strong{display:block;margin-bottom:6px}.migration-status>div{display:grid;gap:3px;padding-top:7px}.migration-status small{color:var(--muted);line-height:1.5}
+/* 社区供需类型徽章 + 卡片信息行 */
+.community-kind-chip{display:inline-block;font-size:8.5px;font-weight:600;padding:2px 7px;border-radius:20px;margin-right:6px;vertical-align:1px}
+.community-kind-chip.kind-demand{background:#e8f0e8;color:#3f6b4a}
+.community-kind-chip.kind-supply{background:#e7eef5;color:#3d6a8f}
+.community-meta{font-size:9.5px;color:#7c877e;margin:6px 0 0}
+.community-facts{display:flex;gap:14px;margin:8px 0 0;padding:8px 10px;background:#f3f7f2;border-radius:8px;font-size:9.5px;color:#5b6a5e}
+.community-facts b{color:#31443a}
+/* 社区供应卡：状态机 + 信任信息 + 预约闭环 + 我的发布管理 */
+.supply-status-chip{display:inline-block;font-size:9px;font-weight:700;padding:3px 10px;border-radius:20px;background:#f0efe8;color:#7c877e;white-space:nowrap}
+.supply-status-chip.is-ok{background:#e8f0e8;color:#3f6b4a}
+.supply-status-chip.is-pending{background:#f3ecdd;color:#9a7b2f}
+.supply-status-chip.is-taken{background:#efeae2;color:#8a8377}
+.supply-status-chip.is-expired{background:#f0efe8;color:#aab2ac}
+.community-post.is-dimmed{opacity:.6}
+.community-time{margin:8px 0 0;font-size:9px;color:#aab2ac}
+.escort-line{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);font-size:10px;color:#5b6a5e;line-height:1.5}
+.escort-line b{color:#31443a}
+.escort-ava{width:26px;height:26px;border-radius:50%;background:var(--mint);display:grid;place-items:center;font-weight:700;color:var(--deep);font-size:11px;flex:none}
+.tag-verified{display:inline-block;font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:20px;background:#e8f0e6;color:#3c6350;vertical-align:1px}
+.community-applicants.is-open{display:grid;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.applicant-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 11px;border-radius:10px;background:#f5f4ec;font-size:10px;line-height:1.5}
+.applicant-row b{color:#31443a}
+.applicant-ops{display:flex;gap:6px;align-items:center;flex:none}
+.primary-button.compact,.secondary-button.compact{padding:8px 12px;font-size:11px}
+.community-region-select{border:1.5px solid var(--line);border-radius:999px;background:#fff;padding:7px 11px;font:inherit;font-size:12px;font-weight:600;color:var(--ink)}
+.community-publish-group{display:flex;gap:8px;align-items:center;flex:none}
+.community-publish-group .text-button{white-space:nowrap}
+.my-posts-list{display:grid;gap:8px}
+.my-post-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:#f5f4ec}
+.my-post-row strong{font-size:12px}
+.my-post-row small{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.5}
+.form-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
