@@ -79,7 +79,9 @@ test('login and registration markup follows the role-free two-step information a
   assert.match(authMarkup, /name="email" type="email"/);
   assert.match(authMarkup, /name="password" type="password"/);
   assert.match(authMarkup, /id="authRegisterRoleStep"[\s\S]*data-auth-role="family"[\s\S]*data-auth-role="escort"/);
-  assert.match(authMarkup, /id="authRegisterNext"/);
+  assert.doesNotMatch(authMarkup, /id="authRegisterNext"/);
+  assert.match(app, /选中账号类型后直接进入第二步/);
+  assert.match(app, /setAuthRegistrationView\(true, 'credentials'\)/);
   assert.match(authMarkup, /name="registerEmail"[\s\S]*name="registerPassword"[\s\S]*name="passwordConfirm"/);
   assert.match(authMarkup, /<details class="auth-experience"/);
   assert.match(authMarkup, /data-auth-guest/);

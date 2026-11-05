@@ -3173,6 +3173,8 @@ document.addEventListener('click', async event => {
   if (event.target.closest('[data-auth-role]')) {
     window.selectedAuthRole = event.target.closest('[data-auth-role]').dataset.authRole;
     document.querySelectorAll('[data-auth-role]').forEach(button => button.classList.toggle('selected', button.dataset.authRole === window.selectedAuthRole));
+    /* 选中账号类型后直接进入第二步，无需再点「下一步」 */
+    setAuthRegistrationView(true, 'credentials');
   }
   if (event.target.closest('[data-auth-guest]')) { window.KangbanAuth.enterGuest(); return; }
   const demoRole = event.target.closest('[data-auth-demo]')?.dataset.authDemo;
