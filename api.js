@@ -34,7 +34,7 @@
   }) : null;
   let mode = cloudConfigured ? 'supabase' : 'local';
   if (mode === 'local') announce('local', '当前为本机演示模式，数据仅保存在此浏览器。配置 Supabase 后可启用云端数据。');
-  else announce('supabase', 'Supabase 已连接 · 云端数据读写正常。');
+  else announce('supabase', 'Supabase 配置已加载；部署数据库迁移后才能读写云端数据。');
 
   function assertTable(table) {
     if (!TABLES.has(table)) throw new Error(`不支持的数据表：${table}`);

@@ -72,7 +72,7 @@ python3 -m http.server 4173
 
 1. Node.js 18+；仓库根目录运行 `node scripts/generate-supabase-config.mjs`。
 2. 运行 `python3 -m http.server 4173`，打开 `http://localhost:4173`；Mac 也可双击 **启动康伴.command**。
-3. 没有 Supabase 配置时，`api.js` 保留 localStorage / IndexedDB 降级，资料只保存在当前浏览器。登录页的体验区提供游客浏览和云端演示账号登录；游客只能看脱敏虚构社区帖。云端演示账号按钮需要运行环境提供 `window.KANGBAN_DEMO_PASSWORD`；该共享口令会对页面访问者可见，只能用于虚构演示账号，不可复用个人密码。未配置时按钮会提示联系管理员。
+3. 没有 Supabase 配置时，`api.js` 保留 localStorage / IndexedDB 降级，资料只保存在当前浏览器。登录页的体验区提供游客浏览和云端演示账号登录；游客只能看脱敏虚构社区帖。当前体验区可一键登录云端虚构演示账号；演示口令随前端公开配置，所有访问者都可读取，因此仅用于虚构、隔离的演示账号，严禁复用个人密码或存放真实健康资料。
 
 
 

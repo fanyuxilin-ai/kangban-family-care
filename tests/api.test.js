@@ -68,7 +68,7 @@ test('cloud mode routes CRUD and surfaces Supabase errors without local fallback
   const config = { url: 'https://example.supabase.co', publishableKey: 'sb_publishable_demo' };
   const { api, storage, events } = boot({ config, client });
   assert.equal(api.mode, 'supabase');
-  assert.match(events[0].detail.message, /已连接|云端/);
+  assert.match(events[0].detail.message, /部署数据库迁移/);
   assert.deepEqual(Array.from(await api.select('medical_records', { filters: { family_id: 'family-1' } }), row => row.id), ['cloud-1']);
   assert.ok(calls.some(call => call[0] === 'eq' && call[1] === 'family_id'));
   nextResult = { data: null, error: { message: 'RLS denied', code: '42501' } };
