@@ -71,8 +71,8 @@ python3 -m http.server 4173
 ### 本机演示模式
 
 1. Node.js 18+；仓库根目录运行 `node scripts/generate-supabase-config.mjs`。
-2. 运行 `python3 -m http.server 4173`，打开 `http://localhost:4173`。
-3. 登录页可选择游客、家庭演示或陪诊师演示。本机演示入口映射 `family-demo@kangban.local` / `escort-demo@kangban.local`，只保存在当前浏览器。云端演示账号使用 `kangban-family-demo@example.com` 和 `kangban-escort-demo@example.com`，可通过管理员初始化脚本重设同一演示口令；陪诊师账号由脚本设为已审核。游客只能看脱敏虚构社区帖。
+2. 运行 `python3 -m http.server 4173`，打开 `http://localhost:4173`；Mac 也可双击 **启动康伴.command**。
+3. 没有 Supabase 配置时，`api.js` 保留 localStorage / IndexedDB 降级，资料只保存在当前浏览器。登录页的体验区提供游客浏览和云端演示账号登录；游客只能看脱敏虚构社区帖。云端演示账号按钮需要运行环境提供 `window.KANGBAN_DEMO_PASSWORD`；该共享口令会对页面访问者可见，只能用于虚构演示账号，不可复用个人密码。未配置时按钮会提示联系管理员。
 
 
 

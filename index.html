@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=20" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -15,20 +15,43 @@
       <a class="brand" href="#home" aria-label="康伴"><span class="brand-mark"><i></i><b></b></span><span>康伴</span></a>
       <p class="eyebrow">家庭就医协同</p><h1 id="authTitle">和家人一起，把就医准备做好</h1>
       <p class="subtle">登录后使用家庭资料与社区。游客只能浏览脱敏的虚构内容。</p>
-      <div class="auth-role-switch" id="authRoleSwitch"><button type="button" data-auth-role="family" class="selected">家属登录</button><button type="button" data-auth-role="escort">陪诊师登录</button></div>
       <form id="authForm" class="auth-form">
-        <label><span>邮箱</span><input class="input-field" name="email" type="email" autocomplete="username" required placeholder="name@example.com"></label>
-        <label><span>密码</span><input class="input-field" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label>
-        <label class="auth-name-field" hidden><span>称呼</span><input class="input-field" name="displayName" maxlength="24" placeholder="怎么称呼你"></label>
+        <div class="auth-login-panel" id="authLoginPanel">
+          <label><span>邮箱</span><input class="input-field" name="email" type="email" autocomplete="username" required placeholder="name@example.com"></label>
+          <label><span>密码</span><input class="input-field" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label>
+        </div>
+        <div class="auth-register-panel" id="authRegisterPanel" hidden>
+          <div class="auth-register-step" id="authRegisterRoleStep">
+            <p class="auth-step-label">第一步 · 选择账号类型</p>
+            <div class="role-choice-list">
+              <button class="role-choice selected" type="button" data-auth-role="family"><span class="role-choice-avatar">家</span><span><strong>家庭账号</strong><small>整理家庭就医资料与陪诊需求</small></span><b>选择</b></button>
+              <button class="role-choice" type="button" data-auth-role="escort"><span class="role-choice-avatar escort-choice-avatar">陪</span><span><strong>陪诊师账号</strong><small>接收家庭需求并管理陪诊服务</small></span><b>选择</b></button>
+            </div>
+            <button class="primary-button" id="authRegisterNext" type="button">下一步</button>
+            <button class="text-button auth-register-back" id="authRegisterCancel" type="button">返回登录</button>
+          </div>
+          <div class="auth-register-step" id="authRegisterCredentials" hidden>
+            <p class="auth-step-label">第二步 · 创建登录信息</p>
+            <label><span>邮箱</span><input class="input-field" name="registerEmail" type="email" autocomplete="email" placeholder="name@example.com"></label>
+            <label><span>密码</span><input class="input-field" name="registerPassword" type="password" autocomplete="new-password" minlength="8" placeholder="至少 8 位"></label>
+            <label><span>确认密码</span><input class="input-field" name="passwordConfirm" type="password" autocomplete="new-password" minlength="8" placeholder="再次输入密码"></label>
+            <button class="text-button auth-register-back" id="authRegisterBack" type="button">返回选择账号类型</button>
+          </div>
+        </div>
         <p class="auth-message" id="authMessage" role="status"></p>
         <button class="primary-button" id="authSubmit" type="submit">登录</button>
-        <button class="text-button auth-register" id="authForgotPassword" type="button">忘记密码？发送重置邮件</button>
-        <button class="text-button auth-register" id="authRegister" type="button">创建账号</button>
+        <button class="secondary-button auth-register" id="authRegister" type="button">创建账号</button>
+        <p class="auth-reset-notice" id="authResetNotice">演示版密码重置请联系管理员</p>
+        <button class="text-button" id="authForgotPassword" type="button" hidden>发送重置邮件</button>
       </form>
-      <div class="auth-divider" id="authDivider"><span>也可以先体验演示</span></div>
-      <button type="button" class="secondary-button auth-guest" id="authGuest" data-auth-guest>游客体验（脱敏社区）</button>
-      <div class="auth-demos" id="authDemos"><p>本机演示账号（不登录云端）</p><button type="button" data-auth-demo="family">家庭演示</button><button type="button" data-auth-demo="escort">陪诊师演示</button></div>
-      <p class="demo-disclaimer" id="authDisclaimer">演示账号仅保存在本机；云端数据需真实账号登录。</p>
+      <details class="auth-experience" id="authExperience">
+        <summary>先逛逛 <span>⌄</span></summary>
+        <div class="auth-experience-actions">
+          <button type="button" data-auth-guest>游客体验（脱敏社区）</button>
+          <button type="button" data-auth-cloud-demo="family">家庭演示账号一键登录</button>
+          <button type="button" data-auth-cloud-demo="escort">陪诊师演示账号一键登录</button>
+        </div>
+      </details>
     </div>
   </section>
   <div class="app-shell">
@@ -218,7 +241,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="api.js?v=4"></script>
-  <script src="auth.js?v=4"></script>
-  <script src="app.js?v=22"></script>
+  <script src="auth.js?v=5"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

@@ -61,15 +61,29 @@
       else if (saved?.mode === 'guest') { session = saved; mode = 'guest'; }
       emit(); return session;
     },
-    async signIn(email, password, requestedRole) {
-      if (!root.KangbanAPI?.isCloudEnabled()) throw new Error('尚未配置 Supabase，当前不能使用真实账号登录；请选“游客体验”或本机演示账号。');
+    async signIn(email, password) {
+      if (!root.KangbanAPI?.isCloudEnabled()) throw new Error('尚未配置 Supabase，当前不能使用真实账号登录；请先体验游客内容或联系管理员。');
       const { data, error } = await root.KangbanAPI.client.auth.signInWithPassword({ email, password });
       if (error) {
-        if (error.message === 'Invalid login credentials') throw new Error('邮箱或密码不正确。若邮箱已确认，请核对注册密码，或使用“忘记密码”重置。');
+        const code = String(error.code || '').toLowerCase();
+        const message = String(error.message || '');
+        if (['user_not_found', 'email_not_found', 'user_missing'].includes(code) || /user (?:not found|does not exist)/i.test(message)) {
+          throw new Error('账号不存在，请检查邮箱或先创建账号。');
+        }
+        if (['invalid_credentials', 'invalid_login_credentials'].includes(code) || /invalid login credentials/i.test(message)) {
+          throw new Error('邮箱或密码错误；若无法确认账号是否存在，请联系管理员。');
+        }
         throw error;
       }
-      const profile = await loadProfile(data.user, requestedRole);
-      if (requestedRole && profile.role !== requestedRole) { await root.KangbanAPI.client.auth.signOut(); throw new Error('该账号角色与当前入口不符。'); }
+      const profile = await loadProfile(data.user, data.user?.user_metadata?.role);
+      if (profile.status === 'pending_review') {
+        await root.KangbanAPI.client.auth.signOut();
+        throw new Error('陪诊师账号待审核，审核通过后即可登录使用。');
+      }
+      if (profile.status === 'suspended') {
+        await root.KangbanAPI.client.auth.signOut();
+        throw new Error('账号已停用，请联系管理员。');
+      }
       session = profile;
       mode = 'cloud'; emit(); return session;
     },

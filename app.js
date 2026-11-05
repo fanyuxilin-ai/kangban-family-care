@@ -2993,6 +2993,43 @@ function startListening() {
 }
 function stopListening() { try { window.activeRecognition?.stop(); } catch {} window.activeRecognition = null; }
 
+function setAuthRegistrationView(enabled, step = 'role') {
+  const form = document.getElementById('authForm');
+  if (!form) return;
+  window.authRegisterMode = !!enabled;
+  const loginPanel = document.getElementById('authLoginPanel');
+  const registerPanel = document.getElementById('authRegisterPanel');
+  const roleStep = document.getElementById('authRegisterRoleStep');
+  const credentials = document.getElementById('authRegisterCredentials');
+  const next = document.getElementById('authRegisterNext');
+  const submit = document.getElementById('authSubmit');
+  const loginInputs = loginPanel?.querySelectorAll('input') || [];
+  const registerInputs = credentials?.querySelectorAll('input') || [];
+  if (loginPanel) loginPanel.hidden = !!enabled;
+  if (registerPanel) registerPanel.hidden = !enabled;
+  if (roleStep) roleStep.hidden = !enabled || step !== 'role';
+  if (credentials) credentials.hidden = !enabled || step !== 'credentials';
+  if (next) next.hidden = !enabled || step !== 'role';
+  loginInputs.forEach(input => { input.disabled = !!enabled; input.required = !enabled && ['email', 'password'].includes(input.name); });
+  registerInputs.forEach(input => {
+    input.disabled = !enabled || step !== 'credentials';
+    input.required = enabled && step === 'credentials';
+    if (!enabled) input.value = '';
+  });
+  if (submit) {
+    submit.hidden = !!enabled && step !== 'credentials';
+    submit.textContent = enabled ? '注册并继续' : '登录';
+  }
+  const createAccount = document.getElementById('authRegister');
+  const resetNotice = document.getElementById('authResetNotice');
+  const experience = document.getElementById('authExperience');
+  if (createAccount) createAccount.hidden = !!enabled;
+  if (resetNotice) resetNotice.hidden = !!enabled;
+  if (experience) experience.hidden = !!enabled;
+  const message = document.getElementById('authMessage');
+  if (message) message.textContent = '';
+}
+
 document.addEventListener('click', async event => {
   if (event.target.closest('[data-auth-role]')) {
     window.selectedAuthRole = event.target.closest('[data-auth-role]').dataset.authRole;
@@ -3001,14 +3038,34 @@ document.addEventListener('click', async event => {
   if (event.target.closest('[data-auth-guest]')) { window.KangbanAuth.enterGuest(); return; }
   const demoRole = event.target.closest('[data-auth-demo]')?.dataset.authDemo;
   if (demoRole) { window.KangbanAuth.enterLocalDemo(demoRole); return; }
+  const cloudDemoRole = event.target.closest('[data-auth-cloud-demo]')?.dataset.authCloudDemo;
+  if (cloudDemoRole) {
+    const message = document.getElementById('authMessage');
+    const email = cloudDemoRole === 'escort' ? 'kangban-escort-demo@example.com' : 'kangban-family-demo@example.com';
+    const password = window.KANGBAN_DEMO_PASSWORD || '';
+    if (!window.KangbanAPI?.isCloudEnabled()) { message.textContent = '尚未配置 Supabase，云端演示账号暂不可用。'; return; }
+    if (!password) { message.textContent = '云端演示账号密码尚未配置，请联系管理员。'; return; }
+    message.textContent = '正在登录云端演示账号…';
+    try { await window.KangbanAuth.signIn(email, password); }
+    catch (error) { message.textContent = error.message || '演示账号登录失败，请联系管理员。'; }
+    return;
+  }
   if (event.target.closest('#authRegister')) {
-    window.authRegisterMode = !window.authRegisterMode;
-    const form = document.getElementById('authForm');
-    form.querySelector('.auth-name-field').hidden = !window.authRegisterMode;
-    document.getElementById('authForgotPassword').hidden = window.authRegisterMode;
-    document.getElementById('authSubmit').textContent = window.authRegisterMode ? '注册并继续' : '登录';
-    document.getElementById('authRegister').textContent = window.authRegisterMode ? '返回登录' : '创建账号';
-    form.querySelector('[name="password"]').autocomplete = window.authRegisterMode ? 'new-password' : 'current-password';
+    window.selectedAuthRole = 'family';
+    document.querySelectorAll('[data-auth-role]').forEach(button => button.classList.toggle('selected', button.dataset.authRole === 'family'));
+    setAuthRegistrationView(true, 'role');
+    return;
+  }
+  if (event.target.closest('#authRegisterNext')) {
+    setAuthRegistrationView(true, 'credentials');
+    return;
+  }
+  if (event.target.closest('#authRegisterBack')) {
+    setAuthRegistrationView(true, 'role');
+    return;
+  }
+  if (event.target.closest('#authRegisterCancel')) {
+    setAuthRegistrationView(false);
     return;
   }
   if (event.target.closest('[data-community-filter]')) {
@@ -3752,24 +3809,21 @@ if (!state.alertsSeeded) {
 function setPasswordRecoveryView(enabled) {
   const isRecovery = !!enabled;
   const form = document.getElementById('authForm');
-  const emailLabel = form?.querySelector('label:nth-of-type(1)');
-  const emailInput = form?.querySelector('[name="email"]');
-  const passwordLabel = form?.querySelector('label:nth-of-type(2) span');
-  const passwordInput = form?.querySelector('[name="password"]');
+  const emailLabel = form?.querySelector('#authLoginPanel label:first-of-type');
+  const emailInput = form?.querySelector('#authLoginPanel [name="email"]');
+  const passwordLabel = form?.querySelector('#authLoginPanel label:nth-of-type(2) span');
+  const passwordInput = form?.querySelector('#authLoginPanel [name="password"]');
   if (!form || !passwordInput) return;
+  setAuthRegistrationView(false);
   emailLabel.hidden = isRecovery;
   emailInput.required = !isRecovery;
   emailInput.disabled = isRecovery;
-  document.getElementById('authRoleSwitch').hidden = isRecovery;
-  document.getElementById('authRegister').hidden = isRecovery || !!window.authRegisterMode;
-  document.getElementById('authForgotPassword').hidden = isRecovery || !!window.authRegisterMode;
-  document.getElementById('authDivider').hidden = isRecovery;
-  document.getElementById('authGuest').hidden = isRecovery;
-  document.getElementById('authDemos').hidden = isRecovery;
-  document.getElementById('authDisclaimer').hidden = isRecovery;
-  form.querySelector('.auth-name-field').hidden = isRecovery || !window.authRegisterMode;
+  document.getElementById('authRegister').hidden = isRecovery;
+  document.getElementById('authForgotPassword').hidden = true;
+  document.getElementById('authResetNotice').hidden = isRecovery;
+  document.getElementById('authExperience').hidden = isRecovery;
   passwordLabel.textContent = isRecovery ? '新密码' : '密码';
-  passwordInput.autocomplete = isRecovery ? 'new-password' : window.authRegisterMode ? 'new-password' : 'current-password';
+  passwordInput.autocomplete = isRecovery ? 'new-password' : 'current-password';
   passwordInput.placeholder = isRecovery ? '请设置至少 8 位新密码' : '至少 8 位';
   passwordInput.value = '';
   document.getElementById('authSubmit').textContent = isRecovery ? '保存新密码' : window.authRegisterMode ? '注册并继续' : '登录';
@@ -3792,6 +3846,12 @@ document.getElementById('authForm')?.addEventListener('submit', async event => {
   const form = new FormData(event.currentTarget);
   const message = document.getElementById('authMessage');
   const button = document.getElementById('authSubmit');
+  const email = String(form.get(window.authRegisterMode ? 'registerEmail' : 'email') || '').trim();
+  const password = String(form.get(window.authRegisterMode ? 'registerPassword' : 'password') || '');
+  if (window.authRegisterMode && password !== String(form.get('passwordConfirm') || '')) {
+    message.textContent = '两次输入的密码不一致，请重新确认。';
+    return;
+  }
   message.textContent = '正在连接…'; button.disabled = true;
   try {
     if (window.KangbanAuth.isPasswordRecovery) {
@@ -3801,10 +3861,12 @@ document.getElementById('authForm')?.addEventListener('submit', async event => {
       event.currentTarget.reset();
       message.textContent = '密码已更新，请使用新密码登录。';
     } else if (window.authRegisterMode) {
-      const result = await window.KangbanAuth.signUp({ email:String(form.get('email')||'').trim(), password:String(form.get('password')||''), displayName:String(form.get('displayName')||'康伴用户').trim(), role:window.selectedAuthRole||'family' });
-      if (result.pendingEmailConfirmation) message.textContent = '注册成功。请到邮箱完成验证，再返回本机页面登录；若链接跳转页被拦截，请回到这里检查账号状态并登录。';
+      const result = await window.KangbanAuth.signUp({ email, password, displayName: '康伴用户', role:window.selectedAuthRole||'family' });
+      if (result.pendingEmailConfirmation) message.textContent = '注册成功。请到邮箱完成验证，再返回登录。';
+      else event.currentTarget.reset();
     } else {
-      await window.KangbanAuth.signIn(String(form.get('email')||'').trim(),String(form.get('password')||''),window.selectedAuthRole||'family');
+      await window.KangbanAuth.signIn(email, password);
+      event.currentTarget.reset();
     }
   } catch (error) { message.textContent = error.message || '操作失败，请稍后重试。'; }
   finally { button.disabled = false; }
@@ -3821,6 +3883,7 @@ async function applyAuthSession(session) {
   }
   if (!session) {
     document.body.classList.remove('authenticated','guest-mode'); gate.hidden = false;
+    setAuthRegistrationView(false);
     document.getElementById('familyTabs').hidden = false; document.getElementById('escortTabs').hidden = true;
     return;
   }
@@ -3844,7 +3907,6 @@ async function applyAuthSession(session) {
   }
   renderRole();
   if (session.role === 'guest') navigate('community');
-  else if (window.KangbanAuth.mode === 'cloud') navigate('community');
   else navigate(session.role === 'escort' ? 'escort' : 'home');
 }
 window.addEventListener('kangban:auth-change', event => { applyAuthSession(event.detail.session); });
