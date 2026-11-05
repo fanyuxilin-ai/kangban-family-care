@@ -78,7 +78,7 @@ npx supabase@latest link --project-ref <your-project-ref>
 npx supabase@latest db push
 ```
 
-迁移按顺序建立 17 张业务表、RLS 与私有 Storage、社区事务 RPC，以及家庭工作区快照和订单履约 RPC。当前开发环境未登录 Supabase CLI、没有项目数据库密码，因此尚未对远程项目执行迁移或创建云端账号。
+迁移已部署到 Supabase 项目 `kangban`（Mumbai），Project ref 为 `vlxdgdrjbomdarrkrctc`。三份迁移按顺序创建 17 张业务表、RLS、私有附件 bucket、社区/订单事务 RPC、家庭工作区快照和履约策略，并登记在 Supabase migration history。详见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。Auth 用户仍需注册；陪诊师需要管理员审核。
 
 4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
 5. 管理员审核陪诊师：先在 Supabase Auth 找到对应用户 ID，再在 SQL Editor 以管理员权限更新两处状态：
@@ -99,8 +99,8 @@ update public.profiles set account_status = 'active', updated_at = now() where i
 
 ## 本次里程碑与已知边界
 
-- **M1 数据层：**17 表、RLS、私有 bucket 与报名/确认 RPC，API 门面和本机回退。尚未连接 Supabase 项目实际执行迁移。
+- **M1 数据层：**17 表、RLS、私有 bucket 与报名/确认 RPC，API 门面和本机回退。迁移已部署到 `kangban` 项目，并记录版本历史。
 - **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示入口映射专用演示邮箱但不创建真实云账号。
 - **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；后端实现报名、选人、双方确认、开始/完成/取消及标准清单事务。Pink 的本机需求大厅、分享码和收入模拟代码保留；真实云端任务分享码尚未接入，收入/评价目前仍属本机演示。
-- **M4 迁移：**列出类别数量、确认后导入、附件上传私有 Storage、migration_runs 进度记录。跨设备附件预览链接和中断恢复尚未在真实 Supabase 项目上端到端验证。
+- **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 进度记录。真实跨账号附件读写、跨设备预览与中断恢复尚未端到端验证；当前 Supabase 项目尚无用户或导入数据。
 - **Pink 能力对照：**需求大厅—保留并将云端社区作为唯一真实接单入口；履约清单—保留八项模板并在云端订单使用事务 RPC/佐证；任务分享码—保留本机实现，云端分享授权待接；收入与互评—保留本机模拟，真实支付/评价表与流程未实现。
