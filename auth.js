@@ -20,11 +20,7 @@
     if (profile.role === 'family') {
       const memberships = await root.KangbanAPI.select('family_memberships', { filters: { user_id: user.id, status: 'active' }, limit: 1 });
       familyId = memberships[0]?.family_id || null;
-      if (!familyId) {
-        const family = await root.KangbanAPI.client.from('families').insert({ created_by: user.id, name: `${profile.display_name}的家庭` }).select().single();
-        if (family.error) throw family.error;
-        familyId = family.data.id;
-      }
+      if (!familyId) familyId = await root.KangbanAPI.rpc('ensure_family_for_current_user');
     }
     return { user, role: profile.role || fallbackRole || 'family', status: profile.account_status || 'active', familyId, displayName: profile.display_name };
   }

@@ -92,7 +92,7 @@
       state[key] = next; writeState(state); return { removed: rows.length - next.length };
     },
     async rpc(name, args = {}) {
-      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
+      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
       if (!client) throw new Error('本机演示模式不执行云端事务 RPC。');
       return runCloud(client.rpc(name, args));
     },
