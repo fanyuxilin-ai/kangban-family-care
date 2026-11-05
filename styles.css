@@ -477,3 +477,48 @@ body:not(.authenticated) .app-shell{display:none}
 /* 发布与管理操作归位：我的页/需求大厅的操作行 */
 .profile-action-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
 .profile-action-row .primary-button,.profile-action-row .secondary-button{margin:0;min-height:40px}
+/* 首页统领区：今日总览条 / 待我处理 / 成员状态行 / 本机数据标注 */
+.today-bar{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fffefa;border:1px solid #e9eae2;border-radius:13px;padding:11px 14px;margin-top:2px;box-shadow:0 3px 12px rgba(62,92,68,.05)}
+.today-bar .tb-date{font-size:12px;font-weight:800;color:#31443a;flex:none}
+.today-bar .tb-chips{display:flex;gap:6px;flex:1;flex-wrap:wrap}
+.tb-chip{font-size:9.5px;font-weight:700;padding:4px 9px;border-radius:20px;background:#f0efe8;color:#7c877e;white-space:nowrap}
+.tb-chip.tb-blue{background:#e7eef3;color:#41668a}
+.tb-chip.tb-green{background:#e8f0e8;color:#3f6b4a}
+.tb-chip.tb-red{background:#f7e9e6;color:#a4503f}
+.tb-chip.tb-amber{background:#f3ecdd;color:#9a7b2f}
+.today-bar .tb-arrow{color:#9aa79c;font-size:11px;transition:transform .18s}
+.today-bar.open .tb-arrow{transform:rotate(180deg)}
+.today-detail{margin-top:8px;padding:4px 12px 10px;background:#fffefa;border:1px solid #e9eae2;border-radius:13px;display:grid;gap:2px}
+.td-row{display:grid;grid-template-columns:44px 1fr auto;gap:9px;align-items:center;padding:7px 0;border-bottom:1px dashed #eceee7}
+.td-row:last-child{border-bottom:none}
+.td-row time{font-size:10.5px;font-weight:700;color:#5b6a5e}
+.td-row strong{font-size:11px;color:#31443a;display:block}
+.td-row small{font-size:9px;color:#949d96}
+.td-row>span{font-size:11px;color:#739078;font-weight:800}
+.td-row.is-done{opacity:.55}
+.todo-section .todo-count{font-style:normal;font-size:11px;background:#f3ecdd;color:#9a7b2f;border-radius:20px;padding:2px 8px;vertical-align:2px;margin-left:4px}
+.todo-list{display:grid;gap:8px}
+.todo-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:12px;background:#f5f4ec}
+.todo-row.todo-high{background:#f7e9e6}
+.todo-mark{width:20px;height:20px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;background:#e4e9e0;color:#7c877e}
+.todo-high .todo-mark{background:#eac6bd;color:#a4503f}
+.todo-copy{flex:1;min-width:0}
+.todo-copy strong{font-size:11.5px;color:#31443a;display:block}
+.todo-high .todo-copy strong{color:#8f4132}
+.todo-copy small{font-size:9.5px;color:#949d96;display:block;margin-top:2px}
+.member-strip{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.member-strip-card{text-align:left;background:#fffefa;border:1px solid #e9eae2;border-radius:13px;padding:11px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 3px 12px rgba(62,92,68,.04)}
+.ms-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.ms-head b{font-size:12px;color:#31443a}
+.ms-alert{font-style:normal;font-size:8.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:#f7e9e6;color:#a4503f}
+.ms-ok{font-style:normal;font-size:8.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:#e8f0e8;color:#3f6b4a}
+.ms-reading{font-size:9.5px;color:#5b6a5e;line-height:1.5}
+.ms-reading em{font-style:normal;font-weight:700;color:#46564a;margin-right:2px}
+.ms-reading i{font-style:normal;font-size:8.5px;font-weight:700;padding:1px 6px;border-radius:20px;vertical-align:1px}
+.ms-reading.ms-empty{color:#aab2ac}
+.ms-med{font-size:9px;color:#7c877e}
+.local-data-badge{display:none;font-size:8.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:#f3ecdd;color:#9a7b2f;vertical-align:1px;margin-left:2px}
+.kb-cloud .local-data-badge{display:inline-block}
+.kb-cloud .local-data-badge[hidden]{display:none}
+.pill-live{background:#e7eef3;color:#2c4a63}
+.pill-live .status-dot{background:#4d84b8;animation:pulse 1.4s infinite}

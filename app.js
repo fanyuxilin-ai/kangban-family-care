@@ -331,8 +331,6 @@ function appointmentProgress(member) {
 function displayToday() {
   const now = new Date();
   document.getElementById('todayLabel').textContent = `${now.getMonth()+1}月${now.getDate()}日 · 家庭健康档案`;
-  const visit = new Date(); visit.setHours(12,0,0,0); visit.setDate(visit.getDate()+4);
-  document.getElementById('nextVisitDate').textContent = `${visit.getMonth()+1}月${visit.getDate()}日 周${'日一二三四五六'[visit.getDay()]}`;
 }
 function renderRecords() {
   const sorted = [...state.records].sort((a,b) => b.date.localeCompare(a.date));
@@ -360,6 +358,10 @@ function renderRecords() {
     </article>`;
   }).join('')}</div>` : `<div class="family-empty-card"><p>还没有陪诊预约。可以先查看陪诊员介绍并提交一笔演示预约。</p><button class="primary-button" data-action="book-profile">预约陪诊员</button></div>`}</div></div>`;
   renderMedicationReminders();
+  updateHero();
+  renderHomeTodayBar();
+  renderHomeTodo(homeTodoItems());
+  renderHomeMemberStrip();
   renderHomeCompanionModule();
   renderHealth();
   renderDocs();
@@ -1755,7 +1757,6 @@ async function renderCloudFamilyOrders() {
   const auth = window.KangbanAuth;
   if (auth?.mode !== 'cloud' || auth.role !== 'family') return;
   const host = document.getElementById('companionLiveOrders');
-  const homeStrip = document.getElementById('homeCompanionLive');
   try {
     const orders = await window.KangbanAPI.rpc('list_my_companion_orders');
     cloudOrderCache = new Map(orders.map(order => [order.id, order]));
@@ -1765,15 +1766,16 @@ async function renderCloudFamilyOrders() {
       host.hidden = !active.length && !needReview.length;
       host.innerHTML = `${active.length ? `<section class="section-block" style="margin-top:2px"><div class="section-heading"><div><p class="eyebrow">陪诊实时动态</p><h2>进行中的陪诊</h2></div></div><div class="demand-post-list">${active.map(order => renderCloudOrderCard(order, false)).join('')}</div></section>` : ''}${needReview.length ? `<section class="section-block"><div class="section-heading"><h2>待评价</h2></div><div class="demand-post-list">${needReview.slice(0, 3).map(order => renderCloudOrderCard(order, false)).join('')}</div></section>` : ''}`;
     }
-    if (homeStrip) {
-      const todayOrder = active.find(order => order.service_date === dateOffset(0));
-      homeStrip.hidden = !todayOrder;
-      if (todayOrder) {
-        const label = { pending_escort_confirmation: '等待陪诊师确认', confirmed: todayOrder.arrived_at ? '陪诊师已到场 · 服务即将开始' : '已确认 · 待服务', in_service: '服务中 · 实时回传进度' }[todayOrder.status] || '';
-        homeStrip.innerHTML = `<button class="companion-live-strip" data-nav="companion"><span class="cls-dot"></span><span class="cls-copy"><strong>今天${todayOrder.starts_at ? ` ${fmtClock(todayOrder.starts_at)}` : ''} · ${esc(todayOrder.service_type)}</strong><small>${esc(todayOrder.hospital_name)} · ${esc(label)}</small></span><span class="cls-arrow">→</span></button>`;
-      }
-    }
-  } catch (error) { if (host) host.innerHTML = `<div class="empty-hint">陪诊动态加载失败：${esc(error.message || error)}</div>`; }
+    /* 首页统领区接云端：Hero 显示当天陪诊；总览条与待办队列用云端订单+新报名 */
+    const todayOrder = active.find(order => order.service_date === dateOffset(0));
+    updateHero(todayOrder);
+    renderHomeTodayBar(orders);
+    renderHomeTodo(homeTodoItems(orders).concat(await fetchCloudSignupItems()));
+    renderHomeMemberStrip();
+  } catch (error) {
+    updateHero();
+    if (host) host.innerHTML = `<div class="empty-hint">陪诊动态加载失败：${esc(error.message || error)}</div>`;
+  }
 }
 /* ===== 云端操作后的上下文刷新（取代单一 renderCommunity） ===== */
 async function refreshCloudAfterAction() {
@@ -2235,6 +2237,9 @@ function renderRole() {
   document.querySelector('#logoutButton')?.classList.toggle('auth-hidden', !window.KangbanAuth?.session || guest);
   const greetName = document.querySelector('#view-home .greeting-row h1 span');
   if (greetName && member) greetName.textContent = member.name;
+  /* 云端模式下，预警/提醒等仍读本机数据的区块诚实标注来源 */
+  document.body.classList?.toggle('kb-cloud', window.KangbanAuth?.mode === 'cloud');
+  document.querySelectorAll('.local-data-badge').forEach(badge => { badge.hidden = window.KangbanAuth?.mode !== 'cloud'; });
   renderCompanionViews();
 }
 
@@ -2246,9 +2251,8 @@ function setRole(role) {
   navigate(state.currentRole === 'escort' ? 'escort' : 'home');
   closeModal();
 }
-function renderMedicationReminders() {
-  const host = document.getElementById('homeMedicationReminders');
-  if (!host) return;
+/* 今日提醒项统一提取（今日提醒区块 / 首页总览条 / 成员状态行共用一个数据源） */
+function todayReminderItems() {
   const today = dateOffset(0);
   const day = new Date(`${today}T12:00:00`).getDay();
   const memberName = id => state.familyMembers.find(member => member.id === id)?.name || '陈兰英';
@@ -2256,23 +2260,137 @@ function renderMedicationReminders() {
     ...(state.medications || []).flatMap(med => (med.times || []).map(time => ({ id: med.id, kind: 'medication', title: med.name, detail: med.dose || med.frequencyLabel || '按已确认医嘱', time, memberId: med.memberId === 'member-mom' || !med.memberId ? 'm1' : med.memberId, med }))),
     ...(state.customReminders || []).filter(reminder => reminder.active !== false && (!reminder.startDate || reminder.startDate <= today) && (!reminder.endDate || reminder.endDate >= today) && (reminder.days || [0,1,2,3,4,5,6]).includes(day)).map(reminder => ({ ...reminder, kind: reminder.kind || 'custom' }))
   ].sort((a,b) => a.time.localeCompare(b.time));
-  if (!items.length) {
-    host.innerHTML = `<div class="med-empty"><span>今天暂无安排，可添加量血压、散步或自定义事项。</span><button class="text-button" data-action="add-reminder">新增提醒 →</button></div>`;
-    return;
-  }
-  host.innerHTML = `<div class="med-reminder-list">${items.map(item => {
+  return items.map(item => {
     const key = `${today}|${item.id}|${item.time}`;
     const log = item.kind === 'medication' ? null : state.reminderLogs?.[key];
     const skipped = log?.status === 'skipped';
     const done = item.kind === 'medication' ? Boolean(state.medicationTaken?.[key]) : log?.status === 'done' || skipped;
     const typeLabel = item.kind === 'medication' ? '服药' : item.kind === 'measurement' ? '测量' : item.kind === 'activity' ? '活动' : '自定义';
-    const subline = item.kind === 'medication' ? `${esc(item.detail)} · ${esc(memberName(item.memberId))}` : `${typeLabel} · ${esc(memberName(item.memberId))}${item.unit ? ` · ${esc(item.unit)}` : ''}`;
+    return { ...item, key, done, skipped, typeLabel, memberName: memberName(item.memberId) };
+  });
+}
+function renderMedicationReminders() {
+  const host = document.getElementById('homeMedicationReminders');
+  if (!host) return;
+  const items = todayReminderItems();
+  renderHomeTodayBar();
+  renderHomeMemberStrip();
+  if (!items.length) {
+    host.innerHTML = `<div class="med-empty"><span>今天暂无安排，可添加量血压、散步或自定义事项。</span><button class="text-button" data-action="add-reminder">新增提醒 →</button></div>`;
+    return;
+  }
+  host.innerHTML = `<div class="med-reminder-list">${items.map(item => {
+    const subline = item.kind === 'medication' ? `${esc(item.detail)} · ${esc(item.memberName)}` : `${item.typeLabel} · ${esc(item.memberName)}${item.unit ? ` · ${esc(item.unit)}` : ''}`;
     const button = item.kind === 'medication'
-      ? `<button class="med-taken-button" data-med-taken="${esc(item.id)}" data-med-time="${esc(item.time)}" ${done ? 'disabled' : ''}>${done ? '已记录' : '记录已服'}</button>`
-      : `<div class="reminder-inline-actions"><button class="med-taken-button" data-reminder-complete="${esc(item.id)}" data-reminder-time="${esc(item.time)}" ${done ? 'disabled' : ''}>${skipped ? '已跳过' : done ? (item.kind === 'measurement' ? '已记录' : '已完成') : (item.kind === 'measurement' ? '记录读数' : '完成')}</button>${!done ? `<button class="reminder-later" data-reminder-snooze="${esc(item.id)}" data-reminder-time="${esc(item.time)}">＋30分</button><button class="reminder-skip" data-reminder-skip="${esc(item.id)}" data-reminder-time="${esc(item.time)}">跳过</button>` : ''}</div>`;
-    const snoozedText = log?.status === 'snoozed' ? ` · 已延后至 ${new Date(log.snoozedUntil).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` : '';
-    return `<div class="med-reminder-row ${done ? 'is-taken' : ''}"><time>${esc(item.time)}</time><div class="med-reminder-copy"><strong>${esc(item.title)} <i>${typeLabel}</i></strong><small>${subline}${esc(snoozedText)}</small></div>${button}</div>`;
+      ? `<button class="med-taken-button" data-med-taken="${esc(item.id)}" data-med-time="${esc(item.time)}" ${item.done ? 'disabled' : ''}>${item.done ? '已记录' : '记录已服'}</button>`
+      : `<div class="reminder-inline-actions"><button class="med-taken-button" data-reminder-complete="${esc(item.id)}" data-reminder-time="${esc(item.time)}" ${item.done ? 'disabled' : ''}>${item.skipped ? '已跳过' : item.done ? (item.kind === 'measurement' ? '已记录' : '已完成') : (item.kind === 'measurement' ? '记录读数' : '完成')}</button>${!item.done ? `<button class="reminder-later" data-reminder-snooze="${esc(item.id)}" data-reminder-time="${esc(item.time)}">＋30分</button><button class="reminder-skip" data-reminder-skip="${esc(item.id)}" data-reminder-time="${esc(item.time)}">跳过</button>` : ''}</div>`;
+    const snoozedText = state.reminderLogs?.[item.key]?.status === 'snoozed' ? ` · 已延后至 ${new Date(state.reminderLogs[item.key].snoozedUntil).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` : '';
+    return `<div class="med-reminder-row ${item.done ? 'is-taken' : ''}"><time>${esc(item.time)}</time><div class="med-reminder-copy"><strong>${esc(item.title)} <i>${item.typeLabel}</i></strong><small>${subline}${esc(snoozedText)}</small></div>${button}</div>`;
   }).join('')}</div>`;
+}
+
+/* ===== 首页统领区：今日总览条 / Hero 真数据 / 待我处理 / 成员状态行 ===== */
+function updateHero(cloudOrder) {
+  const host = document.getElementById('homeHeroBody');
+  if (!host) return;
+  const hero = (pill, spark, kicker, title, meta, actionHtml, live = false) => {
+    host.innerHTML = `<div class="hero-top"><span class="pill pill-light${live ? ' pill-live' : ''}"><span class="status-dot"></span> ${pill}</span><span class="hero-spark">${spark}</span></div><p class="hero-kicker">${kicker}</p><h2>${title}</h2><div class="appointment-meta">${meta}</div>${actionHtml}`;
+  };
+  const today = dateOffset(0);
+  if (cloudOrder) {
+    const label = { pending_escort_confirmation: '等待陪诊师确认', confirmed: cloudOrder.arrived_at ? '陪诊师已到场 · 即将开始' : '已确认 · 待服务', in_service: '服务中 · 实时回传进度' }[cloudOrder.status] || '';
+    hero(cloudOrder.status === 'in_service' ? '陪诊进行中' : '今日陪诊', '♡', '今天的服务', esc(cloudOrder.hospital_name || ''), `${esc(cloudOrder.service_type || '')} · ${cloudOrder.starts_at ? `${fmtClock(cloudOrder.starts_at)} · ` : ''}<span>${esc(label)}</span>`, `<button class="hero-action" data-nav="companion">查看陪诊动态 <span>→</span></button>`, true);
+    return;
+  }
+  const localToday = (state.companionOrders || []).find(order => order.date === today && ['pending', 'accepted'].includes(order.status));
+  if (localToday) {
+    hero('今日陪诊', '♡', '今天的服务', esc(localToday.hospital), `${esc(localToday.service)} · <span>${localToday.status === 'accepted' ? '陪诊员已接单' : '等待陪诊员确认'}</span>`, `<button class="hero-action" data-action="companion">查看安排 <span>→</span></button>`, true);
+    return;
+  }
+  const upcoming = (state.companionOrders || []).filter(order => order.date > today && ['pending', 'accepted'].includes(order.status)).sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (upcoming) {
+    hero('家庭档案已就绪', '✳', '下一次就诊', esc(upcoming.hospital), `${esc(upcoming.service)} · <span>${formatDate(upcoming.date)}</span>`, `<button class="hero-action" data-action="companion">查看安排 <span>→</span></button>`);
+    return;
+  }
+  hero('一切如常', '✳', '今天暂无就诊安排', '有空整理一下健康档案', '<span>录入读数，或去社区看看需求</span>', `<button class="hero-action" data-action="add-reading">录入读数 <span>→</span></button>`);
+}
+function homeTodoItems(cloudOrders) {
+  const items = [];
+  for (const order of state.companionOrders || []) {
+    if (order.status === 'completed' && order.serviceReport?.needsFamily) items.push({ level: 'high', title: `${order.service} · 陪诊员标记需家属跟进`, sub: `${order.hospital} · ${order.date}`, action: '<button class="text-button" data-nav="companion">查看反馈 →</button>' });
+    else if (order.status === 'pending') items.push({ level: 'mid', title: `${order.service} · 等待陪诊员确认`, sub: `${order.hospital} · ${order.date}`, action: '<button class="text-button" data-nav="companion">查看安排 →</button>' });
+    else if (order.status === 'completed' && !order.reviews?.family) items.push({ level: 'low', title: `${order.service} · 待评价`, sub: `${order.hospital} · ${order.date}`, action: `<button class="text-button" data-order-review="${esc(order.id)}" data-review-role="family">去评价 →</button>` });
+  }
+  if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family') {
+    for (const order of cloudOrders || []) {
+      if (order.status === 'pending_escort_confirmation') items.push({ level: 'mid', title: `${order.service_type} · 等待陪诊师确认`, sub: `${order.hospital_name} · ${order.service_date}`, action: '<button class="text-button" data-nav="companion">查看动态 →</button>' });
+      else if (order.status === 'completed' && !order.reviews?.family) items.push({ level: 'low', title: `${order.service_type} · 待评价`, sub: `${order.hospital_name} · ${order.service_date}`, action: `<button class="text-button" data-cloud-order-review="${esc(order.id)}" data-review-role="family">去评价 →</button>` });
+    }
+  }
+  return items;
+}
+async function fetchCloudSignupItems() {
+  const auth = window.KangbanAuth;
+  if (auth?.mode !== 'cloud' || auth.role !== 'family') return [];
+  try {
+    const posts = await window.KangbanAPI.select('community_posts', { filters: { family_id: auth.session.familyId, type: 'demand' }, order: { column: 'created_at', ascending: false }, limit: 20 });
+    const openPosts = posts.filter(post => ['open', 'has_applicants'].includes(post.status));
+    const counts = await Promise.all(openPosts.map(async post => ({ post, signups: await window.KangbanAPI.select('post_signups', { filters: { post_id: post.id, status: 'applied' } }).catch(() => []) })));
+    return counts.filter(({ signups }) => signups.length).map(({ post, signups }) => ({ level: 'mid', title: `${post.service_type || '陪诊需求'} · ${signups.length} 位陪诊师报名`, sub: `${post.hospital_name || ''}${post.service_date ? ` · ${post.service_date}` : ''}`, action: '<button class="text-button" data-nav="community">去查看 →</button>' }));
+  } catch { return []; }
+}
+function renderHomeTodo(items) {
+  const host = document.getElementById('homeTodoQueue');
+  if (!host) return;
+  if (!items || !items.length) { host.innerHTML = ''; host.hidden = true; return; }
+  host.hidden = false;
+  host.innerHTML = `<section class="section-block todo-section"><div class="section-heading"><div><p class="eyebrow">散在各处的待办，收拢到这里</p><h2>待我处理 <i class="todo-count">${items.length}</i></h2></div></div><div class="todo-list">${items.map(item => `<div class="todo-row todo-${item.level}"><span class="todo-mark">${item.level === 'high' ? '!' : '·'}</span><div class="todo-copy"><strong>${esc(item.title)}</strong><small>${esc(item.sub || '')}</small></div>${item.action}</div>`).join('')}</div></section>`;
+}
+function renderHomeTodayBar(cloudOrders) {
+  const host = document.getElementById('homeTodayBar');
+  if (!host) return;
+  const items = todayReminderItems();
+  const doneCount = items.filter(item => item.done).length;
+  const activeOrders = window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family'
+    ? (cloudOrders || []).filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service'].includes(order.status))
+    : (state.companionOrders || []).filter(order => ['pending', 'accepted'].includes(order.status));
+  const warnCount = (state.alerts || []).filter(alert => alert.level === 'red' || alert.level === 'yellow').length;
+  const todoCount = homeTodoItems(cloudOrders).length;
+  const chip = (label, count, cls = '') => `<span class="tb-chip ${count ? cls : ''}">${label} ${count}</span>`;
+  const chips = [chip('提醒', items.length, 'tb-blue'), chip('陪诊', activeOrders.length, 'tb-green'), chip('预警', warnCount, 'tb-red'), chip('待办', todoCount, 'tb-amber')].join('');
+  const detail = items.length
+    ? items.map(item => `<div class="td-row ${item.done ? 'is-done' : ''}"><time>${esc(item.time)}</time><div><strong>${esc(item.title)}</strong><small>${esc(item.typeLabel)} · ${esc(item.memberName)}</small></div><span>${item.done ? '✓' : ''}</span></div>`).join('')
+    : '<p class="privacy-small" style="text-align:left">今天还没有提醒安排。</p>';
+  host.innerHTML = `<button type="button" class="today-bar" id="todayBarToggle"><span class="tb-date">今天</span><span class="tb-chips">${chips}</span><span class="tb-arrow">▾</span></button><div class="today-detail" id="todayDetail" hidden>${detail}</div>`;
+}
+function renderHomeMemberStrip() {
+  const host = document.getElementById('homeMemberStrip');
+  const section = document.getElementById('homeMemberSection');
+  if (!host || !section) return;
+  const members = state.familyMembers || [];
+  if (!members.length) { section.hidden = true; return; }
+  section.hidden = false;
+  host.innerHTML = members.map(member => {
+    const latestByMetric = {};
+    memberMetricEntries(member.id).slice().sort((a, b) => `${b.date}${b.time || ''}`.localeCompare(`${a.date}${a.time || ''}`)).forEach(entry => { if (!latestByMetric[entry.metric]) latestByMetric[entry.metric] = entry; });
+    let rows = Object.values(latestByMetric);
+    const sys = rows.find(entry => entry.metric === '收缩压');
+    const dia = rows.find(entry => entry.metric === '舒张压');
+    if (sys && dia) rows = rows.filter(entry => entry !== sys && entry !== dia).concat([{ metric: '血压', value: `${sys.value}/${dia.value}`, unit: 'mmHg', date: sys.date }]);
+    const abnormalCount = latestAbnormal(member.id).length;
+    const readingLine = rows.slice(0, 2).map(entry => {
+      const status = entry.metric === '血压' ? (bpReadingState(entry.value).abnormal ? '偏高' : '正常') : statusLabelOf(entry.value, entry.metric);
+      const tag = entry.metric === '血压' ? bpReadingState(entry.value).tag : statusTagOf(entry.value, entry.metric);
+      return `<span class="ms-reading"><em>${esc(entry.metric)}</em> ${esc(String(entry.value))}${entry.unit && entry.metric !== '血压' ? esc(entry.unit) : ''} <i class="${tag}">${status}</i></span>`;
+    }).join('') || '<span class="ms-reading ms-empty">暂无读数</span>';
+    const meds = todayReminderItems().filter(item => item.kind === 'medication' && item.memberId === member.id);
+    const medLine = meds.length ? `<span class="ms-med">服药 ${meds.filter(item => item.done).length}/${meds.length}</span>` : '';
+    return `<button type="button" class="member-strip-card" data-nav="health"><span class="ms-head"><b>${esc(member.name)}</b>${abnormalCount ? `<i class="ms-alert">${abnormalCount} 项异常</i>` : '<i class="ms-ok">正常</i>'}</span>${readingLine}${medLine}</button>`;
+  }).join('');
+}
+function showHomeSharePicker() {
+  openModal(`${modalHead('生成就诊分享码', '选择成员', '分享码按成员生成；需先完成该成员的就诊准备清单，全部勾选后才能生成。')}
+    <div class="my-posts-list">${(state.familyMembers || []).map(member => `<button class="my-post-row" data-action="share" data-share-member="${esc(member.id)}"><span><strong>${esc(member.name)}</strong><small>${esc(member.role || member.relationship || '')} · 就诊准备 ${appointmentProgress(member)}/${APPOINTMENT_ITEMS.length} 项</small></span><span class="cls-arrow">→</span></button>`).join('')}</div>`);
 }
 
 function reminderWeekdays(days = []) { return ['日','一','二','三','四','五','六'].filter((_, index) => days.includes(index)).map(day => `周${day}`).join('、') || '未设置'; }
@@ -3529,6 +3647,13 @@ document.addEventListener('click', async event => {
   const nav = event.target.closest('[data-nav]');
   if (nav) { navigate(nav.dataset.nav); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
+  if (action === 'home-share') { showHomeSharePicker(); return; }
+  if (action === 'home-demand') { navigate('companion'); showDemandForm(); return; }
+  if (event.target.closest('#todayBarToggle')) {
+    const detail = document.getElementById('todayDetail');
+    if (detail) { detail.hidden = !detail.hidden; event.target.closest('.today-bar')?.classList.toggle('open', !detail.hidden); }
+    return;
+  }
   if (action === 'family-member-add') { showFamilyMemberAdd(); return; }
   if (action === 'availability-form') showAvailabilityForm();
   if (action === 'my-posts') { showMyPosts(); return; }
