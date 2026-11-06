@@ -1752,7 +1752,7 @@ async function renderCloudWorkbench() {
       <div id="escortMyPostsArea"></div>
       ${shareLookup}
       <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。患者资料仅经家庭分享码授权后可见。</p></div>`;
-    renderEscortMyPosts(myPosts || [], pendingBookings.length, mySignups || [], allPosts || []);
+    renderEscortMyPosts(myPosts || [], pendingBookings.length, mySignups || [], Object.fromEntries((allPosts || []).map(post => [post.id, post])));
   } catch (error) { host.innerHTML = `<div class="empty-hint">工作台加载失败：${esc(error.message || error)} <button class="text-button" data-action="escort-reload">重试</button></div>`; }
 }
 /* ===== 陪诊师「我的发布」抽屉（对称家庭端：发布管理归事务中心）：默认收缩一行，有新预约时高亮；
