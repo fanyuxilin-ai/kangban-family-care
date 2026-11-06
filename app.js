@@ -1473,8 +1473,9 @@ function taskShareActive(share) { return share && !share.revokedAt && Date.now()
 
 /* ============ 社区需求区（FR-12）：家庭发布需求帖 → 陪诊师接单大厅 ============ */
 function demandPostStatusChip(status) {
+  const label = POST_STATUS_LABEL[status] || status || '';
   const map = { '招募中': 'record-status', '已接单': 'record-status', '服务中': 'record-status', '已完成': 'record-status', '已取消': 'record-status' };
-  return `<span class="${map[status] || 'record-status'}">${esc(status)}</span>`;
+  return `<span class="${map[label] || 'record-status'}">${esc(label)}</span>`;
 }
 const GUEST_COMMUNITY_FEED = [
   { id: 'guest-post-1', type: 'demand', status: 'open', service_type: '检查陪同', hospital_name: '市第一人民医院', service_date: dateOffset(6), summary: '需要一位陪诊员协助完成检查流程与院内引导', author_label: '家庭用户', region: '深圳 · 南山区', budget_min: 150, budget_max: 200, created_at: hoursAgoIso(2) },
@@ -1520,10 +1521,10 @@ function escortTrustLine(post) {
 function renderCommunityPost(post, { guest = false, escort = false } = {}) {
   const isDemand = post.type === 'demand' || !post.type;
   const privateActions = !guest && post.id && !String(post.id).startsWith('guest-');
-  const kindChip = `<span class="community-kind-chip ${isDemand ? 'kind-demand' : 'kind-supply'}">${isDemand ? '需求' : '供应'}</span>`;
+  const kindChip = `<span class="community-kind-chip ${isDemand ? 'kind-demand' : 'kind-supply'}">${isDemand ? '需求' : '服务'}</span>`;
   const applicantCount = post._applicants?.length;
   if (!isDemand) {
-    /* 供应卡（陪诊师可预约时段）：信任信息 + 状态机（可约→待确认→已约）+ 预约/管理操作 */
+    /* 服务卡（陪诊师发布的陪诊服务）：信任信息 + 状态机（可约→待确认→已约）+ 预约/管理操作 */
     const slot = [post.service_date, post.start_time ? String(post.start_time).slice(0, 5) : '', post.end_time ? String(post.end_time).slice(0, 5) : ''].filter(Boolean).join(' ');
     const dimmed = isPostExpired(post) || ['booked', 'cancelled'].includes(post.status) ? ' is-dimmed' : '';
     let actions = '';
@@ -1541,12 +1542,12 @@ function renderCommunityPost(post, { guest = false, escort = false } = {}) {
       }
     }
     return `<article class="demand-post-card community-post${dimmed}" data-community-type="availability" ${post.id && !String(post.id).startsWith('guest-') ? `data-post-id="${esc(post.id)}"` : ''}>
-    <div class="family-order-top"><strong>${esc(post.service_type || post.service || '可预约时段')}${guest && post.author_label ? ` · ${esc(post.author_label)}` : ''}</strong>${supplyStatusChip(post)}</div>
+    <div class="family-order-top"><strong>${esc(post.service_type || post.service || '陪诊服务')}${guest && post.author_label ? ` · ${esc(post.author_label)}` : ''}</strong>${supplyStatusChip(post)}</div>
     <p class="community-meta">${kindChip}${esc(post.region || '服务区域待补充')}${slot ? ` · ${esc(slot)}` : ''}</p>
     ${post.summary ? `<p>${esc(post.summary)}</p>` : ''}
     ${escortTrustLine(post)}
     ${postTimeLine(post)}
-    ${guest ? '<small class="privacy-small">游客仅查看脱敏虚构内容，登录后可预约或发布。</small>' : ''}
+    ${guest ? '<small class="privacy-small">游客仅浏览脱敏虚构内容；登录家庭账号后，此处下方会出现「预约该服务」按钮。</small>' : ''}
     ${actions}
   </article>`;
   }
@@ -1559,7 +1560,7 @@ function renderCommunityPost(post, { guest = false, escort = false } = {}) {
     <p>${esc(post.summary || post.need || '陪诊服务信息')}</p>
     ${budget || applicantCount ? `<p class="community-facts">${budget ? `<span>预算 <b>${esc(budget)}</b></span>` : ''}${applicantCount ? `<span>${applicantCount} 位陪诊师已报名</span>` : ''}</p>` : ''}
     ${postTimeLine(post)}
-    ${guest ? '<small class="privacy-small">游客仅查看脱敏虚构内容，登录后可发布或报名。</small>' : ''}
+    ${guest ? '<small class="privacy-small">游客仅浏览脱敏虚构内容；登录陪诊师账号后，此处下方会出现「报名」按钮。</small>' : ''}
     ${privateActions && escort && ['open','has_applicants'].includes(post.status) ? `<button class="primary-button" data-community-apply="${esc(post.id)}">报名陪诊需求</button>` : ''}
     ${privateActions && !escort && post.status === 'has_applicants' ? `<div class="community-applicants" data-applicants-for="${esc(post.id)}"><small>加载报名信息…</small></div>` : ''}
     ${privateActions && !escort && ['awaiting_confirmation','confirmed','in_service'].includes(post.status) ? `<small class="privacy-small">家庭确认陪诊员后，患者资料只对家庭成员和已选陪诊员开放。</small>` : ''}
@@ -1621,9 +1622,9 @@ async function renderCommunity() {
   posts = posts.filter(post => (communityFilter === 'all' || (communityFilter === 'demand' ? (post.type === 'demand' || !post.type) : post.type === 'availability')) && (communityRegion === 'all' || String(post.region || '').includes(communityRegion)));
   posts = [...posts.filter(post => !isPostExpired(post)), ...posts.filter(post => isPostExpired(post))];
   const emptyHints = {
-    all: guest ? '社区还没有内容。登录后，家庭可发布陪诊需求，陪诊师可发布可预约时段。' : '目前没有社区内容。你可以发布陪诊需求。',
+    all: guest ? '社区还没有内容。登录后，家庭可发布陪诊需求，陪诊师可发布陪诊服务。' : '目前没有社区内容。你可以发布陪诊需求。',
     demand: '还没有陪诊需求帖。家庭登录后点「发布需求」，把医院、日期和需要帮忙的事写清楚。',
-    availability: '还没有陪诊师发布可预约时段。通过审核的陪诊师登录后，点「发布可约时段」即可发布。'
+    availability: '还没有陪诊师发布陪诊服务。通过审核的陪诊师登录后，点「发布陪诊服务」即可发布。'
   };
   host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => renderCommunityPost(post, { guest, escort })).join('')}</div>` : `<div class="empty-hint">${emptyHints[communityFilter] || emptyHints.all}</div>`;
   if (auth?.mode === 'cloud' && !escort) {
@@ -1652,16 +1653,16 @@ async function renderCloudEscortProfile() {
     if(!profile){host.innerHTML='<div class="empty-hint">陪诊师资料尚未初始化，请重新登录。</div>';return;}
     const approved=profile.review_status==='approved';
     const paused=profile.available===false;
-    host.innerHTML=`<div class="me-idcard"><div class="me-id-top"><div class="me-ava">${esc((profile.display_name||'陪').slice(0,1))}</div><div><b>${esc(profile.display_name||'陪诊师')}</b><small>${approved?'陪诊师账号 · 已审核':'陪诊师账号 · 审核中'}</small></div></div><div class="me-status"><span class="me-dot"></span>${paused?'已暂停接单 · 家庭暂不能预约你的时段':'接单中 · 社区大厅可被家庭预约'}</div></div><section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">发布可约时段与管理发布都在工作台；这里维护面向家庭展示的介绍资料。</p></section>`;
+    host.innerHTML=`<div class="me-idcard"><div class="me-id-top"><div class="me-ava">${esc((profile.display_name||'陪').slice(0,1))}</div><div><b>${esc(profile.display_name||'陪诊师')}</b><small>${approved?'陪诊师账号 · 已审核':'陪诊师账号 · 审核中'}</small></div></div><div class="me-status"><span class="me-dot"></span>${paused?'已暂停接单 · 家庭暂不能预约你的时段':'接单中 · 社区大厅可被家庭预约'}</div></div><section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">发布陪诊服务与管理发布都在工作台；这里维护面向家庭展示的介绍资料。</p></section>`;
   } catch(error){host.innerHTML=`<div class="empty-hint">陪诊师资料加载失败：${esc(error.message||error)}</div>`;}
 }
 function showAvailabilityForm(post = null) {
   const auth = window.KangbanAuth;
-  if (auth?.mode !== 'cloud' || auth?.role !== 'escort' || auth.session?.status !== 'active') { toast('陪诊师账号审核通过后才可发布可约时段'); return; }
+  if (auth?.mode !== 'cloud' || auth?.role !== 'escort' || auth.session?.status !== 'active') { toast('陪诊师账号审核通过后才可发布陪诊服务'); return; }
   const editing = Boolean(post);
   const serviceOptions = ['门诊全程陪诊', '检查陪同', '代取药 · 代取报告', '住院日间陪护', '报告解读'].map(service => `<option value="${esc(service)}"${post?.service_type === service ? ' selected' : ''}>${esc(service)}</option>`).join('');
   const prefillRegion = post?.region || auth.session?.escortProfile?.service_area || '';
-  openModal(`${modalHead('陪诊师社区', editing ? '编辑可约时段' : '发布可预约时段', '只展示服务区域、日期与服务内容，不发布个人证件或患者信息。')}
+  openModal(`${modalHead('陪诊师社区', editing ? '编辑陪诊服务' : '发布陪诊服务', '只展示服务区域、日期与服务内容，不发布个人证件或患者信息。')}
     <form class="order-form" id="availabilityForm" ${editing ? `data-edit-id="${esc(post.id)}"` : ''}><label><span class="field-label-block">服务区域</span><input class="input-field" name="region" maxlength="100" required placeholder="例如：深圳南山区" value="${esc(prefillRegion)}"></label><label><span class="field-label-block">服务类型</span><select class="input-field" name="serviceType" required>${serviceOptions}</select></label><label><span class="field-label-block">可约日期</span><input class="input-field" name="date" type="date" value="${esc(post?.service_date || dateOffset(3))}" required></label><div class="form-two-col"><label><span class="field-label-block">开始时间</span><input class="input-field" name="start" type="time" value="${esc(post?.start_time ? String(post.start_time).slice(0, 5) : '09:00')}" required></label><label><span class="field-label-block">结束时间</span><input class="input-field" name="end" type="time" value="${esc(post?.end_time ? String(post.end_time).slice(0, 5) : '12:00')}" required></label></div><label><span class="field-label-block">服务介绍（选填）</span><textarea class="input-field" name="summary" maxlength="200" placeholder="例如：熟悉市一院流程，可协助挂号与院内引导">${esc(post?.summary || '')}</textarea></label><button class="primary-button" type="submit">${editing ? '保存修改' : '发布时段'}</button></form>`);
 }
 async function showMyPosts() {
@@ -1671,7 +1672,7 @@ async function showMyPosts() {
   else renderCloudWorkbench();
 }
 function showBookAvailabilityModal(post) {
-  openModal(`${modalHead('预约可约时段', '提交预约申请', '陪诊师确认后生成正式订单，确认前可随时撤销；患者资料在成单前不会开放。')}
+  openModal(`${modalHead('预约陪诊服务', '提交预约申请', '陪诊师确认后生成正式订单，确认前可随时撤销；患者资料在成单前不会开放。')}
     <form class="order-form" id="bookAvailabilityForm" data-post-id="${esc(post.id)}"><p class="privacy-small">${esc(post.service_type || '陪诊服务')} · ${esc(post.region || '')} · ${esc(post.service_date || '')}${post.start_time ? ` ${esc(String(post.start_time).slice(0, 5))}` : ''}</p><label><span class="field-label-block">想说明的情况（选填）</span><textarea class="input-field" name="note" maxlength="200" placeholder="例如：母亲周三复查，希望全程陪同"></textarea></label><button class="primary-button" type="submit">提交预约申请</button></form>`);
 }
 /* ===== 云端订单时间线（双端共用）：已确认→已到场→服务中→履约清单→完成互评 ===== */
@@ -1726,11 +1727,13 @@ async function renderCloudWorkbench() {
   if (!host || window.KangbanAuth?.mode !== 'cloud' || window.KangbanAuth.role !== 'escort') return;
   host.hidden = false;
   try {
-    const [profileRows, orders, bookings, myPosts] = await Promise.all([
+    const [profileRows, orders, bookings, myPosts, mySignups, allPosts] = await Promise.all([
       window.KangbanAPI.select('escort_profiles', { filters: { user_id: window.KangbanAuth.session.user.id }, limit: 1 }),
       window.KangbanAPI.rpc('list_my_companion_orders'),
       window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => []),
-      window.KangbanAPI.select('community_posts', { filters: { author_id: window.KangbanAuth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 50 }).catch(() => [])
+      window.KangbanAPI.select('community_posts', { filters: { author_id: window.KangbanAuth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 50 }).catch(() => []),
+      window.KangbanAPI.select('post_signups', { filters: { escort_id: window.KangbanAuth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 20 }).catch(() => []),
+      window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 }).catch(() => [])
     ]);
     const profile = profileRows[0] || null;
     if (profile) window.KangbanAuth.session.escortProfile = profile;
@@ -1741,40 +1744,52 @@ async function renderCloudWorkbench() {
     const paused = profile && profile.available === false;
     const shareLookup = `<section class="section-block"><div class="section-heading"><div><p class="eyebrow">家庭授权</p><h2>输入本次任务分享码</h2></div></div><form class="order-form" id="cloudTaskShareLookup"><label><span class="field-label-block">6 位分享码</span><input class="input-field" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary-button" type="submit">验证并查看授权内容</button></form><div id="cloudTaskShareResult"></div></section>`;
     host.innerHTML = `
-      <div class="escort-status-card"><div><span class="cloud-pill">云端生效 · 预约申请实时校验</span><strong>${paused ? '暂停接单' : '可预约'}</strong><small>${paused ? '家庭暂时不能预约你的可约时段' : '社区页可被家庭预约你的可约时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused ? '1' : '0'}">${paused ? '恢复接单' : '暂停接单'}</button></div>
+      <div class="escort-status-card"><div><span class="cloud-pill">云端生效 · 预约申请实时校验</span><strong>${paused ? '暂停接单' : '可预约'}</strong><small>${paused ? '家庭暂时不能预约你的服务时段' : '社区页可被家庭预约你的服务时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused ? '1' : '0'}">${paused ? '恢复接单' : '暂停接单'}</button></div>
       ${profile && profile.review_status !== 'approved' ? '<div class="boundary-note"><strong>审核中</strong><p>审核通过前不能发布时段或报名需求。</p></div>' : ''}
       <div class="escort-stat-grid"><div><strong>${pendingBookings.length + orders.filter(order => order.status === 'pending_escort_confirmation').length}</strong><span>待确认</span></div><div><strong>${activeOrders.filter(order => order.status !== 'pending_escort_confirmation').length}</strong><span>进行中</span></div><div><strong>${completedOrders.length}</strong><span>已完成</span></div></div>
       ${pendingBookings.length ? `<section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>新的预约申请</h2></div>${pendingBookings.map(booking => `<div class="invite-card"><div class="family-order-top"><strong>${esc(booking.booker_label || '家庭用户')} 预约了你的时段</strong><span class="supply-status-chip is-pending">待确认</span></div><p class="community-meta">${esc(booking.note || '未附言')} · ${esc(new Date(booking.created_at).toLocaleString('zh-CN'))}</p><div class="order-actions-2"><button class="secondary-button compact" data-community-respond="${esc(booking.id)}" data-accept="0">婉拒</button><button class="primary-button compact" data-community-respond="${esc(booking.id)}" data-accept="1">接受预约</button></div></div>`).join('')}</section>` : ''}
-      <section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>我的陪诊安排</h2></div>${orders.length ? `<div class="demand-post-list">${orders.map(order => renderCloudOrderCard(order, true)).join('')}</div>` : `<div class="empty-link">还没有订单。发布可约时段等家庭预约，或去社区报名别人的需求 <b data-nav="community">→ 打开社区</b></div>`}</section>
+      <section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>我的陪诊安排</h2></div>${orders.length ? `<div class="demand-post-list">${orders.map(order => renderCloudOrderCard(order, true)).join('')}</div>` : `<div class="empty-link">还没有订单。发布陪诊服务等家庭预约，或去社区报名别人的需求 <b data-nav="community">→ 打开社区</b></div>`}</section>
       <div id="escortMyPostsArea"></div>
       ${shareLookup}
       <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。患者资料仅经家庭分享码授权后可见。</p></div>`;
-    renderEscortMyPosts(myPosts || [], pendingBookings.length);
+    renderEscortMyPosts(myPosts || [], pendingBookings.length, mySignups || [], allPosts || []);
   } catch (error) { host.innerHTML = `<div class="empty-hint">工作台加载失败：${esc(error.message || error)} <button class="text-button" data-action="escort-reload">重试</button></div>`; }
 }
-/* ===== 陪诊师「我的发布」抽屉（对称家庭端：发布管理归事务中心）：默认收缩一行，有新预约时高亮 ===== */
+/* ===== 陪诊师「我的发布」抽屉（对称家庭端：发布管理归事务中心）：默认收缩一行，有新预约时高亮；
+   抽屉内两组：我的服务（发布管理 + 收到的预约计数）+ 我的报名（我报名的需求跟进，填补报名→成单盲区） ===== */
 let escortMyPostsOpen = false;
-let escortMyPostsCache = { posts: [], newBookings: 0 };
-function renderEscortMyPosts(posts = escortMyPostsCache.posts, newBookings = escortMyPostsCache.newBookings) {
+let escortMyPostsCache = { posts: [], newBookings: 0, signups: [], postById: {} };
+function renderEscortMyPosts(posts = escortMyPostsCache.posts, newBookings = escortMyPostsCache.newBookings, signups = escortMyPostsCache.signups, postById = escortMyPostsCache.postById) {
   const host = document.getElementById('escortMyPostsArea');
   if (!host) return;
-  escortMyPostsCache = { posts: posts || [], newBookings: newBookings || 0 };
+  escortMyPostsCache = { posts: posts || [], newBookings: newBookings || 0, signups: signups || [], postById: postById || {} };
   const rows = escortMyPostsCache.posts;
-  if (!rows.length) {
+  const mySignups = escortMyPostsCache.signups;
+  const pendingSignups = mySignups.filter(signup => signup.status === 'applied').length;
+  if (!rows.length && !mySignups.length) {
     host.hidden = false;
-    host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar" id="escortMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">还没有发布可约时段</span><span class="mp-arrow">${escortMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${escortMyPostsOpen ? '' : 'hidden'}><p class="empty-hint">发布可约时段后，家庭可以在社区大厅直接向你提交预约申请。</p><div class="mp-head"><button class="primary-button compact" data-action="availability-form">＋ 发布可约时段</button></div></div></section>`;
+    host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar" id="escortMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">还没有发布陪诊服务</span><span class="mp-arrow">${escortMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${escortMyPostsOpen ? '' : 'hidden'}><p class="empty-hint">发布陪诊服务后，家庭可以在社区大厅直接向你提交预约申请。</p><div class="mp-head"><button class="primary-button compact" data-action="availability-form">＋ 发布陪诊服务</button></div></div></section>`;
     return;
   }
   const inProgress = rows.filter(post => ['open', 'has_applicants', 'awaiting_confirmation'].includes(post.status)).length;
   const listHtml = rows.map(post => {
-    const label = post.type === 'availability' ? '供应 · 时段' : '需求';
+    const label = post.type === 'availability' ? '服务 · 时段' : '需求';
     const info = post.type === 'availability' ? `${post.region || ''} · ${post.service_date || ''}${post.start_time ? ` ${String(post.start_time).slice(0, 5)}` : ''}` : `${post.hospital_name || ''} · ${post.service_date || ''}`;
     const cancellable = post.type === 'demand' ? ['open', 'has_applicants'].includes(post.status) : post.status === 'open';
     const editable = post.type === 'availability' && post.status === 'open';
     return `<div class="my-post-row"><div><strong>${esc(post.service_type)}</strong><small>${esc(label)} · ${esc(info)} · ${esc(POST_STATUS_LABEL[post.status] || post.status)}</small></div><div class="applicant-ops">${editable ? `<button class="secondary-button compact" data-my-edit="${esc(post.id)}">编辑</button>` : ''}${cancellable ? `<button class="text-button" data-my-cancel="${esc(post.id)}">取消</button>` : ''}</div></div>`;
   }).join('');
+  /* 我的报名组：状态 applied=待家庭挑选 / selected=已选中 / declined=未被选中 / withdrawn=已撤回 */
+  const signupsHtml = mySignups.length ? `<div class="mp-subhead">我的报名</div>${mySignups.map(signup => {
+    const post = escortMyPostsCache.postById[signup.post_id] || {};
+    const label = SIGNUP_STATUS_LABEL[signup.status] || signup.status;
+    const note = signup.note ? ` · 附言：${esc(signup.note.length > 36 ? `${signup.note.slice(0, 36)}…` : signup.note)}` : '';
+    const tail = signup.status === 'selected' ? ' · 成单后见「我的陪诊安排」' : '';
+    return `<div class="my-post-row"><div><strong>${esc(post.service_type || '陪诊需求报名')}</strong><small>${esc(label)} · ${esc(post.hospital_name || '')}${post.service_date ? ` · ${esc(post.service_date)}` : ''}${note}${tail}</small></div></div>`;
+  }).join('')}` : '';
+  const facts = [inProgress ? `${inProgress} 条进行中` : '', escortMyPostsCache.newBookings ? `<b>${escortMyPostsCache.newBookings} 个新预约</b>` : '', pendingSignups ? `${pendingSignups} 个报名待确认` : ''].filter(Boolean).join(' · ');
   host.hidden = false;
-  host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar${escortMyPostsCache.newBookings ? ' has-new' : ''}" id="escortMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">${inProgress ? `${inProgress} 条进行中` : '暂无进行中'}${escortMyPostsCache.newBookings ? ` · <b>${escortMyPostsCache.newBookings} 个新预约</b>` : ''}</span><span class="mp-arrow">${escortMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${escortMyPostsOpen ? '' : 'hidden'}><div class="mp-head"><button class="text-button" data-action="availability-form">＋ 发布可约时段</button></div>${listHtml}</div></section>`;
+  host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar${escortMyPostsCache.newBookings ? ' has-new' : ''}" id="escortMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">${facts || '暂无进行中'}</span><span class="mp-arrow">${escortMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${escortMyPostsOpen ? '' : 'hidden'}><div class="mp-head"><button class="text-button" data-action="availability-form">＋ 发布陪诊服务</button></div>${rows.length ? `<div class="mp-subhead">我发布的服务</div>${listHtml}` : ''}${signupsHtml}</div></section>`;
 }
 /* ===== 家庭端陪诊 Tab 实时动态 + 首页当天入口 ===== */
 async function renderCloudFamilyOrders() {
@@ -1798,8 +1813,8 @@ async function renderCloudFamilyOrders() {
     renderHomeTodo(homeTodoItems(orders).concat(match.items));
     /* 红点单一来源：有新报名点亮陪诊 Tab（子页签角标已取消，通知文案引导回「我的陪诊」） */
     setHallDot(match.items.length > 0);
-    /* 「我的发布」抽屉：撮合中事务收在事务中心，默认收缩 */
-    renderFamilyMyPosts(match.posts, orders);
+    /* 「我的发布」抽屉：撮合中事务收在事务中心，默认收缩（含我发出的预约申请） */
+    renderFamilyMyPosts(match.posts, orders, match.bookings, match.postById);
     renderHomeMemberStrip();
   } catch (error) {
     updateHero();
@@ -2428,9 +2443,13 @@ function homeTodoItems(cloudOrders) {
 }
 async function fetchCloudFamilyMatch() {
   const auth = window.KangbanAuth;
-  if (auth?.mode !== 'cloud' || auth.role !== 'family') return { items: [], posts: [] };
+  if (auth?.mode !== 'cloud' || auth.role !== 'family') return { items: [], posts: [], bookings: [], postById: {} };
   try {
-    const posts = await window.KangbanAPI.select('community_posts', { filters: { family_id: auth.session.familyId, type: 'demand' }, order: { column: 'created_at', ascending: false }, limit: 20 });
+    const [posts, bookings, allPosts] = await Promise.all([
+      window.KangbanAPI.select('community_posts', { filters: { family_id: auth.session.familyId, type: 'demand' }, order: { column: 'created_at', ascending: false }, limit: 20 }),
+      window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => []),
+      window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 }).catch(() => [])
+    ]);
     const openPosts = posts.filter(post => ['open', 'has_applicants'].includes(post.status));
     const counts = await Promise.all(openPosts.map(async post => ({ post, signups: await window.KangbanAPI.select('post_signups', { filters: { post_id: post.id, status: 'applied' } }).catch(() => []) })));
     let profileById = {};
@@ -2443,18 +2462,21 @@ async function fetchCloudFamilyMatch() {
       post._applicants = signups.map(signup => { const p = profileById[signup.escort_id] || {}; return { ...signup, display_name: p.display_name || '待核验陪诊师', experience: p.experience || '', service_area: p.service_area || '', bio: p.bio || '' }; });
     }
     const items = counts.filter(({ signups }) => signups.length).map(({ post }) => ({ level: 'mid', title: `${post.service_type || '陪诊需求'} · ${post._applicants.length} 位陪诊师报名`, sub: `${post.hospital_name || ''}${post.service_date ? ` · ${post.service_date}` : ''}`, action: '<button class="text-button" data-nav="companion" data-open-my-posts>去处理 →</button>' }));
-    return { items, posts };
-  } catch { return { items: [], posts: [] }; }
+    return { items, posts, bookings: bookings || [], postById: Object.fromEntries((allPosts || []).map(post => [post.id, post])) };
+  } catch { return { items: [], posts: [], bookings: [], postById: {} }; }
 }
-/* ===== 家庭端「我的发布」抽屉（撮合中事务归我的陪诊）：默认收缩一行，有新报名时高亮 ===== */
+/* ===== 家庭端「我的发布」抽屉（撮合中事务归我的陪诊）：默认收缩一行，有新报名时高亮；
+   抽屉内两组：我的需求（报名跟进）+ 我的预约申请（对陪诊师服务的预约跟进） ===== */
 let familyMyPostsOpen = false;
-let familyMyPostsCache = { posts: [], orders: [] };
-function renderFamilyMyPosts(posts = familyMyPostsCache.posts, orders = familyMyPostsCache.orders) {
+let familyMyPostsCache = { posts: [], orders: [], bookings: [], postById: {} };
+const SIGNUP_STATUS_LABEL = { applied: '待家庭挑选', selected: '已选中', declined: '未被选中', withdrawn: '已撤回' };
+const BOOKING_STATUS_LABEL = { applied: '待陪诊师确认', accepted: '已确认', rejected: '未通过', cancelled: '已撤销' };
+function renderFamilyMyPosts(posts = familyMyPostsCache.posts, orders = familyMyPostsCache.orders, bookings = familyMyPostsCache.bookings, postById = familyMyPostsCache.postById) {
   const host = document.getElementById('familyMyPostsArea');
   if (!host) return;
   const auth = window.KangbanAuth;
   if (auth?.role === 'escort' || auth?.role === 'guest') { host.hidden = true; return; }
-  familyMyPostsCache = { posts: posts || [], orders: orders || [] };
+  familyMyPostsCache = { posts: posts || [], orders: orders || [], bookings: bookings || [], postById: postById || {} };
   const cloud = auth?.mode === 'cloud';
   let rows;
   if (cloud) {
@@ -2464,16 +2486,19 @@ function renderFamilyMyPosts(posts = familyMyPostsCache.posts, orders = familyMy
     rows = (state.demandPosts || []).map(post => ({ post: { ...post, type: 'demand', status: statusMap[post.status] || post.status }, applicants: [] }));
   }
   const activeOrders = familyMyPostsCache.orders.filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service', 'pending', 'accepted'].includes(order.status)).length;
-  /* 既无订单也无发布：空态引导卡，补齐发布入口撤出社区后的发现路径 */
-  if (!rows.length) {
+  const myBookings = cloud ? familyMyPostsCache.bookings : [];
+  const pendingBookings = myBookings.filter(booking => booking.status === 'applied').length;
+  /* 既无订单也无发布也无预约申请：空态引导卡，补齐发布入口撤出社区后的发现路径 */
+  if (!rows.length && !myBookings.length) {
     if (!activeOrders) {
       host.hidden = false;
-      host.innerHTML = `<div class="empty-guide-card"><strong>还没有陪诊安排</strong><p>发布第一个陪诊需求，审核通过的陪诊师会来报名；也可以先去社区大厅，看看别人的需求怎么写。</p><div class="guide-ops"><button class="primary-button" data-action="demand-form">＋ 发布陪诊需求</button><button class="secondary-button" data-csub="hall">去社区大厅看看</button></div></div>`;
+      host.innerHTML = `<div class="empty-guide-card"><strong>还没有陪诊安排</strong><p>发布第一个陪诊需求，审核通过的陪诊师会来报名；也可以去社区大厅预约陪诊师发布的陪诊服务。</p><div class="guide-ops"><button class="primary-button" data-action="demand-form">＋ 发布陪诊需求</button><button class="secondary-button" data-csub="hall">去社区大厅看看</button></div></div>`;
     } else host.hidden = true;
     return;
   }
   const inProgress = rows.filter(row => ['open', 'has_applicants', 'awaiting_confirmation', 'confirmed', 'in_service'].includes(row.post.status)).length;
   const newSignups = rows.reduce((sum, row) => sum + row.applicants.length, 0);
+  const facts = [inProgress ? `${inProgress} 条进行中` : '', newSignups ? `<b>${newSignups} 个新报名</b>` : '', pendingBookings ? `<b>${pendingBookings} 个预约待确认</b>` : ''].filter(Boolean).join(' · ');
   const listHtml = rows.map(row => {
     const p = row.post;
     const label = POST_STATUS_LABEL[p.status] || p.status;
@@ -2481,8 +2506,16 @@ function renderFamilyMyPosts(posts = familyMyPostsCache.posts, orders = familyMy
     const applicantsHtml = row.applicants.length ? `<div class="community-applicants is-open">${row.applicants.map(signup => `<div class="applicant-row"><div class="applicant-copy"><b>${esc(signup.display_name)}</b><small>${signup.note ? esc(signup.note.length > 72 ? `${signup.note.slice(0, 72)}…` : signup.note) : '未填写自我介绍'}${signup.experience ? ` · ${esc(signup.experience)}` : ''}</small></div><div class="applicant-ops">${signup.resume_path ? `<button class="secondary-button compact" data-signup-resume="${esc(signup.resume_path)}">看简历</button>` : ''}<button class="primary-button compact" data-community-confirm="${esc(signup.id)}">查看介绍并确认</button></div></div>`).join('')}</div>` : '';
     return `<div class="my-post-row"><div><strong>${esc(p.service_type || p.service || '陪诊需求')}</strong><small>${esc(label)} · ${esc(p.hospital_name || p.hospital || '医院待补充')} · ${esc(p.service_date || p.date || '时间待沟通')}${row.applicants.length ? ` · ${row.applicants.length} 位已报名` : ''}</small></div><div class="applicant-ops">${cancellable ? `<button class="text-button" data-${cloud ? 'community-cancel-post' : 'demand-cancel'}="${esc(p.id)}">取消</button>` : ''}</div></div>${applicantsHtml}`;
   }).join('');
+  /* 我的预约申请组：跟进「家庭预约陪诊师服务」这条撮合线（RPC 已返回 post 上下文） */
+  const bookingsHtml = myBookings.length ? `<div class="mp-subhead">我的预约申请</div>${myBookings.map(booking => {
+    const post = familyMyPostsCache.postById[booking.post_id] || {};
+    const label = BOOKING_STATUS_LABEL[booking.status] || booking.status;
+    const note = booking.note ? ` · 附言：${esc(booking.note.length > 36 ? `${booking.note.slice(0, 36)}…` : booking.note)}` : '';
+    const ops = booking.status === 'applied' ? `<button class="text-button" data-community-cancel-booking="${esc(booking.id)}">撤销申请</button>` : '';
+    return `<div class="my-post-row"><div><strong>${esc(post.service_type || '陪诊服务预约')}</strong><small>${esc(label)} · ${esc(post.region || '')}${post.service_date ? ` · ${esc(post.service_date)}` : ''}${note}</small></div><div class="applicant-ops">${ops}</div></div>`;
+  }).join('')}` : '';
   host.hidden = false;
-  host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar${newSignups ? ' has-new' : ''}" id="familyMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">${inProgress ? `${inProgress} 条进行中` : '暂无进行中'}${newSignups ? ` · <b>${newSignups} 个新报名</b>` : ''}</span><span class="mp-arrow">${familyMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${familyMyPostsOpen ? '' : 'hidden'}><div class="mp-head"><button class="text-button" data-action="demand-form">＋ 发布需求</button></div>${listHtml}</div></section>`;
+  host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar${newSignups || pendingBookings ? ' has-new' : ''}" id="familyMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">${facts || '暂无进行中'}</span><span class="mp-arrow">${familyMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${familyMyPostsOpen ? '' : 'hidden'}><div class="mp-head"><button class="text-button" data-action="demand-form">＋ 发布需求</button></div>${rows.length ? `<div class="mp-subhead">我发布的需求</div>${listHtml}` : ''}${bookingsHtml}</div></section>`;
 }
 let homeTodoCache = [];       // 待我处理队列（本地 + 云端 + 新报名，由 renderHomeTodo 喂入）
 let homeCloudOrdersCache = []; // 云端订单缓存（总览条陪诊胶囊计数用）
@@ -4726,7 +4759,7 @@ document.addEventListener('submit', async event => {
           start_time:payload.start, end_time:payload.end, service_type:payload.serviceType,
           summary:payload.summary || '可预约陪诊时段，服务范围由陪诊师本人确认', status:'open'
         });
-        closeModal(); toast('可预约时段已发布');
+        closeModal(); toast('陪诊服务已发布');
       }
       await renderCommunity();
     } catch(error) { toast(`操作失败：${error.message||error}`); }

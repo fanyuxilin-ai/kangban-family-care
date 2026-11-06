@@ -606,6 +606,9 @@ body:not(.authenticated) .app-shell{display:none}
 .my-posts-bar .mp-arrow{color:#a8b0a8;font-size:12px}
 .my-posts-detail{padding:2px 12px 13px;display:grid;gap:8px}
 .my-posts-detail .mp-head{display:flex;justify-content:flex-end}
+/* 抽屉内分组小标题：我的发布 / 我的预约申请（家庭）· 我发布的服务 / 我的报名（陪诊师） */
+.my-posts-detail .mp-subhead{font-size:10px;font-weight:700;color:#8a938a;letter-spacing:.04em;margin-top:2px}
+.my-posts-detail .mp-subhead + .my-post-row{margin-top:-4px}
 .my-posts-detail .my-post-row{background:#f5f4ec}
 /* 家庭端空态引导卡：发布入口撤出社区后的发现路径 */
 .empty-guide-card{margin-top:14px;background:var(--white);border:1px dashed #cdd6cc;border-radius:15px;padding:18px 16px;text-align:center}
