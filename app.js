@@ -60,6 +60,10 @@ const seed = {
   missedAlerts: {},
   nextAlertId: 1,
   alertsSeeded: false,
+  /* 预警来源开关：设备类默认关（未接入设备），由设备管理里的接入开关联动点亮 */
+  alertSources: { device: false, missedDose: true, checkup: true, manual: true },
+  /* 设备注册表：首页「设备预警」区块仅在任一设备接入后显示；真机接入后此处换成真实绑定 */
+  devices: { glucose: false, bp: false, watch: false },
   familyMembers: [
     { id: 'm1', name: '陈兰英', role: '母亲', age: 68, conditions: '高血压', allergies: '青霉素', medications: '氨氯地平 5mg · 每日一次；阿司匹林 100mg · 每日一次', surgeries: '无记录', avatarClass: 'member-avatar-1' },
     { id: 'm2', name: '周建国', role: '父亲', age: 71, conditions: '2型糖尿病 · 高血压', allergies: '无已知过敏', medications: '二甲双胍 0.5g · 每日两次', surgeries: '2019年 白内障手术', avatarClass: 'member-avatar-2' },
@@ -239,7 +243,10 @@ function loadState() {
     loaded.reminderLogs = saved.reminderLogs && typeof saved.reminderLogs === 'object' ? saved.reminderLogs : {};
     loaded.reminderNotified = saved.reminderNotified && typeof saved.reminderNotified === 'object' ? saved.reminderNotified : {};
     loaded.measurementRecords = Array.isArray(saved.measurementRecords) ? saved.measurementRecords : [];
-    loaded.alerts = saved.alerts || [];
+    /* 旧版本预警没有生命周期字段，补默认值（默认视为未处理，可在预警中心处理归档） */
+    loaded.alerts = (saved.alerts || []).map(alert => ({ status: 'open', times: 1, ackedAt: '', resolvedAt: '', resolvedNote: '', dedupKey: '', memberName: '', ...alert }));
+    loaded.alertSources = { device: false, missedDose: true, checkup: true, manual: true, ...(saved.alertSources || {}) };
+    loaded.devices = { glucose: false, bp: false, watch: false, ...(saved.devices || {}) };
     loaded.missedAlerts = saved.missedAlerts || {};
     loaded.nextAlertId = saved.nextAlertId || 1;
     loaded.insurancePolicies = saved.insurancePolicies || structuredClone(seed.insurancePolicies);
@@ -873,8 +880,8 @@ function showCheckupConfirm(memberId) {
     saveState(); renderHealth(); closeModal();
     const abnormal = edited.filter(row => checkupRowStatus(row, row.value) !== 'normal');
     toast(`已导入 ${edited.length} 项指标${learned ? `（新登记 ${learned} 项指标范围）` : ''}${abnormal.length ? `，${abnormal.length} 项异常进入跟踪` : '，全部正常'}`);
-    if (abnormal.length) {
-      createAlert('blue', '体检指标异常已入库', `${member.name}本次体检 ${abnormal.map(row => `${row.metric} ${row.value}${row.unit || ''}（${tagLabel(checkupRowStatus(row, row.value))}）`).join('、')}，超出参考范围，已进入异常指标跟踪，建议下次复查关注。`, '体检导入');
+    if (abnormal.length && state.alertSources?.checkup !== false) {
+      createAlert('blue', '体检指标异常已入库', `${member.name}本次体检 ${abnormal.map(row => `${row.metric} ${row.value}${row.unit || ''}（${tagLabel(checkupRowStatus(row, row.value))}）`).join('、')}，超出参考范围，已进入异常指标跟踪，建议下次复查关注。`, '体检导入 · 异常跟踪', `${member.id}|体检|${dateOffset(0)}`, member.name);
     }
     showMemberDashboard(memberId);
   });
@@ -1466,8 +1473,9 @@ function taskShareActive(share) { return share && !share.revokedAt && Date.now()
 
 /* ============ 社区需求区（FR-12）：家庭发布需求帖 → 陪诊师接单大厅 ============ */
 function demandPostStatusChip(status) {
+  const label = POST_STATUS_LABEL[status] || status || '';
   const map = { '招募中': 'record-status', '已接单': 'record-status', '服务中': 'record-status', '已完成': 'record-status', '已取消': 'record-status' };
-  return `<span class="${map[status] || 'record-status'}">${esc(status)}</span>`;
+  return `<span class="${map[label] || 'record-status'}">${esc(label)}</span>`;
 }
 const GUEST_COMMUNITY_FEED = [
   { id: 'guest-post-1', type: 'demand', status: 'open', service_type: '检查陪同', hospital_name: '市第一人民医院', service_date: dateOffset(6), summary: '需要一位陪诊员协助完成检查流程与院内引导', author_label: '家庭用户', region: '深圳 · 南山区', budget_min: 150, budget_max: 200, created_at: hoursAgoIso(2) },
@@ -1513,10 +1521,10 @@ function escortTrustLine(post) {
 function renderCommunityPost(post, { guest = false, escort = false } = {}) {
   const isDemand = post.type === 'demand' || !post.type;
   const privateActions = !guest && post.id && !String(post.id).startsWith('guest-');
-  const kindChip = `<span class="community-kind-chip ${isDemand ? 'kind-demand' : 'kind-supply'}">${isDemand ? '需求' : '供应'}</span>`;
+  const kindChip = `<span class="community-kind-chip ${isDemand ? 'kind-demand' : 'kind-supply'}">${isDemand ? '需求' : '服务'}</span>`;
   const applicantCount = post._applicants?.length;
   if (!isDemand) {
-    /* 供应卡（陪诊师可预约时段）：信任信息 + 状态机（可约→待确认→已约）+ 预约/管理操作 */
+    /* 服务卡（陪诊师发布的陪诊服务）：信任信息 + 状态机（可约→待确认→已约）+ 预约/管理操作 */
     const slot = [post.service_date, post.start_time ? String(post.start_time).slice(0, 5) : '', post.end_time ? String(post.end_time).slice(0, 5) : ''].filter(Boolean).join(' ');
     const dimmed = isPostExpired(post) || ['booked', 'cancelled'].includes(post.status) ? ' is-dimmed' : '';
     let actions = '';
@@ -1534,12 +1542,12 @@ function renderCommunityPost(post, { guest = false, escort = false } = {}) {
       }
     }
     return `<article class="demand-post-card community-post${dimmed}" data-community-type="availability" ${post.id && !String(post.id).startsWith('guest-') ? `data-post-id="${esc(post.id)}"` : ''}>
-    <div class="family-order-top"><strong>${esc(post.service_type || post.service || '可预约时段')}${guest && post.author_label ? ` · ${esc(post.author_label)}` : ''}</strong>${supplyStatusChip(post)}</div>
+    <div class="family-order-top"><strong>${esc(post.service_type || post.service || '陪诊服务')}${guest && post.author_label ? ` · ${esc(post.author_label)}` : ''}</strong>${supplyStatusChip(post)}</div>
     <p class="community-meta">${kindChip}${esc(post.region || '服务区域待补充')}${slot ? ` · ${esc(slot)}` : ''}</p>
     ${post.summary ? `<p>${esc(post.summary)}</p>` : ''}
     ${escortTrustLine(post)}
     ${postTimeLine(post)}
-    ${guest ? '<small class="privacy-small">游客仅查看脱敏虚构内容，登录后可预约或发布。</small>' : ''}
+    ${guest ? '<small class="privacy-small">游客仅浏览脱敏虚构内容；登录家庭账号后，此处下方会出现「预约该服务」按钮。</small>' : ''}
     ${actions}
   </article>`;
   }
@@ -1552,7 +1560,7 @@ function renderCommunityPost(post, { guest = false, escort = false } = {}) {
     <p>${esc(post.summary || post.need || '陪诊服务信息')}</p>
     ${budget || applicantCount ? `<p class="community-facts">${budget ? `<span>预算 <b>${esc(budget)}</b></span>` : ''}${applicantCount ? `<span>${applicantCount} 位陪诊师已报名</span>` : ''}</p>` : ''}
     ${postTimeLine(post)}
-    ${guest ? '<small class="privacy-small">游客仅查看脱敏虚构内容，登录后可发布或报名。</small>' : ''}
+    ${guest ? '<small class="privacy-small">游客仅浏览脱敏虚构内容；登录陪诊师账号后，此处下方会出现「报名」按钮。</small>' : ''}
     ${privateActions && escort && ['open','has_applicants'].includes(post.status) ? `<button class="primary-button" data-community-apply="${esc(post.id)}">报名陪诊需求</button>` : ''}
     ${privateActions && !escort && post.status === 'has_applicants' ? `<div class="community-applicants" data-applicants-for="${esc(post.id)}"><small>加载报名信息…</small></div>` : ''}
     ${privateActions && !escort && ['awaiting_confirmation','confirmed','in_service'].includes(post.status) ? `<small class="privacy-small">家庭确认陪诊员后，患者资料只对家庭成员和已选陪诊员开放。</small>` : ''}
@@ -1569,6 +1577,7 @@ async function renderCommunity() {
   /* 发布与管理操作已归位：家庭在「陪诊·需求大厅」，陪诊师在「我的」页；社区只负责浏览与筛选 */
   const reviewNotice = escort && auth?.mode === 'cloud' && auth.session?.status === 'pending_review' ? '陪诊师账号正在等待审核；审核通过前不能发布时段或报名。' : '';
   if (status) status.innerHTML = guest ? '游客模式 · 仅展示脱敏虚构社区内容 <button class="text-button" data-action="logout">切换登录 →</button>' : auth?.mode === 'cloud' ? '正在加载云端社区…' : '本机演示社区 · 数据保存在当前浏览器';
+  /* 社区大厅人人一致：家庭/陪诊师/游客看到同一份帖子流，区别只在卡上按钮；家庭发布与管理入口在「陪诊 · 我的发布」 */
   let posts = [];
   try {
     if (guest) posts = GUEST_COMMUNITY_FEED;
@@ -1613,9 +1622,9 @@ async function renderCommunity() {
   posts = posts.filter(post => (communityFilter === 'all' || (communityFilter === 'demand' ? (post.type === 'demand' || !post.type) : post.type === 'availability')) && (communityRegion === 'all' || String(post.region || '').includes(communityRegion)));
   posts = [...posts.filter(post => !isPostExpired(post)), ...posts.filter(post => isPostExpired(post))];
   const emptyHints = {
-    all: guest ? '社区还没有内容。登录后，家庭可发布陪诊需求，陪诊师可发布可预约时段。' : '目前没有社区内容。你可以发布陪诊需求。',
+    all: guest ? '社区还没有内容。登录后，家庭可发布陪诊需求，陪诊师可发布陪诊服务。' : '目前没有社区内容。你可以发布陪诊需求。',
     demand: '还没有陪诊需求帖。家庭登录后点「发布需求」，把医院、日期和需要帮忙的事写清楚。',
-    availability: '还没有陪诊师发布可预约时段。通过审核的陪诊师登录后，点「发布可约时段」即可发布。'
+    availability: '还没有陪诊师发布陪诊服务。通过审核的陪诊师登录后，点「发布陪诊服务」即可发布。'
   };
   host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => renderCommunityPost(post, { guest, escort })).join('')}</div>` : `<div class="empty-hint">${emptyHints[communityFilter] || emptyHints.all}</div>`;
   if (auth?.mode === 'cloud' && !escort) {
@@ -1644,37 +1653,26 @@ async function renderCloudEscortProfile() {
     if(!profile){host.innerHTML='<div class="empty-hint">陪诊师资料尚未初始化，请重新登录。</div>';return;}
     const approved=profile.review_status==='approved';
     const paused=profile.available===false;
-    host.innerHTML=`<div class="escort-status-card"><div><span class="eyebrow">接单状态 · 云端</span><strong>${paused?'暂停接单':'可预约'}</strong><small>${paused?'家庭暂时不能预约你的可约时段':'恢复后家庭可预约你的可约时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused?'1':'0'}">${paused?'恢复接单':'暂停接单'}</button></div><div class="profile-action-row"><button class="primary-button" data-action="availability-form">＋ 发布可约时段</button><button class="secondary-button" data-action="my-posts">我的发布</button></div>${approved?'':'<p class="privacy-small">账号审核通过后才能发布时段或报名需求。</p>'}<section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍 · ${approved?'已审核':'待审核'}</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">可约时段与发布的帖子都在本页管理；社区页供家庭浏览与预约。</p></section>`;
+    host.innerHTML=`<div class="me-idcard"><div class="me-id-top"><div class="me-ava">${esc((profile.display_name||'陪').slice(0,1))}</div><div><b>${esc(profile.display_name||'陪诊师')}</b><small>${approved?'陪诊师账号 · 已审核':'陪诊师账号 · 审核中'}</small></div></div><div class="me-status"><span class="me-dot"></span>${paused?'已暂停接单 · 家庭暂不能预约你的时段':'接单中 · 社区大厅可被家庭预约'}</div></div><section class="section-block escort-profile-cloud"><div class="section-heading"><div><p class="eyebrow">陪诊师资料</p><h2>我的介绍</h2></div></div><form class="escort-profile-form" id="cloudEscortProfileForm"><label><span class="field-label-block">称呼</span><input class="input-field" name="display_name" maxlength="48" value="${esc(profile.display_name)}" required></label><label><span class="field-label-block">陪诊经验</span><input class="input-field" name="experience" maxlength="100" value="${esc(profile.experience||'')}"></label><label><span class="field-label-block">服务区域</span><input class="input-field" name="service_area" maxlength="160" value="${esc(profile.service_area||'')}"></label><label><span class="field-label-block">自我介绍</span><textarea name="bio" maxlength="500">${esc(profile.bio||'')}</textarea></label><button class="secondary-button" type="submit">保存介绍</button></form><p class="privacy-small">发布陪诊服务与管理发布都在工作台；这里维护面向家庭展示的介绍资料。</p></section>`;
   } catch(error){host.innerHTML=`<div class="empty-hint">陪诊师资料加载失败：${esc(error.message||error)}</div>`;}
 }
 function showAvailabilityForm(post = null) {
   const auth = window.KangbanAuth;
-  if (auth?.mode !== 'cloud' || auth?.role !== 'escort' || auth.session?.status !== 'active') { toast('陪诊师账号审核通过后才可发布可约时段'); return; }
+  if (auth?.mode !== 'cloud' || auth?.role !== 'escort' || auth.session?.status !== 'active') { toast('陪诊师账号审核通过后才可发布陪诊服务'); return; }
   const editing = Boolean(post);
   const serviceOptions = ['门诊全程陪诊', '检查陪同', '代取药 · 代取报告', '住院日间陪护', '报告解读'].map(service => `<option value="${esc(service)}"${post?.service_type === service ? ' selected' : ''}>${esc(service)}</option>`).join('');
   const prefillRegion = post?.region || auth.session?.escortProfile?.service_area || '';
-  openModal(`${modalHead('陪诊师社区', editing ? '编辑可约时段' : '发布可预约时段', '只展示服务区域、日期与服务内容，不发布个人证件或患者信息。')}
+  openModal(`${modalHead('陪诊师社区', editing ? '编辑陪诊服务' : '发布陪诊服务', '只展示服务区域、日期与服务内容，不发布个人证件或患者信息。')}
     <form class="order-form" id="availabilityForm" ${editing ? `data-edit-id="${esc(post.id)}"` : ''}><label><span class="field-label-block">服务区域</span><input class="input-field" name="region" maxlength="100" required placeholder="例如：深圳南山区" value="${esc(prefillRegion)}"></label><label><span class="field-label-block">服务类型</span><select class="input-field" name="serviceType" required>${serviceOptions}</select></label><label><span class="field-label-block">可约日期</span><input class="input-field" name="date" type="date" value="${esc(post?.service_date || dateOffset(3))}" required></label><div class="form-two-col"><label><span class="field-label-block">开始时间</span><input class="input-field" name="start" type="time" value="${esc(post?.start_time ? String(post.start_time).slice(0, 5) : '09:00')}" required></label><label><span class="field-label-block">结束时间</span><input class="input-field" name="end" type="time" value="${esc(post?.end_time ? String(post.end_time).slice(0, 5) : '12:00')}" required></label></div><label><span class="field-label-block">服务介绍（选填）</span><textarea class="input-field" name="summary" maxlength="200" placeholder="例如：熟悉市一院流程，可协助挂号与院内引导">${esc(post?.summary || '')}</textarea></label><button class="primary-button" type="submit">${editing ? '保存修改' : '发布时段'}</button></form>`);
 }
 async function showMyPosts() {
-  const auth = window.KangbanAuth;
-  if (auth?.mode !== 'cloud' || !auth.session?.user?.id) { toast('我的发布仅云端模式可用'); return; }
-  openModal(`${modalHead('我的发布', '管理我发布的帖子', '招募中的需求和可约时段可以取消或下架；进行中的预约和订单需先处理完成。')}<div id="myPostsList" class="my-posts-list"><p class="empty-hint">加载中…</p></div>`);
-  const host = document.getElementById('myPostsList');
-  try {
-    const posts = await window.KangbanAPI.select('community_posts', { filters: { author_id: auth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 50 });
-    if (!posts.length) { host.innerHTML = '<p class="empty-hint">还没有发布过内容。</p>'; return; }
-    host.innerHTML = posts.map(post => {
-      const label = post.type === 'availability' ? '供应 · 时段' : '需求';
-      const info = post.type === 'availability' ? `${post.region || ''} · ${post.service_date || ''}${post.start_time ? ` ${String(post.start_time).slice(0, 5)}` : ''}` : `${post.hospital_name || ''} · ${post.service_date || ''}`;
-      const cancellable = post.type === 'demand' ? ['open', 'has_applicants'].includes(post.status) : post.status === 'open';
-      const editable = post.type === 'availability' && post.status === 'open';
-      return `<div class="my-post-row"><div><strong>${esc(post.service_type)}</strong><small>${esc(label)} · ${esc(info)} · ${esc(POST_STATUS_LABEL[post.status] || post.status)}</small></div><div class="applicant-ops">${editable ? `<button class="secondary-button compact" data-my-edit="${esc(post.id)}">编辑</button>` : ''}${cancellable ? `<button class="text-button" data-my-cancel="${esc(post.id)}">取消</button>` : ''}</div></div>`;
-    }).join('');
-  } catch (error) { host.textContent = `加载失败：${error.message || error}`; }
+  /* 陪诊师发布管理已收进工作台「我的发布」抽屉；此入口保留兜底，直接展开抽屉 */
+  escortMyPostsOpen = true;
+  if (currentTab !== 'escort') navigate('escort');
+  else renderCloudWorkbench();
 }
 function showBookAvailabilityModal(post) {
-  openModal(`${modalHead('预约可约时段', '提交预约申请', '陪诊师确认后生成正式订单，确认前可随时撤销；患者资料在成单前不会开放。')}
+  openModal(`${modalHead('预约陪诊服务', '提交预约申请', '陪诊师确认后生成正式订单，确认前可随时撤销；患者资料在成单前不会开放。')}
     <form class="order-form" id="bookAvailabilityForm" data-post-id="${esc(post.id)}"><p class="privacy-small">${esc(post.service_type || '陪诊服务')} · ${esc(post.region || '')} · ${esc(post.service_date || '')}${post.start_time ? ` ${esc(String(post.start_time).slice(0, 5))}` : ''}</p><label><span class="field-label-block">想说明的情况（选填）</span><textarea class="input-field" name="note" maxlength="200" placeholder="例如：母亲周三复查，希望全程陪同"></textarea></label><button class="primary-button" type="submit">提交预约申请</button></form>`);
 }
 /* ===== 云端订单时间线（双端共用）：已确认→已到场→服务中→履约清单→完成互评 ===== */
@@ -1729,10 +1727,13 @@ async function renderCloudWorkbench() {
   if (!host || window.KangbanAuth?.mode !== 'cloud' || window.KangbanAuth.role !== 'escort') return;
   host.hidden = false;
   try {
-    const [profileRows, orders, bookings] = await Promise.all([
+    const [profileRows, orders, bookings, myPosts, mySignups, allPosts] = await Promise.all([
       window.KangbanAPI.select('escort_profiles', { filters: { user_id: window.KangbanAuth.session.user.id }, limit: 1 }),
       window.KangbanAPI.rpc('list_my_companion_orders'),
-      window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => [])
+      window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => []),
+      window.KangbanAPI.select('community_posts', { filters: { author_id: window.KangbanAuth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 50 }).catch(() => []),
+      window.KangbanAPI.select('post_signups', { filters: { escort_id: window.KangbanAuth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 20 }).catch(() => []),
+      window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 }).catch(() => [])
     ]);
     const profile = profileRows[0] || null;
     if (profile) window.KangbanAuth.session.escortProfile = profile;
@@ -1743,14 +1744,52 @@ async function renderCloudWorkbench() {
     const paused = profile && profile.available === false;
     const shareLookup = `<section class="section-block"><div class="section-heading"><div><p class="eyebrow">家庭授权</p><h2>输入本次任务分享码</h2></div></div><form class="order-form" id="cloudTaskShareLookup"><label><span class="field-label-block">6 位分享码</span><input class="input-field" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary-button" type="submit">验证并查看授权内容</button></form><div id="cloudTaskShareResult"></div></section>`;
     host.innerHTML = `
-      <div class="escort-status-card"><div><span class="cloud-pill">云端生效 · 预约申请实时校验</span><strong>${paused ? '暂停接单' : '可预约'}</strong><small>${paused ? '家庭暂时不能预约你的可约时段' : '社区页可被家庭预约你的可约时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused ? '1' : '0'}">${paused ? '恢复接单' : '暂停接单'}</button></div>
+      <div class="escort-status-card"><div><span class="cloud-pill">云端生效 · 预约申请实时校验</span><strong>${paused ? '暂停接单' : '可预约'}</strong><small>${paused ? '家庭暂时不能预约你的服务时段' : '社区页可被家庭预约你的服务时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused ? '1' : '0'}">${paused ? '恢复接单' : '暂停接单'}</button></div>
       ${profile && profile.review_status !== 'approved' ? '<div class="boundary-note"><strong>审核中</strong><p>审核通过前不能发布时段或报名需求。</p></div>' : ''}
       <div class="escort-stat-grid"><div><strong>${pendingBookings.length + orders.filter(order => order.status === 'pending_escort_confirmation').length}</strong><span>待确认</span></div><div><strong>${activeOrders.filter(order => order.status !== 'pending_escort_confirmation').length}</strong><span>进行中</span></div><div><strong>${completedOrders.length}</strong><span>已完成</span></div></div>
       ${pendingBookings.length ? `<section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>新的预约申请</h2></div>${pendingBookings.map(booking => `<div class="invite-card"><div class="family-order-top"><strong>${esc(booking.booker_label || '家庭用户')} 预约了你的时段</strong><span class="supply-status-chip is-pending">待确认</span></div><p class="community-meta">${esc(booking.note || '未附言')} · ${esc(new Date(booking.created_at).toLocaleString('zh-CN'))}</p><div class="order-actions-2"><button class="secondary-button compact" data-community-respond="${esc(booking.id)}" data-accept="0">婉拒</button><button class="primary-button compact" data-community-respond="${esc(booking.id)}" data-accept="1">接受预约</button></div></div>`).join('')}</section>` : ''}
-      <section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>我的陪诊安排</h2></div>${orders.length ? `<div class="demand-post-list">${orders.map(order => renderCloudOrderCard(order, true)).join('')}</div>` : `<div class="empty-link">还没有订单。去社区报名别人的需求，或等家庭预约你的时段 <b data-nav="community">→ 打开社区</b></div>`}</section>
+      <section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>我的陪诊安排</h2></div>${orders.length ? `<div class="demand-post-list">${orders.map(order => renderCloudOrderCard(order, true)).join('')}</div>` : `<div class="empty-link">还没有订单。发布陪诊服务等家庭预约，或去社区报名别人的需求 <b data-nav="community">→ 打开社区</b></div>`}</section>
+      <div id="escortMyPostsArea"></div>
       ${shareLookup}
       <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。患者资料仅经家庭分享码授权后可见。</p></div>`;
+    renderEscortMyPosts(myPosts || [], pendingBookings.length, mySignups || [], Object.fromEntries((allPosts || []).map(post => [post.id, post])));
   } catch (error) { host.innerHTML = `<div class="empty-hint">工作台加载失败：${esc(error.message || error)} <button class="text-button" data-action="escort-reload">重试</button></div>`; }
+}
+/* ===== 陪诊师「我的发布」抽屉（对称家庭端：发布管理归事务中心）：默认收缩一行，有新预约时高亮；
+   抽屉内两组：我的服务（发布管理 + 收到的预约计数）+ 我的报名（我报名的需求跟进，填补报名→成单盲区） ===== */
+let escortMyPostsOpen = false;
+let escortMyPostsCache = { posts: [], newBookings: 0, signups: [], postById: {} };
+function renderEscortMyPosts(posts = escortMyPostsCache.posts, newBookings = escortMyPostsCache.newBookings, signups = escortMyPostsCache.signups, postById = escortMyPostsCache.postById) {
+  const host = document.getElementById('escortMyPostsArea');
+  if (!host) return;
+  escortMyPostsCache = { posts: posts || [], newBookings: newBookings || 0, signups: signups || [], postById: postById || {} };
+  const rows = escortMyPostsCache.posts;
+  const mySignups = escortMyPostsCache.signups;
+  const pendingSignups = mySignups.filter(signup => signup.status === 'applied').length;
+  if (!rows.length && !mySignups.length) {
+    host.hidden = false;
+    host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar" id="escortMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">还没有发布陪诊服务</span><span class="mp-arrow">${escortMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${escortMyPostsOpen ? '' : 'hidden'}><p class="empty-hint">发布陪诊服务后，家庭可以在社区大厅直接向你提交预约申请。</p><div class="mp-head"><button class="primary-button compact" data-action="availability-form">＋ 发布陪诊服务</button></div></div></section>`;
+    return;
+  }
+  const inProgress = rows.filter(post => ['open', 'has_applicants', 'awaiting_confirmation'].includes(post.status)).length;
+  const listHtml = rows.map(post => {
+    const label = post.type === 'availability' ? '服务 · 时段' : '需求';
+    const info = post.type === 'availability' ? `${post.region || ''} · ${post.service_date || ''}${post.start_time ? ` ${String(post.start_time).slice(0, 5)}` : ''}` : `${post.hospital_name || ''} · ${post.service_date || ''}`;
+    const cancellable = post.type === 'demand' ? ['open', 'has_applicants'].includes(post.status) : post.status === 'open';
+    const editable = post.type === 'availability' && post.status === 'open';
+    return `<div class="my-post-row"><div><strong>${esc(post.service_type)}</strong><small>${esc(label)} · ${esc(info)} · ${esc(POST_STATUS_LABEL[post.status] || post.status)}</small></div><div class="applicant-ops">${editable ? `<button class="secondary-button compact" data-my-edit="${esc(post.id)}">编辑</button>` : ''}${cancellable ? `<button class="text-button" data-my-cancel="${esc(post.id)}">取消</button>` : ''}</div></div>`;
+  }).join('');
+  /* 我的报名组：状态 applied=待家庭挑选 / selected=已选中 / declined=未被选中 / withdrawn=已撤回 */
+  const signupsHtml = mySignups.length ? `<div class="mp-subhead">我的报名</div>${mySignups.map(signup => {
+    const post = escortMyPostsCache.postById[signup.post_id] || {};
+    const label = SIGNUP_STATUS_LABEL[signup.status] || signup.status;
+    const note = signup.note ? ` · 附言：${esc(signup.note.length > 36 ? `${signup.note.slice(0, 36)}…` : signup.note)}` : '';
+    const tail = signup.status === 'selected' ? ' · 成单后见「我的陪诊安排」' : '';
+    return `<div class="my-post-row"><div><strong>${esc(post.service_type || '陪诊需求报名')}</strong><small>${esc(label)} · ${esc(post.hospital_name || '')}${post.service_date ? ` · ${esc(post.service_date)}` : ''}${note}${tail}</small></div></div>`;
+  }).join('')}` : '';
+  const facts = [inProgress ? `${inProgress} 条进行中` : '', escortMyPostsCache.newBookings ? `<b>${escortMyPostsCache.newBookings} 个新预约</b>` : '', pendingSignups ? `${pendingSignups} 个报名待确认` : ''].filter(Boolean).join(' · ');
+  host.hidden = false;
+  host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar${escortMyPostsCache.newBookings ? ' has-new' : ''}" id="escortMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">${facts || '暂无进行中'}</span><span class="mp-arrow">${escortMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${escortMyPostsOpen ? '' : 'hidden'}><div class="mp-head"><button class="text-button" data-action="availability-form">＋ 发布陪诊服务</button></div>${rows.length ? `<div class="mp-subhead">我发布的服务</div>${listHtml}` : ''}${signupsHtml}</div></section>`;
 }
 /* ===== 家庭端陪诊 Tab 实时动态 + 首页当天入口 ===== */
 async function renderCloudFamilyOrders() {
@@ -1770,7 +1809,12 @@ async function renderCloudFamilyOrders() {
     const todayOrder = active.find(order => order.service_date === dateOffset(0));
     updateHero(todayOrder);
     renderHomeTodayBar(orders);
-    renderHomeTodo(homeTodoItems(orders).concat(await fetchCloudSignupItems()));
+    const match = await fetchCloudFamilyMatch();
+    renderHomeTodo(homeTodoItems(orders).concat(match.items));
+    /* 红点单一来源：有新报名点亮陪诊 Tab（子页签角标已取消，通知文案引导回「我的陪诊」） */
+    setHallDot(match.items.length > 0);
+    /* 「我的发布」抽屉：撮合中事务收在事务中心，默认收缩（含我发出的预约申请） */
+    renderFamilyMyPosts(match.posts, orders, match.bookings, match.postById);
     renderHomeMemberStrip();
   } catch (error) {
     updateHero();
@@ -1783,11 +1827,15 @@ async function refreshCloudAfterAction() {
   if (auth?.mode !== 'cloud') { await renderCommunity(); return; }
   if (auth.role === 'escort') { try { await renderCloudWorkbench(); } catch { /* 忽略 */ } }
   else { try { await renderCompanionViews(); } catch { /* 忽略 */ } }
-  if (currentTab === 'community') await renderCommunity();
+  if (currentTab === 'community' || (currentTab === 'companion' && companionSub === 'hall')) await renderCommunity();
 }
 /* ===== Tab 红点提示 ===== */
 function setTabDot(tab, on) {
   document.querySelectorAll(`.tab[data-tab="${tab}"]`).forEach(el => el.classList.toggle('has-dot', on));
+}
+/* 红点单一来源：家庭端只认「陪诊 Tab」，子页签角标已取消 */
+function setHallDot(on) {
+  setTabDot('companion', on);
 }
 /* ===== Realtime 订阅：对方状态一变，本端自动刷新 + 提示 ===== */
 let cloudRealtimeChannel = null;
@@ -1808,6 +1856,14 @@ function subscribeCloudRealtime() {
       toast('预约申请有更新');
       if (currentTab !== dotTab) setTabDot(dotTab, true);
       refreshCloudAfterAction();
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'post_signups' }, () => {
+      /* 家庭发的需求帖来了新报名：主动把人推回事务中心处理 */
+      if (auth.role === 'family') {
+        toast('有人报名你的需求，去「我的陪诊」处理');
+        if (currentTab !== 'companion') setTabDot('companion', true);
+        refreshCloudAfterAction();
+      }
     })
     .subscribe();
 }
@@ -2002,7 +2058,7 @@ function cancelDemandPost(postId) {
   const post = (state.demandPosts || []).find(item => item.id === postId);
   if (!post || post.status !== '招募中') { toast('只有招募中的需求可以取消'); return; }
   post.status = '已取消';
-  saveState(); renderRecords();
+  saveState(); renderRecords(); renderCompanionViews();
   toast('需求帖已取消');
 }
 /* 需求帖状态联动：陪诊订单开始履约 → 服务中；完成 → 已完成 */
@@ -2144,17 +2200,20 @@ function createVisitReminderFromReport(order, nextVisitDate, nextVisitNote) {
 async function renderCompanionViews() {
   /* 云端模式：陪诊师 → 云端工作台；家庭 → 陪诊 Tab 实时动态。本地演示 DOM 全部让位 */
   const cloudAuth = window.KangbanAuth;
-  const familyMyPosts = document.getElementById('familyMyPostsButton');
-  if (familyMyPosts) familyMyPosts.hidden = cloudAuth?.mode !== 'cloud' || cloudAuth?.role === 'escort';
   if (cloudAuth?.mode === 'cloud') {
     const localOrders = document.getElementById('companionOrders');
     if (localOrders) localOrders.hidden = true;
     if (cloudAuth.role === 'escort') { try { await renderCloudWorkbench(); } catch (error) { console.warn('工作台加载失败', error); } }
-    else { try { await renderCloudFamilyOrders(); } catch (error) { console.warn('陪诊动态加载失败', error); } }
+    else {
+      /* 云端家庭：「我的陪诊」子页签只留实时动态；本地演示块（装饰卡/认识服务人员/选择服务）让位给「社区大厅」 */
+      ['companionIntro', 'companionProfileSection', 'companionServicesSection'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
+      try { await renderCloudFamilyOrders(); } catch (error) { console.warn('陪诊动态加载失败', error); }
+    }
     return;
   }
   const localOrdersReset = document.getElementById('companionOrders');
   if (localOrdersReset) localOrdersReset.hidden = false;
+  ['companionIntro', 'companionProfileSection', 'companionServicesSection'].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = false; });
   const profile = state.companionProfile;
   const familyProfile = document.getElementById('familyEscortProfile');
   if (familyProfile) {
@@ -2210,6 +2269,8 @@ async function renderCompanionViews() {
   renderEscortHall();
   renderDemandPosts();
   renderEscortIncome();
+  /* 本地演示家庭：我的发布抽屉同样收在「我的陪诊」（本机数据） */
+  if (state.currentRole !== 'escort') renderFamilyMyPosts([], state.companionOrders);
 }
 
 function renderRole() {
@@ -2221,6 +2282,8 @@ function renderRole() {
   document.getElementById('roleAvatar').textContent = isEscort ? state.companionProfile.name.slice(0, 1) : (member?.name.slice(0, 1) || '家');
   document.getElementById('roleLabel').textContent = isEscort ? `陪诊员端 · ${state.companionProfile.name}` : `家庭端 · ${member?.name || '家人'}`;
   document.body.classList?.toggle('cloud-escort-mode',cloudEscort);
+  /* 陪诊 Tab 子页签（我的陪诊/社区大厅）只在家庭端显示 */
+  document.body.classList?.toggle('family-mode', !guest && !isEscort);
   document.getElementById('familyTabs').hidden = guest || isEscort;
   document.getElementById('escortTabs').hidden = !isEscort || cloudEscort;
   const cloudNav = document.getElementById('cloudEscortTabs');
@@ -2241,6 +2304,40 @@ function renderRole() {
   document.body.classList?.toggle('kb-cloud', window.KangbanAuth?.mode === 'cloud');
   document.querySelectorAll('.local-data-badge').forEach(badge => { badge.hidden = window.KangbanAuth?.mode !== 'cloud'; });
   renderCompanionViews();
+  renderMePage();
+}
+
+/* ===== 「我的」页 v4 · 纯文字：身份卡 + 两组纯文字行，无图标无废话 ===== */
+function meRow(label, value, action, valueOn) {
+  return `<button class="me-row" data-action="${action}"><b>${esc(label)}</b>${value ? `<span class="v${valueOn ? ' on' : ''}">${esc(value)}</span>` : ''}<span class="arr">›</span></button>`;
+}
+function renderMePage() {
+  const idHost = document.getElementById('meIdCard');
+  if (!idHost) return;
+  const auth = window.KangbanAuth;
+  const cloud = auth?.mode === 'cloud' && auth.session?.user;
+  const deviceCount = Object.values(state.devices || {}).filter(Boolean).length;
+  const memberCount = (state.familyMembers || []).length;
+  const notifyGranted = typeof window !== 'undefined' && window.Notification?.permission === 'granted';
+  if (cloud) {
+    const email = String(auth.session.user.email || '');
+    const at = email.indexOf('@');
+    const masked = at > 0 ? `${email.slice(0, Math.min(2, at))}***${email.slice(at)}` : email;
+    idHost.innerHTML = `<div class="me-id-top"><div class="me-ava">${esc((auth.session.displayName || '家').slice(0, 1))}</div><div><b>${esc(auth.session.displayName || '家庭成员')}</b><small>${esc(masked)}</small></div><button class="me-out" data-action="logout">退出登录</button></div><div class="me-status"><span class="me-dot"></span>已连接云端 · 多端同步</div>`;
+    document.getElementById('mePrimaryRows').innerHTML = meRow('家庭成员', memberCount ? String(memberCount) : '', 'family') + meRow('设备管理', deviceCount ? String(deviceCount) : '', 'devices') + meRow('账号安全', '', 'account-security');
+    document.getElementById('meGeneralRows').innerHTML = meRow('通知设置', notifyGranted ? '已开启' : '未开启', 'notify-settings', notifyGranted) + meRow('分享码与授权', '', 'share') + meRow('帮助与服务说明', '', 'help') + meRow('关于康伴', 'v0.9', 'about');
+  } else {
+    idHost.innerHTML = `<div class="me-id-top"><div class="me-ava me-ava-local">⌂</div><div><b>本机演示模式</b><small>数据保存在当前浏览器</small></div><button class="me-out me-out-login" data-action="logout">登录 / 注册</button></div>`;
+    document.getElementById('mePrimaryRows').innerHTML = meRow('家庭成员', memberCount ? String(memberCount) : '', 'family') + meRow('设备管理', deviceCount ? String(deviceCount) : '', 'devices');
+    document.getElementById('meGeneralRows').innerHTML = meRow('分享码与授权', '', 'share') + meRow('帮助与服务说明', '', 'help') + meRow('关于康伴', 'v0.9', 'about');
+  }
+}
+function showAccountSecurity() {
+  const auth = window.KangbanAuth;
+  if (auth?.mode !== 'cloud' || !auth.session?.user) { toast('本机演示模式没有云端账号'); return; }
+  openModal(`${modalHead('账号安全', '云端账号信息', '健康档案与陪诊安排保存在家庭云端空间，换设备登录即可恢复；如需修改密码，退出后在登录页操作。')}
+    <div class="account-security"><div class="my-post-row"><div><strong>${esc(String(auth.session.user.email || ''))}</strong><small>登录邮箱 · ${auth.session.role === 'family' ? '家庭账号' : '陪诊师账号'}${auth.session.isAdmin ? ' · 管理员' : ''}</small></div></div><div class="my-post-row"><div><strong>多端同步已开启</strong><small>同一账号在其他设备登录，数据自动保持一致。</small></div></div></div>
+    <button class="secondary-button" data-action="logout" style="margin-top:12px">退出登录</button>`);
 }
 
 function setRole(role) {
@@ -2266,43 +2363,46 @@ function todayReminderItems() {
     const skipped = log?.status === 'skipped';
     const done = item.kind === 'medication' ? Boolean(state.medicationTaken?.[key]) : log?.status === 'done' || skipped;
     const typeLabel = item.kind === 'medication' ? '服药' : item.kind === 'measurement' ? '测量' : item.kind === 'activity' ? '活动' : '自定义';
-    return { ...item, key, done, skipped, typeLabel, memberName: memberName(item.memberId) };
+    return { ...item, key, done, skipped, skipReason: log?.reason || '', typeLabel, memberName: memberName(item.memberId) };
   });
 }
+/* 提醒行（带打卡操作）：主列表只渲染未完成项（完成后折叠进「已完成」条）；
+   行内只留主操作 + 延后，跳过收进「···」菜单需确认原因——完成才消失，闭环可追溯 */
+function reminderRowHtml(item) {
+  const subline = item.kind === 'medication' ? `${esc(item.detail)} · ${esc(item.memberName)}` : `${item.typeLabel} · ${esc(item.memberName)}${item.unit ? ` · ${esc(item.unit)}` : ''}`;
+  const button = item.kind === 'medication'
+    ? `<button class="med-taken-button" data-med-taken="${esc(item.id)}" data-med-time="${esc(item.time)}">记录已服</button>`
+    : `<div class="reminder-inline-actions"><button class="med-taken-button" data-reminder-complete="${esc(item.id)}" data-reminder-time="${esc(item.time)}">${item.kind === 'measurement' ? '记录读数' : '完成'}</button><button class="reminder-later" data-reminder-snooze="${esc(item.id)}" data-reminder-time="${esc(item.time)}">延后</button><button class="reminder-more" data-reminder-skip="${esc(item.id)}" data-reminder-time="${esc(item.time)}" aria-label="更多操作">···</button></div>`;
+  const snoozedText = state.reminderLogs?.[item.key]?.status === 'snoozed' ? ` · 已延后至 ${new Date(state.reminderLogs[item.key].snoozedUntil).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` : '';
+  return `<div class="med-reminder-row"><time>${esc(item.time)}</time><div class="med-reminder-copy"><strong>${esc(item.title)} <i>${item.typeLabel}</i></strong><small>${subline}${esc(snoozedText)}</small></div>${button}</div>`;
+}
+/* 已完成行的回看形态：✓ 已记录 / 已跳过 · 原因 */
+function reminderDoneRowHtml(item) {
+  const subline = item.skipped ? `已跳过${item.skipReason ? ` · ${esc(item.skipReason)}` : ''}` : (item.kind === 'medication' ? '已记录服药' : '已完成');
+  return `<div class="med-reminder-row is-taken"><time>${esc(item.time)}</time><div class="med-reminder-copy"><strong>${esc(item.title)} <i>${item.typeLabel}</i></strong><small>${esc(item.memberName)} · ${subline}</small></div><span class="done-check">✓</span></div>`;
+}
+/* 今日提醒区块已并入首页总览条展开区；此函数保留为刷新入口 */
 function renderMedicationReminders() {
-  const host = document.getElementById('homeMedicationReminders');
-  if (!host) return;
-  const items = todayReminderItems();
   renderHomeTodayBar();
   renderHomeMemberStrip();
-  if (!items.length) {
-    host.innerHTML = `<div class="med-empty"><span>今天暂无安排，可添加量血压、散步或自定义事项。</span><button class="text-button" data-action="add-reminder">新增提醒 →</button></div>`;
-    return;
-  }
-  host.innerHTML = `<div class="med-reminder-list">${items.map(item => {
-    const subline = item.kind === 'medication' ? `${esc(item.detail)} · ${esc(item.memberName)}` : `${item.typeLabel} · ${esc(item.memberName)}${item.unit ? ` · ${esc(item.unit)}` : ''}`;
-    const button = item.kind === 'medication'
-      ? `<button class="med-taken-button" data-med-taken="${esc(item.id)}" data-med-time="${esc(item.time)}" ${item.done ? 'disabled' : ''}>${item.done ? '已记录' : '记录已服'}</button>`
-      : `<div class="reminder-inline-actions"><button class="med-taken-button" data-reminder-complete="${esc(item.id)}" data-reminder-time="${esc(item.time)}" ${item.done ? 'disabled' : ''}>${item.skipped ? '已跳过' : item.done ? (item.kind === 'measurement' ? '已记录' : '已完成') : (item.kind === 'measurement' ? '记录读数' : '完成')}</button>${!item.done ? `<button class="reminder-later" data-reminder-snooze="${esc(item.id)}" data-reminder-time="${esc(item.time)}">＋30分</button><button class="reminder-skip" data-reminder-skip="${esc(item.id)}" data-reminder-time="${esc(item.time)}">跳过</button>` : ''}</div>`;
-    const snoozedText = state.reminderLogs?.[item.key]?.status === 'snoozed' ? ` · 已延后至 ${new Date(state.reminderLogs[item.key].snoozedUntil).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` : '';
-    return `<div class="med-reminder-row ${item.done ? 'is-taken' : ''}"><time>${esc(item.time)}</time><div class="med-reminder-copy"><strong>${esc(item.title)} <i>${item.typeLabel}</i></strong><small>${subline}${esc(snoozedText)}</small></div>${button}</div>`;
-  }).join('')}</div>`;
 }
 
 /* ===== 首页统领区：今日总览条 / Hero 真数据 / 待我处理 / 成员状态行 ===== */
 function updateHero(cloudOrder) {
   const host = document.getElementById('homeHeroBody');
   if (!host) return;
+  const today = dateOffset(0);
+  const localToday = (state.companionOrders || []).find(order => order.date === today && ['pending', 'accepted'].includes(order.status));
+  /* 常用服务随情境变化：今天有陪诊 → 分享码置前并标注 */
+  renderHomeQuick(Boolean(cloudOrder || localToday));
   const hero = (pill, spark, kicker, title, meta, actionHtml, live = false) => {
     host.innerHTML = `<div class="hero-top"><span class="pill pill-light${live ? ' pill-live' : ''}"><span class="status-dot"></span> ${pill}</span><span class="hero-spark">${spark}</span></div><p class="hero-kicker">${kicker}</p><h2>${title}</h2><div class="appointment-meta">${meta}</div>${actionHtml}`;
   };
-  const today = dateOffset(0);
   if (cloudOrder) {
     const label = { pending_escort_confirmation: '等待陪诊师确认', confirmed: cloudOrder.arrived_at ? '陪诊师已到场 · 即将开始' : '已确认 · 待服务', in_service: '服务中 · 实时回传进度' }[cloudOrder.status] || '';
     hero(cloudOrder.status === 'in_service' ? '陪诊进行中' : '今日陪诊', '♡', '今天的服务', esc(cloudOrder.hospital_name || ''), `${esc(cloudOrder.service_type || '')} · ${cloudOrder.starts_at ? `${fmtClock(cloudOrder.starts_at)} · ` : ''}<span>${esc(label)}</span>`, `<button class="hero-action" data-nav="companion">查看陪诊动态 <span>→</span></button>`, true);
     return;
   }
-  const localToday = (state.companionOrders || []).find(order => order.date === today && ['pending', 'accepted'].includes(order.status));
   if (localToday) {
     hero('今日陪诊', '♡', '今天的服务', esc(localToday.hospital), `${esc(localToday.service)} · <span>${localToday.status === 'accepted' ? '陪诊员已接单' : '等待陪诊员确认'}</span>`, `<button class="hero-action" data-action="companion">查看安排 <span>→</span></button>`, true);
     return;
@@ -2312,7 +2412,19 @@ function updateHero(cloudOrder) {
     hero('家庭档案已就绪', '✳', '下一次就诊', esc(upcoming.hospital), `${esc(upcoming.service)} · <span>${formatDate(upcoming.date)}</span>`, `<button class="hero-action" data-action="companion">查看安排 <span>→</span></button>`);
     return;
   }
-  hero('一切如常', '✳', '今天暂无就诊安排', '有空整理一下健康档案', '<span>录入读数，或去社区看看需求</span>', `<button class="hero-action" data-action="add-reading">录入读数 <span>→</span></button>`);
+  hero('一切如常', '✳', '今天暂无就诊安排', '有空整理一下健康档案', '<span>录入读数，或去社区看看需求</span>', `<button class="hero-action" data-nav="health">查看健康档案 <span>→</span></button>`);
+}
+/* 常用服务：单行四列紧凑格，分享码常驻；就诊日加「今天用得上」角标 */
+function renderHomeQuick(hasTodayOrder) {
+  const host = document.getElementById('quickGrid');
+  if (!host) return;
+  const items = [
+    { action: 'add-reading', icon: '↥', cls: 'icon-upload', title: '录入读数', sub: '手动 / 语音 / 拍照' },
+    { action: 'docs-upload', icon: '▤', cls: 'icon-doc', title: '上传资料', sub: '病历 / 发票 · 配报销' },
+    { action: 'home-share', icon: '⌁', cls: 'icon-share', title: '分享码', sub: '给陪诊师临时授权', hot: hasTodayOrder },
+    { action: 'home-demand', icon: '♡', cls: 'icon-heart', title: '发需求', sub: '社区发单等报名' }
+  ];
+  host.innerHTML = items.map(item => `<button class="quick-item q4-compact ${item.hot ? 'quick-hot' : ''}" data-action="${item.action}">${item.hot ? '<span class="quick-corner">今天用得上</span>' : ''}<span class="quick-icon ${item.cls}">${item.icon}</span><strong>${item.title}</strong><small>${item.sub}</small></button>`).join('');
 }
 function homeTodoItems(cloudOrders) {
   const items = [];
@@ -2329,39 +2441,129 @@ function homeTodoItems(cloudOrders) {
   }
   return items;
 }
-async function fetchCloudSignupItems() {
+async function fetchCloudFamilyMatch() {
   const auth = window.KangbanAuth;
-  if (auth?.mode !== 'cloud' || auth.role !== 'family') return [];
+  if (auth?.mode !== 'cloud' || auth.role !== 'family') return { items: [], posts: [], bookings: [], postById: {} };
   try {
-    const posts = await window.KangbanAPI.select('community_posts', { filters: { family_id: auth.session.familyId, type: 'demand' }, order: { column: 'created_at', ascending: false }, limit: 20 });
+    const [posts, bookings, allPosts] = await Promise.all([
+      window.KangbanAPI.select('community_posts', { filters: { family_id: auth.session.familyId, type: 'demand' }, order: { column: 'created_at', ascending: false }, limit: 20 }),
+      window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => []),
+      window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 }).catch(() => [])
+    ]);
     const openPosts = posts.filter(post => ['open', 'has_applicants'].includes(post.status));
     const counts = await Promise.all(openPosts.map(async post => ({ post, signups: await window.KangbanAPI.select('post_signups', { filters: { post_id: post.id, status: 'applied' } }).catch(() => []) })));
-    return counts.filter(({ signups }) => signups.length).map(({ post, signups }) => ({ level: 'mid', title: `${post.service_type || '陪诊需求'} · ${signups.length} 位陪诊师报名`, sub: `${post.hospital_name || ''}${post.service_date ? ` · ${post.service_date}` : ''}`, action: '<button class="text-button" data-nav="community">去查看 →</button>' }));
-  } catch { return []; }
+    let profileById = {};
+    const escortIds = [...new Set(counts.flatMap(({ signups }) => signups.map(signup => signup.escort_id).filter(Boolean)))];
+    if (escortIds.length) {
+      const profiles = await window.KangbanAPI.select('escort_profiles').catch(() => []);
+      profileById = Object.fromEntries(profiles.map(profile => [profile.user_id, profile]));
+    }
+    for (const { post, signups } of counts) {
+      post._applicants = signups.map(signup => { const p = profileById[signup.escort_id] || {}; return { ...signup, display_name: p.display_name || '待核验陪诊师', experience: p.experience || '', service_area: p.service_area || '', bio: p.bio || '' }; });
+    }
+    const items = counts.filter(({ signups }) => signups.length).map(({ post }) => ({ level: 'mid', title: `${post.service_type || '陪诊需求'} · ${post._applicants.length} 位陪诊师报名`, sub: `${post.hospital_name || ''}${post.service_date ? ` · ${post.service_date}` : ''}`, action: '<button class="text-button" data-nav="companion" data-open-my-posts>去处理 →</button>' }));
+    return { items, posts, bookings: bookings || [], postById: Object.fromEntries((allPosts || []).map(post => [post.id, post])) };
+  } catch { return { items: [], posts: [], bookings: [], postById: {} }; }
 }
-function renderHomeTodo(items) {
-  const host = document.getElementById('homeTodoQueue');
+/* ===== 家庭端「我的发布」抽屉（撮合中事务归我的陪诊）：默认收缩一行，有新报名时高亮；
+   抽屉内两组：我的需求（报名跟进）+ 我的预约申请（对陪诊师服务的预约跟进） ===== */
+let familyMyPostsOpen = false;
+let familyMyPostsCache = { posts: [], orders: [], bookings: [], postById: {} };
+const SIGNUP_STATUS_LABEL = { applied: '待家庭挑选', selected: '已选中', declined: '未被选中', withdrawn: '已撤回' };
+const BOOKING_STATUS_LABEL = { applied: '待陪诊师确认', accepted: '已确认', rejected: '未通过', cancelled: '已撤销' };
+function renderFamilyMyPosts(posts = familyMyPostsCache.posts, orders = familyMyPostsCache.orders, bookings = familyMyPostsCache.bookings, postById = familyMyPostsCache.postById) {
+  const host = document.getElementById('familyMyPostsArea');
   if (!host) return;
-  if (!items || !items.length) { host.innerHTML = ''; host.hidden = true; return; }
+  const auth = window.KangbanAuth;
+  if (auth?.role === 'escort' || auth?.role === 'guest') { host.hidden = true; return; }
+  familyMyPostsCache = { posts: posts || [], orders: orders || [], bookings: bookings || [], postById: postById || {} };
+  const cloud = auth?.mode === 'cloud';
+  let rows;
+  if (cloud) {
+    rows = familyMyPostsCache.posts.map(post => ({ post, applicants: post._applicants || [] }));
+  } else {
+    const statusMap = { '招募中': 'open', '已接单': 'confirmed', '服务中': 'in_service', '已完成': 'completed', '已取消': 'cancelled' };
+    rows = (state.demandPosts || []).map(post => ({ post: { ...post, type: 'demand', status: statusMap[post.status] || post.status }, applicants: [] }));
+  }
+  const activeOrders = familyMyPostsCache.orders.filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service', 'pending', 'accepted'].includes(order.status)).length;
+  const myBookings = cloud ? familyMyPostsCache.bookings : [];
+  const pendingBookings = myBookings.filter(booking => booking.status === 'applied').length;
+  /* 既无订单也无发布也无预约申请：空态引导卡，补齐发布入口撤出社区后的发现路径 */
+  if (!rows.length && !myBookings.length) {
+    if (!activeOrders) {
+      host.hidden = false;
+      host.innerHTML = `<div class="empty-guide-card"><strong>还没有陪诊安排</strong><p>发布第一个陪诊需求，审核通过的陪诊师会来报名；也可以去社区大厅预约陪诊师发布的陪诊服务。</p><div class="guide-ops"><button class="primary-button" data-action="demand-form">＋ 发布陪诊需求</button><button class="secondary-button" data-csub="hall">去社区大厅看看</button></div></div>`;
+    } else host.hidden = true;
+    return;
+  }
+  const inProgress = rows.filter(row => ['open', 'has_applicants', 'awaiting_confirmation', 'confirmed', 'in_service'].includes(row.post.status)).length;
+  const newSignups = rows.reduce((sum, row) => sum + row.applicants.length, 0);
+  const facts = [inProgress ? `${inProgress} 条进行中` : '', newSignups ? `<b>${newSignups} 个新报名</b>` : '', pendingBookings ? `<b>${pendingBookings} 个预约待确认</b>` : ''].filter(Boolean).join(' · ');
+  const listHtml = rows.map(row => {
+    const p = row.post;
+    const label = POST_STATUS_LABEL[p.status] || p.status;
+    const cancellable = ['open', 'has_applicants'].includes(p.status);
+    const applicantsHtml = row.applicants.length ? `<div class="community-applicants is-open">${row.applicants.map(signup => `<div class="applicant-row"><div class="applicant-copy"><b>${esc(signup.display_name)}</b><small>${signup.note ? esc(signup.note.length > 72 ? `${signup.note.slice(0, 72)}…` : signup.note) : '未填写自我介绍'}${signup.experience ? ` · ${esc(signup.experience)}` : ''}</small></div><div class="applicant-ops">${signup.resume_path ? `<button class="secondary-button compact" data-signup-resume="${esc(signup.resume_path)}">看简历</button>` : ''}<button class="primary-button compact" data-community-confirm="${esc(signup.id)}">查看介绍并确认</button></div></div>`).join('')}</div>` : '';
+    return `<div class="my-post-row"><div><strong>${esc(p.service_type || p.service || '陪诊需求')}</strong><small>${esc(label)} · ${esc(p.hospital_name || p.hospital || '医院待补充')} · ${esc(p.service_date || p.date || '时间待沟通')}${row.applicants.length ? ` · ${row.applicants.length} 位已报名` : ''}</small></div><div class="applicant-ops">${cancellable ? `<button class="text-button" data-${cloud ? 'community-cancel-post' : 'demand-cancel'}="${esc(p.id)}">取消</button>` : ''}</div></div>${applicantsHtml}`;
+  }).join('');
+  /* 我的预约申请组：跟进「家庭预约陪诊师服务」这条撮合线（RPC 已返回 post 上下文） */
+  const bookingsHtml = myBookings.length ? `<div class="mp-subhead">我的预约申请</div>${myBookings.map(booking => {
+    const post = familyMyPostsCache.postById[booking.post_id] || {};
+    const label = BOOKING_STATUS_LABEL[booking.status] || booking.status;
+    const note = booking.note ? ` · 附言：${esc(booking.note.length > 36 ? `${booking.note.slice(0, 36)}…` : booking.note)}` : '';
+    const ops = booking.status === 'applied' ? `<button class="text-button" data-community-cancel-booking="${esc(booking.id)}">撤销申请</button>` : '';
+    return `<div class="my-post-row"><div><strong>${esc(post.service_type || '陪诊服务预约')}</strong><small>${esc(label)} · ${esc(post.region || '')}${post.service_date ? ` · ${esc(post.service_date)}` : ''}${note}</small></div><div class="applicant-ops">${ops}</div></div>`;
+  }).join('')}` : '';
   host.hidden = false;
-  host.innerHTML = `<section class="section-block todo-section"><div class="section-heading"><div><p class="eyebrow">散在各处的待办，收拢到这里</p><h2>待我处理 <i class="todo-count">${items.length}</i></h2></div></div><div class="todo-list">${items.map(item => `<div class="todo-row todo-${item.level}"><span class="todo-mark">${item.level === 'high' ? '!' : '·'}</span><div class="todo-copy"><strong>${esc(item.title)}</strong><small>${esc(item.sub || '')}</small></div>${item.action}</div>`).join('')}</div></section>`;
+  host.innerHTML = `<section class="section-block my-posts-drawer"><button type="button" class="my-posts-bar${newSignups || pendingBookings ? ' has-new' : ''}" id="familyMyPostsToggle"><strong>我的发布</strong><span class="mp-facts">${facts || '暂无进行中'}</span><span class="mp-arrow">${familyMyPostsOpen ? '▾' : '▸'}</span></button><div class="my-posts-detail" ${familyMyPostsOpen ? '' : 'hidden'}><div class="mp-head"><button class="text-button" data-action="demand-form">＋ 发布需求</button></div>${rows.length ? `<div class="mp-subhead">我发布的需求</div>${listHtml}` : ''}${bookingsHtml}</div></section>`;
+}
+let homeTodoCache = [];       // 待我处理队列（本地 + 云端 + 新报名，由 renderHomeTodo 喂入）
+let homeCloudOrdersCache = []; // 云端订单缓存（总览条陪诊胶囊计数用）
+let todayBarOpen = false;      // 总览条展开状态（重渲染后保持）
+let todayDoneOpen = false;     // 「已完成」折叠条展开状态
+function renderHomeTodo(items) {
+  homeTodoCache = items || [];
+  renderHomeTodayBar();
 }
 function renderHomeTodayBar(cloudOrders) {
+  if (cloudOrders) homeCloudOrdersCache = cloudOrders;
   const host = document.getElementById('homeTodayBar');
   if (!host) return;
   const items = todayReminderItems();
-  const doneCount = items.filter(item => item.done).length;
   const activeOrders = window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family'
-    ? (cloudOrders || []).filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service'].includes(order.status))
+    ? homeCloudOrdersCache.filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service'].includes(order.status))
     : (state.companionOrders || []).filter(order => ['pending', 'accepted'].includes(order.status));
-  const warnCount = (state.alerts || []).filter(alert => alert.level === 'red' || alert.level === 'yellow').length;
-  const todoCount = homeTodoItems(cloudOrders).length;
+  /* 预警胶囊 = 首页「设备预警」窗口的未处理数（设备上报口径，与首页区块一致；手动渠道在预警中心） */
+  const warnCount = (state.alerts || []).filter(alert => (alert.level === 'red' || alert.level === 'yellow') && alert.status !== 'resolved' && deviceAlert(alert)).length;
+  const todoCount = homeTodoCache.length;
   const chip = (label, count, cls = '') => `<span class="tb-chip ${count ? cls : ''}">${label} ${count}</span>`;
-  const chips = [chip('提醒', items.length, 'tb-blue'), chip('陪诊', activeOrders.length, 'tb-green'), chip('预警', warnCount, 'tb-red'), chip('待办', todoCount, 'tb-amber')].join('');
-  const detail = items.length
-    ? items.map(item => `<div class="td-row ${item.done ? 'is-done' : ''}"><time>${esc(item.time)}</time><div><strong>${esc(item.title)}</strong><small>${esc(item.typeLabel)} · ${esc(item.memberName)}</small></div><span>${item.done ? '✓' : ''}</span></div>`).join('')
-    : '<p class="privacy-small" style="text-align:left">今天还没有提醒安排。</p>';
-  host.innerHTML = `<button type="button" class="today-bar" id="todayBarToggle"><span class="tb-date">今天</span><span class="tb-chips">${chips}</span><span class="tb-arrow">▾</span></button><div class="today-detail" id="todayDetail" hidden>${detail}</div>`;
+  const chips = [chip('待提醒', items.filter(item => !item.done).length, 'tb-blue'), chip('陪诊', activeOrders.length, 'tb-green'), chip('预警', warnCount, 'tb-red'), chip('待办', todoCount, 'tb-amber')].join('');
+  /* 展开区 = 今日提醒（可打卡，完成才消失） + 待我处理 + 新增提醒，原来的独立区块全部并入这里 */
+  const pending = items.filter(item => !item.done);
+  const doneItems = items.filter(item => item.done);
+  let reminderGroup;
+  if (!items.length) {
+    reminderGroup = `<div class="med-empty"><span>今天暂无提醒安排。</span><button class="text-button" data-action="add-reminder">新增提醒 →</button></div>`;
+  } else if (!pending.length) {
+    reminderGroup = `<div class="all-done">✓ 今日提醒全部完成（${doneItems.length}/${items.length}）</div><button type="button" class="done-bar" data-done-toggle><span>▾ 已完成 ${doneItems.length}</span><span class="mut">${doneItems.some(item => item.skipped) ? '含已跳过' : ''}</span></button><div class="done-list" ${todayDoneOpen ? '' : 'hidden'}>${doneItems.map(reminderDoneRowHtml).join('')}</div>`;
+  } else {
+    const doneBlock = doneItems.length
+      ? `<button type="button" class="done-bar" data-done-toggle><span>${todayDoneOpen ? '▾' : '▸'} 已完成 ${doneItems.length}</span><span class="mut">${doneItems.some(item => item.skipped) ? '含已跳过' : ''}</span></button><div class="done-list" ${todayDoneOpen ? '' : 'hidden'}>${doneItems.map(reminderDoneRowHtml).join('')}</div>`
+      : '';
+    reminderGroup = `<div class="tb-group-title">今日提醒 <i>${doneItems.length}/${items.length} 已完成</i></div>${pending.map(reminderRowHtml).join('')}${doneBlock}`;
+  }
+  const todoGroup = homeTodoCache.length
+    ? `<div class="tb-group-title">待我处理 <i>${homeTodoCache.length} 项</i></div><div class="todo-list">${homeTodoCache.map(item => `<div class="todo-row todo-${item.level}"><span class="todo-mark">${item.level === 'high' ? '!' : '·'}</span><div class="todo-copy"><strong>${esc(item.title)}</strong><small>${esc(item.sub || '')}</small></div>${item.action}</div>`).join('')}</div>`
+    : '';
+  host.innerHTML = `<button type="button" class="today-bar" id="todayBarToggle"><span class="tb-date">今天</span><span class="tb-chips">${chips}</span><span class="tb-arrow">▾</span></button><div class="today-detail" id="todayDetail" ${todayBarOpen ? '' : 'hidden'}>${reminderGroup}${todoGroup}<button class="secondary-button reminder-add-home" data-action="add-reminder">＋ 新增自定义提醒</button><button class="text-button tb-all-link" data-action="reminders">查看全部提醒 →</button></div>`;
+  host.querySelector('.today-bar')?.classList.toggle('open', todayBarOpen);
+}
+/* 读数时间标注：今天的带时刻，昨天标注「昨天」，更早显示日期——杜绝旧读数冒充最新 */
+function readingTimeLabel(entry) {
+  const today = dateOffset(0);
+  if (entry.date === today) return entry.time ? `今天 ${entry.time}` : '今天';
+  if (entry.date === dateOffset(-1)) return entry.time ? `昨天 ${entry.time}` : '昨天';
+  return formatDate(entry.date);
 }
 function renderHomeMemberStrip() {
   const host = document.getElementById('homeMemberStrip');
@@ -2370,23 +2572,30 @@ function renderHomeMemberStrip() {
   const members = state.familyMembers || [];
   if (!members.length) { section.hidden = true; return; }
   section.hidden = false;
-  host.innerHTML = members.map(member => {
+  const cards = members.map(member => {
     const latestByMetric = {};
     memberMetricEntries(member.id).slice().sort((a, b) => `${b.date}${b.time || ''}`.localeCompare(`${a.date}${a.time || ''}`)).forEach(entry => { if (!latestByMetric[entry.metric]) latestByMetric[entry.metric] = entry; });
     let rows = Object.values(latestByMetric);
     const sys = rows.find(entry => entry.metric === '收缩压');
     const dia = rows.find(entry => entry.metric === '舒张压');
-    if (sys && dia) rows = rows.filter(entry => entry !== sys && entry !== dia).concat([{ metric: '血压', value: `${sys.value}/${dia.value}`, unit: 'mmHg', date: sys.date }]);
-    const abnormalCount = latestAbnormal(member.id).length;
+    if (sys && dia) rows = rows.filter(entry => entry !== sys && entry !== dia).concat([{ metric: '血压', value: `${sys.value}/${dia.value}`, unit: 'mmHg', date: sys.date, time: sys.time }]);
+    const abnormalList = latestAbnormal(member.id);
+    const abnormalNames = abnormalList.map(entry => entry.metric).slice(0, 2).join(' ');
     const readingLine = rows.slice(0, 2).map(entry => {
       const status = entry.metric === '血压' ? (bpReadingState(entry.value).abnormal ? '偏高' : '正常') : statusLabelOf(entry.value, entry.metric);
       const tag = entry.metric === '血压' ? bpReadingState(entry.value).tag : statusTagOf(entry.value, entry.metric);
-      return `<span class="ms-reading"><em>${esc(entry.metric)}</em> ${esc(String(entry.value))}${entry.unit && entry.metric !== '血压' ? esc(entry.unit) : ''} <i class="${tag}">${status}</i></span>`;
+      return `<span class="ms-reading"><em>${esc(entry.metric)}</em> ${esc(String(entry.value))}${entry.unit && entry.metric !== '血压' ? esc(entry.unit) : ''} <i class="${tag}">${status}</i><u class="ms-time">${esc(readingTimeLabel(entry))}</u></span>`;
     }).join('') || '<span class="ms-reading ms-empty">暂无读数</span>';
     const meds = todayReminderItems().filter(item => item.kind === 'medication' && item.memberId === member.id);
     const medLine = meds.length ? `<span class="ms-med">服药 ${meds.filter(item => item.done).length}/${meds.length}</span>` : '';
-    return `<button type="button" class="member-strip-card" data-nav="health"><span class="ms-head"><b>${esc(member.name)}</b>${abnormalCount ? `<i class="ms-alert">${abnormalCount} 项异常</i>` : '<i class="ms-ok">正常</i>'}</span>${readingLine}${medLine}</button>`;
-  }).join('');
+    const attention = abnormalList.length > 0;
+    const headTag = abnormalList.length
+      ? `<i class="ms-alert">${abnormalList.length} 项异常${abnormalNames ? ` · ${esc(abnormalNames)}` : ''}</i>`
+      : '<i class="ms-ok">正常</i>';
+    const emptyCta = rows.length ? '' : '<span class="ms-cta" data-action="add-reading">去录入 →</span>';
+    return { attention, html: `<button type="button" class="member-strip-card ${attention ? 'ms-attention' : 'ms-calm'}" data-nav="health"><span class="ms-head"><b>${esc(member.name)}</b>${headTag}</span>${readingLine}${emptyCta}${medLine}</button>` };
+  }).sort((a, b) => (b.attention ? 1 : 0) - (a.attention ? 1 : 0));
+  host.innerHTML = cards.map(card => card.html).join('');
 }
 function showHomeSharePicker() {
   openModal(`${modalHead('生成就诊分享码', '选择成员', '分享码按成员生成；需先完成该成员的就诊准备清单，全部勾选后才能生成。')}
@@ -2413,44 +2622,112 @@ function showReminderManager() {
     <button class="secondary-button" id="enableMedicationNotifications">开启浏览器通知</button>
     <p class="privacy-small">提醒记录用于家庭日常协同，不提供诊断或治疗建议。浏览器关闭后，定时通知暂不可用。</p>`);
 }
+/* 新增提醒（渐进式）：先选做什么（模板自动带出名称/记录方式/单位）→ 谁和什么时候 → 高级项折叠；隐藏字段名与旧表单一致，提交处理逻辑不变 */
+const REMINDER_TPLS = [
+  { key: 'bloodPressure', icon: '🩺', label: '测血压', kind: 'measurement', title: '测量血压', metricType: 'bloodPressure', unit: 'mmHg', fill: '已自动填好：名称「测量血压」· 记录方式「血压（收缩压 / 舒张压）」· 单位 mmHg' },
+  { key: 'bloodSugar', icon: '🩸', label: '测血糖', kind: 'measurement', title: '测量血糖', metricType: 'bloodSugar', unit: 'mmol/L', fill: '已自动填好：名称「测量血糖」· 记录方式「血糖（数值）」· 单位 mmol/L' },
+  { key: 'walk', icon: '🚶', label: '散步', kind: 'activity', title: '散步', fill: '已自动填好：名称「散步」· 类型「活动 / 训练」' },
+  { key: 'visit', icon: '🏥', label: '复诊提醒', kind: 'custom', title: '复诊提醒', fill: '已自动填好：名称「复诊提醒」——想改可以直接改' },
+  { key: 'custom', icon: '✏️', label: '自定义', kind: 'custom', title: '', fill: '自己起个名字，再选好对象和时间就行' }
+];
 function showReminderForm() {
   const members = state.familyMembers?.length ? state.familyMembers : seed.familyMembers;
-  const memberOptions = members.map(member => `<option value="${esc(member.id)}">${esc(member.name)}${member.role ? `（${esc(member.role)}）` : member.relationship ? `（${esc(member.relationship)}）` : ''}</option>`).join('');
-  const weekdays = ['日','一','二','三','四','五','六'].map((day,index) => `<label class="reminder-day"><input type="checkbox" name="days" value="${index}" checked><span>周${day}</span></label>`).join('');
-  openModal(`${modalHead('家庭自定义 · 按成员记录', '新增提醒', '不限于预设项目，写下家人需要记住的事项。测量类完成时会记录读数。')}
+  const weekdays = ['日','一','二','三','四','五','六'].map((day,index) => `<label class="reminder-day"><input type="checkbox" class="rf-day-check" value="${index}" ${index === 1 ? '' : 'checked'}><span>周${day}</span></label>`).join('');
+  const memberChips = members.map((member, index) => `<button type="button" class="rf-mb ${index === 0 ? 'sel' : ''}" data-rf-member="${esc(member.id)}"><span class="rf-av">${esc(member.name[0] || '家')}</span>${esc(member.name)}</button>`).join('');
+  const tplChips = REMINDER_TPLS.map(tpl => `<button type="button" class="rf-tpl ${tpl.key === 'bloodPressure' ? 'sel' : ''}" data-rf-tpl="${tpl.key}"><span class="rf-tpl-ic">${tpl.icon}</span>${tpl.label}</button>`).join('');
+  openModal(`${modalHead('家庭自定义 · 按成员记录', '新增提醒', '先选要提醒的事，对象和时间跟着选；测量类完成时会记录读数。')}
     <form class="reminder-form" id="reminderForm">
-      <label><span class="field-label-block">提醒对象</span><select class="input-field" name="memberId" required>${memberOptions}</select></label>
-      <label><span class="field-label-block">项目类型</span><select class="input-field" name="kind" id="reminderKind"><option value="measurement">健康测量</option><option value="activity">活动 / 训练</option><option value="custom">自定义事项</option></select></label>
-      <div class="reminder-template-row"><span class="field-label-block">快速选择，也可自己填写</span><div><button type="button" class="reminder-template" data-reminder-template="bloodPressure">测血压</button><button type="button" class="reminder-template" data-reminder-template="bloodSugar">测血糖</button><button type="button" class="reminder-template" data-reminder-template="walk">散步</button></div></div>
-      <label><span class="field-label-block">提醒名称</span><input class="input-field" name="title" maxlength="40" placeholder="例如：测量血压、散步、复诊前准备" required></label>
-      <label id="metricTypeRow"><span class="field-label-block">记录方式</span><select class="input-field" name="metricType"><option value="bloodPressure">血压（收缩压 / 舒张压）</option><option value="bloodSugar">血糖（数值）</option><option value="custom">其他指标（自定义数值）</option></select></label>
-      <label id="metricUnitRow"><span class="field-label-block">单位</span><input class="input-field" name="unit" value="mmHg" maxlength="12" placeholder="例如 mmol/L、次、分钟"></label>
-      <label><span class="field-label-block">说明（选填）</span><input class="input-field" name="detail" maxlength="100" placeholder="例如：饭后两小时；如身体不适请及时告知家人"></label>
-      <label><span class="field-label-block">提醒时间</span><input class="input-field" name="time" type="time" required value="08:00"></label>
-      <div><span class="field-label-block">重复日期</span><div class="reminder-days">${weekdays}</div></div>
-      <label><span class="field-label-block">开始日期</span><input class="input-field" name="startDate" type="date" value="${dateOffset(0)}" required></label>
-      <label><span class="field-label-block">结束日期（选填）</span><input class="input-field" name="endDate" type="date"></label>
-      <button class="primary-button" type="submit">保存提醒</button>
+      <input type="hidden" name="memberId" value="${esc(members[0]?.id || 'm1')}">
+      <input type="hidden" name="kind" value="measurement">
+      <input type="hidden" name="title" value="测量血压">
+      <input type="hidden" name="metricType" value="bloodPressure">
+      <input type="hidden" name="unit" value="mmHg">
+      <input type="hidden" name="startDate" value="${dateOffset(0)}">
+      <input type="hidden" name="time" value="08:00">
+      ${[0,1,2,3,4,5,6].map(day => `<input type="hidden" name="days" value="${day}" data-rf-day="${day}" ${day === 1 ? 'disabled' : ''}>`).join('')}
+      <div class="f-label">要提醒什么？点一个就行</div>
+      <div class="rf-tpl-grid">${tplChips}</div>
+      <div class="rf-autofill" id="rfAutofill">${REMINDER_TPLS[0].fill}</div>
+      <label id="rfNameRow" hidden><span class="field-label-block">提醒名称</span><input class="input-field" id="rfNameInput" maxlength="40" placeholder="例如：复查前禁食 8 小时"></label>
+      <div class="f-label">提醒谁？</div>
+      <div class="rf-mb-row">${memberChips}</div>
+      <div class="f-label">什么时候提醒？</div>
+      <div class="rf-seg" id="rfTimeSeg">
+        <button type="button" class="sel" data-rf-time="08:00">早上 8:00</button>
+        <button type="button" data-rf-time="12:00">中午 12:00</button>
+        <button type="button" data-rf-time="20:00">晚上 8:00</button>
+        <button type="button" data-rf-time="custom">自定义 ⏱</button>
+      </div>
+      <input class="input-field" id="rfTimeInput" type="time" value="08:00" hidden>
+      <div class="f-label">重复</div>
+      <div class="rf-seg" id="rfDaySeg">
+        <button type="button" class="sel" data-rf-days="all">每天</button>
+        <button type="button" data-rf-days="weekday">工作日</button>
+        <button type="button" data-rf-days="custom">每周几…</button>
+      </div>
+      <div class="reminder-days" id="rfDayPicker" hidden>${weekdays}</div>
+      <details class="rf-adv"><summary>▸ 高级（说明、结束日期）</summary>
+        <label style="margin-top:8px"><span class="field-label-block">说明（选填）</span><input class="input-field" name="detail" maxlength="100" placeholder="例如：饭后两小时；如身体不适请及时告知家人"></label>
+        <label style="margin-top:8px"><span class="field-label-block">结束日期（选填，默认长期有效）</span><input class="input-field" name="endDate" type="date"></label>
+      </details>
+      <button class="primary-button" type="submit" id="rfSave" style="margin-top:14px">完成（每天 8:00 · 提醒 ${esc(members[0]?.name || '家人')} 测量血压）</button>
     </form><p class="privacy-small">设置的时间和频次请以医生、药师或家庭实际安排为准。</p>`);
-  document.getElementById('reminderKind')?.addEventListener('change', event => {
-    const isMeasurement = event.target.value === 'measurement';
-    document.getElementById('metricTypeRow').hidden = !isMeasurement;
-    document.getElementById('metricUnitRow').hidden = !isMeasurement;
-  });
-  document.getElementById('reminderKind')?.dispatchEvent(new Event('change'));
-  document.querySelector('[name="metricType"]')?.addEventListener('change', event => {
-    const unit = document.querySelector('[name="unit"]');
-    if (unit) unit.value = event.target.value === 'bloodPressure' ? 'mmHg' : event.target.value === 'bloodSugar' ? 'mmol/L' : '';
-  });
-  document.querySelectorAll('[data-reminder-template]').forEach(button => button.addEventListener('click', () => {
-    const title = document.querySelector('[name="title"]');
-    const kind = document.getElementById('reminderKind');
-    const metricType = document.querySelector('[name="metricType"]');
-    if (button.dataset.reminderTemplate === 'bloodPressure') { kind.value = 'measurement'; title.value = '测量血压'; metricType.value = 'bloodPressure'; }
-    if (button.dataset.reminderTemplate === 'bloodSugar') { kind.value = 'measurement'; title.value = '测量血糖'; metricType.value = 'bloodSugar'; }
-    if (button.dataset.reminderTemplate === 'walk') { kind.value = 'activity'; title.value = '散步'; }
-    kind.dispatchEvent(new Event('change'));
-    metricType.dispatchEvent(new Event('change'));
+  const form = document.getElementById('reminderForm');
+  const saveLabel = () => {
+    const title = form.querySelector('[name="title"]').value || '自定义事项';
+    const time = form.querySelector('[name="time"]').value || '08:00';
+    const memberName = members.find(member => member.id === form.querySelector('[name="memberId"]').value)?.name || '家人';
+    const dayMode = document.querySelector('#rfDaySeg .sel')?.dataset.rfDays;
+    const repeatText = dayMode === 'weekday' ? '工作日' : dayMode === 'custom' ? '自定义重复' : '每天';
+    document.getElementById('rfSave').textContent = `完成（${repeatText} ${time} · 提醒 ${memberName} ${title}）`;
+  };
+  form.querySelectorAll('[data-rf-tpl]').forEach(button => button.addEventListener('click', () => {
+    form.querySelectorAll('[data-rf-tpl]').forEach(item => item.classList.remove('sel'));
+    button.classList.add('sel');
+    const tpl = REMINDER_TPLS.find(item => item.key === button.dataset.rfTpl);
+    form.querySelector('[name="kind"]').value = tpl.kind;
+    form.querySelector('[name="title"]').value = tpl.title;
+    form.querySelector('[name="metricType"]').value = tpl.metricType || '';
+    form.querySelector('[name="unit"]').value = tpl.unit || '';
+    document.getElementById('rfAutofill').textContent = tpl.fill;
+    document.getElementById('rfNameRow').hidden = tpl.key !== 'custom';
+    const nameInput = document.getElementById('rfNameInput');
+    if (tpl.key === 'custom') { nameInput.value = ''; nameInput.focus(); }
+    saveLabel();
+  }));
+  document.getElementById('rfNameInput')?.addEventListener('input', event => { form.querySelector('[name="title"]').value = event.target.value.trim(); saveLabel(); });
+  form.querySelectorAll('[data-rf-member]').forEach(button => button.addEventListener('click', () => {
+    form.querySelectorAll('[data-rf-member]').forEach(item => item.classList.remove('sel'));
+    button.classList.add('sel');
+    form.querySelector('[name="memberId"]').value = button.dataset.rfMember;
+    saveLabel();
+  }));
+  document.querySelectorAll('#rfTimeSeg [data-rf-time]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('#rfTimeSeg [data-rf-time]').forEach(item => item.classList.remove('sel'));
+    button.classList.add('sel');
+    const custom = button.dataset.rfTime === 'custom';
+    document.getElementById('rfTimeInput').hidden = !custom;
+    if (!custom) { form.querySelector('[name="time"]').value = button.dataset.rfTime; }
+    else { form.querySelector('[name="time"]').value = document.getElementById('rfTimeInput').value || '08:00'; }
+    saveLabel();
+  }));
+  document.getElementById('rfTimeInput')?.addEventListener('change', event => { form.querySelector('[name="time"]').value = event.target.value || '08:00'; saveLabel(); });
+  const setDays = mode => {
+    form.querySelectorAll('[data-rf-day]').forEach(input => { input.disabled = mode === 'weekday' ? !['1','2','3','4','5'].includes(input.dataset.rfDay) : false; });
+    if (mode !== 'custom') document.querySelectorAll('.rf-day-check').forEach(box => { box.checked = mode === 'all' || ['1','2','3','4','5'].includes(box.value); });
+    document.getElementById('rfDayPicker').hidden = mode !== 'custom';
+    saveLabel();
+  };
+  document.querySelectorAll('#rfDaySeg [data-rf-days]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('#rfDaySeg [data-rf-days]').forEach(item => item.classList.remove('sel'));
+    button.classList.add('sel');
+    setDays(button.dataset.rfDays);
+  }));
+  document.querySelectorAll('.rf-day-check').forEach(box => box.addEventListener('change', () => {
+    const input = form.querySelector(`[data-rf-day="${box.value}"]`);
+    if (input) input.disabled = !box.checked;
+    if (![...document.querySelectorAll('.rf-day-check')].some(item => item.checked)) { box.checked = true; toast('至少保留一天'); }
+    saveLabel();
   }));
 }
 function showReminderCompletion(id, time) {
@@ -2504,13 +2781,22 @@ function snoozeCustomReminder(id, time) {
   state.reminderLogs = { ...(state.reminderLogs || {}), [key]: { ...(state.reminderLogs?.[key] || {}), status: 'snoozed', memberId: reminder.memberId, actor: '小林', snoozedAt: nowLabel(), snoozedUntil: until.toISOString() } };
   saveState(); renderRecords(); toast(`已延后到 ${until.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`);
 }
-function skipCustomReminder(id, time) {
+function skipCustomReminder(id, time, reason = '') {
   const reminder = state.customReminders.find(item => item.id === id);
   if (!reminder) return;
   const key = reminderOccurrenceKey(reminder, time);
   if (['done','skipped'].includes(state.reminderLogs?.[key]?.status)) return;
-  state.reminderLogs = { ...(state.reminderLogs || {}), [key]: { status: 'skipped', memberId: reminder.memberId, actor: '小林', completedAt: nowLabel() } };
-  saveState(); renderRecords(); toast('已跳过本次提醒');
+  state.reminderLogs = { ...(state.reminderLogs || {}), [key]: { status: 'skipped', memberId: reminder.memberId, actor: '小林', reason, completedAt: nowLabel() } };
+  saveState(); renderRecords(); toast(reason ? `已跳过并记录原因：${reason}` : '已跳过本次提醒');
+}
+/* 跳过 = 有记录的终态：必须给原因（外出未带 / 身体不适 / 医嘱已调整 / 其他） */
+function showSkipConfirm(id, time) {
+  const reminder = state.customReminders.find(item => item.id === id);
+  if (!reminder) return;
+  const reasons = ['外出未带', '身体不适', '医嘱已调整', '其他'];
+  openModal(`${modalHead(`${esc(time)} · ${esc(reminder.title)}`, '为什么跳过？', '跳过会记入提醒记录并可追溯；漏服监测照常兜底，超过 90 分钟未处理仍会升级为预警。')}
+    <div class="skip-reasons">${reasons.map(reason => `<button class="skip-reason-btn" data-skip-reason="${esc(id)}" data-skip-time="${esc(time)}" data-reason="${esc(reason)}">${esc(reason)}</button>`).join('')}</div>
+    <p class="privacy-small">确认后本次提醒进入「已完成」区并标注原因。</p>`);
 }
 function checkMedicationReminders() {
   const now = new Date();
@@ -2526,13 +2812,14 @@ function checkMedicationReminders() {
         state.medicationNotified = { ...(state.medicationNotified || {}), [key]: true };
         changed = true;
         const message = `${med.name}${med.dose ? ` · ${med.dose}` : ''}，请按已确认医嘱核对。`;
-        if ('Notification' in window && Notification.permission === 'granted') new Notification('康伴服药提醒', { body: message, tag: key });
+        if (typeof window !== 'undefined' && window.Notification?.permission === 'granted') new window.Notification('康伴服药提醒', { body: message, tag: key });
         else if (document.visibilityState === 'visible') toast(`服药提醒：${med.name} · ${time}`);
       }
-      if (delta > 90 && !state.medicationTaken?.[key] && !state.missedAlerts?.[key]) {
+      if (delta > 90 && !state.medicationTaken?.[key] && !state.missedAlerts?.[key] && state.alertSources?.missedDose !== false) {
         state.missedAlerts = { ...(state.missedAlerts || {}), [key]: true };
         changed = true;
-        createAlert('yellow', '提醒后仍未记录服药', `${med.name}（${med.dose || '按医嘱'}）计划 ${time} 服用，超过 90 分钟未记录已服。请联系妈妈确认是否漏服，不要自行补服处方药。`, '服药提醒闭环');
+        const missedMember = state.familyMembers.find(m => m.id === med.memberId);
+        createAlert('yellow', '提醒后仍未记录服药', `${med.name}（${med.dose || '按医嘱'}）计划 ${time} 服用，超过 90 分钟未记录已服。请联系${missedMember?.name || '本人'}确认是否漏服，不要自行补服处方药。`, '服药提醒闭环 · 漏服监测', `${med.memberId || 'family'}|漏服|${med.id}|${day}`, missedMember?.name || '');
       }
     }
   }
@@ -2560,69 +2847,251 @@ function checkCustomReminders() {
       changed = true;
       const member = state.familyMembers.find(item => item.id === reminder.memberId)?.name || '家人';
       const message = `${member}：${reminder.title}${reminder.detail ? ` · ${reminder.detail}` : ''}`;
-      if ('Notification' in window && Notification.permission === 'granted') new Notification('康伴提醒', { body: message, tag: notificationKey });
+      if (typeof window !== 'undefined' && window.Notification?.permission === 'granted') new window.Notification('康伴提醒', { body: message, tag: notificationKey });
       else if (document.visibilityState === 'visible') toast(`康伴提醒：${reminder.title} · ${reminder.time}`);
     }
   }
   if (changed) saveState();
 }
 
-/* ============ 健康预警（FR-02 规则版）与分级告知（FR-04） ============ */
+/* ============ 健康预警（统一规则引擎 + 生命周期 + 真实分级告知 FR-02/FR-04） ============ */
 const ALERT_META = {
   red: { label: '紧急', badge: 'alert-badge-red', hint: '立即处理' },
   yellow: { label: '需要关注', badge: 'alert-badge-yellow', hint: '建议跟进' },
   blue: { label: '一般', badge: 'alert-badge-blue', hint: '日常留意' }
 };
-const NOTIFY_PLAN = {
-  red: ['已向全体家庭成员推送 App 强提醒', '已发起电话外呼（演示）：小林 · 女儿', '已在平台后台生成人工介入记录'],
-  yellow: ['已推送 App 通知给家庭成员', '已加入今日健康汇总'],
-  blue: ['已加入今日健康汇总，家人打开首页可见']
-};
-function evaluateReading(reading) {
-  const { systolic, diastolic } = reading;
-  if (systolic >= 180 || diastolic >= 110) return { level: 'red', title: '血压明显升高', detail: `收缩压 ${systolic} mmHg / 舒张压 ${diastolic} mmHg，达到紧急阈值（≥180/≥110）。请立即联系妈妈确认情况，必要时就医。` };
-  if (systolic >= 160 || diastolic >= 100) return { level: 'yellow', title: '血压偏高', detail: `收缩压 ${systolic} mmHg / 舒张压 ${diastolic} mmHg，超过关注阈值（≥160/≥100）。建议今天复测一次并留意妈妈的状态。` };
-  if (systolic >= 140 || diastolic >= 90) return { level: 'blue', title: '血压轻度升高', detail: `收缩压 ${systolic} mmHg / 舒张压 ${diastolic} mmHg，轻度超过日常范围（≥140/≥90），已记入健康汇总。` };
-  return null;
+/* 生命周期：open 未处理 → acked 已确认关注 → resolved 已处理/自动恢复关闭 */
+const ALERT_STATUS_LABEL = { open: '未处理', acked: '已确认', resolved: '已处理' };
+/* 分级告知：只记录本端真实执行的通知动作（应用内提醒 + 系统通知），不再虚构电话外呼 */
+function buildNotifyLog(level) {
+  const familyCount = (state.familyMembers || []).length || 1;
+  const log = [`已发送应用内${level === 'red' ? '强' : ''}提醒给全部 ${familyCount} 位家庭成员`];
+  if (typeof window !== 'undefined' && window.Notification?.permission === 'granted') log.push('已通过系统通知渠道推送到本设备');
+  else log.push('系统通知未授权，已降级为应用内提醒（在浏览器设置中开启通知可升级推送）');
+  log.push(level === 'red' ? '已置顶到首页「待我处理」队列' : '已加入今日健康汇总');
+  return log;
+}
+/* 统一预警规则表：任何入口保存读数后自动逐条评估；desc 同时作为预警中心的规则说明 */
+const ALERT_RULES = [
+  { key: 'bp', label: '血压', unit: 'mmHg',
+    level: (sys, dia) => (sys >= 180 || dia >= 110) ? 'red' : (sys >= 160 || dia >= 100) ? 'yellow' : (sys >= 140 || dia >= 90) ? 'blue' : null,
+    title: level => level === 'red' ? '血压明显升高' : level === 'yellow' ? '血压偏高' : '血压轻度升高',
+    detail: (level, sys, dia) => level === 'red'
+      ? `收缩压 ${sys} mmHg / 舒张压 ${dia} mmHg，达到紧急阈值（≥180/≥110）。请立即联系本人确认情况，必要时就医。`
+      : level === 'yellow'
+        ? `收缩压 ${sys} mmHg / 舒张压 ${dia} mmHg，超过关注阈值（≥160/≥100）。建议今天复测一次并留意状态。`
+        : `收缩压 ${sys} mmHg / 舒张压 ${dia} mmHg，轻度超过日常范围（≥140/≥90），已记入健康汇总。`,
+    desc: '≥140/90 一般 · ≥160/100 需关注 · ≥180/110 紧急' },
+  { key: '血糖', label: '血糖', unit: 'mmol/L',
+    level: v => (v >= 16.7 || v <= 2.8) ? 'red' : (v >= 11.1 || v <= 3.9) ? 'yellow' : v >= 7.0 ? 'blue' : null,
+    title: level => `血糖${level === 'red' ? '明显异常' : level === 'yellow' ? '异常 · 需要关注' : '轻度偏高'}`,
+    detail: (level, v) => level === 'red'
+      ? `血糖 ${v} mmol/L，${v <= 2.8 ? '达到低血糖紧急阈值（≤2.8）' : '达到紧急阈值（≥16.7）'}，请立即联系本人确认情况，必要时就医。`
+      : level === 'yellow'
+        ? `血糖 ${v} mmol/L，${v <= 3.9 ? '低于关注阈值（≤3.9），警惕低血糖' : '超过关注阈值（≥11.1）'}，建议今天复测一次。`
+        : `血糖 ${v} mmol/L，轻度超过日常范围（≥7.0），已记入健康汇总。`,
+    desc: '≥7.0 一般 · ≥11.1 需关注 · ≥16.7 紧急；≤3.9 需关注 · ≤2.8 紧急' },
+  { key: '心率', label: '心率（静息）', unit: '次/分',
+    level: v => (v > 150 || v < 45) ? 'red' : (v > 120 || v < 50) ? 'yellow' : v > 100 ? 'blue' : null,
+    title: level => `心率${level === 'red' ? '明显异常' : level === 'yellow' ? '异常 · 需要关注' : '偏快'}`,
+    detail: (level, v) => level === 'red'
+      ? `静息心率 ${v} 次/分，超出安全范围（<45 或 >150），请立即确认本人状态。`
+      : level === 'yellow'
+        ? `静息心率 ${v} 次/分，超过关注阈值（<50 或 >120），建议复测并留意感受。`
+        : `静息心率 ${v} 次/分，略高于日常范围（>100），持续偏快建议就诊评估。`,
+    desc: '>100 一般 · >120 需关注 · >150 紧急；<50 需关注 · <45 紧急' },
+  { key: '血氧', label: '血氧', unit: '%',
+    level: v => v < 90 ? 'red' : v < 95 ? 'yellow' : null,
+    title: level => `血氧${level === 'red' ? '过低' : '偏低 · 需要关注'}`,
+    detail: (level, v) => level === 'red'
+      ? `血氧 ${v}%，低于 90%，请立即确认呼吸状态，必要时就医。`
+      : `血氧 ${v}%，低于 95%，建议复测并关注呼吸状态。`,
+    desc: '<95% 需关注 · <90% 紧急' },
+  { key: '体温', label: '体温', unit: '℃',
+    level: v => (v >= 39 || (v > 0 && v < 35)) ? 'red' : v >= 37.3 ? 'yellow' : null,
+    title: level => level === 'red' ? '体温明显异常' : '低热 · 需要关注',
+    detail: (level, v) => level === 'red'
+      ? `体温 ${v}℃，${v < 35 ? '低于 35℃，属低体温危险信号' : '达到高热阈值（≥39℃）'}，请立即处理并考虑就医。`
+      : `体温 ${v}℃，超过 37.3℃，出现低热，建议多饮水并复测。`,
+    desc: '≥37.3℃ 需关注 · ≥39℃ 紧急；<35℃ 紧急' }
+];
+/* 血压趋势：近 3 天第 3 次及以上偏高，轻度升级为需要关注（升级不影响单次紧急阈值） */
+function bpTrendUpgrade(memberId, level) {
+  if (level !== 'blue') return level;
+  const cutoff = Date.now() - 3 * 86400000;
+  const elevated = (state.bodyMetrics || []).filter(entry => entry.memberId === memberId && entry.metric === '收缩压' && entry.value >= 140 && Date.parse(entry.date) >= cutoff).length;
+  return elevated >= 3 ? 'yellow' : level;
+}
+/* 统一评估：一组指标行（收缩压+舒张压成对）→ 预警结果列表，供所有录入入口复用 */
+function evaluateMetricAlerts(memberId, rows) {
+  const results = [];
+  const get = metric => rows.find(row => row.metric === metric);
+  const sys = get('收缩压'), dia = get('舒张压');
+  const bp = ALERT_RULES[0];
+  if (sys && dia) {
+    const base = bp.level(Number(sys.value), Number(dia.value));
+    const level = base ? bpTrendUpgrade(memberId, base) : null;
+    if (level) {
+      const upgraded = level !== base;
+      results.push({ ruleKey: 'bp', level, metricLabel: `血压 ${sys.value}/${dia.value}`, title: bp.title(level) + (upgraded ? '（连续偏高）' : ''), detail: bp.detail(level, sys.value, dia.value) + (upgraded ? ' 近 3 天多次偏高，已上调关注级别。' : '') });
+    }
+  }
+  ALERT_RULES.slice(1).forEach(rule => {
+    const row = get(rule.key);
+    if (!row || !Number.isFinite(Number(row.value))) return;
+    const level = rule.level(Number(row.value));
+    if (!level) return;
+    results.push({ ruleKey: rule.key, level, metricLabel: `${rule.label} ${row.value}${rule.unit}`, title: rule.title(level), detail: rule.detail(level, row.value) });
+  });
+  return results;
+}
+/* 生成预警（含同日去重合并）：同成员同规则同一天已有未处理预警时，更新数值与次数而不是新增一条 */
+function raiseAlert({ level, title, detail, source, dedupKey, memberName, createdAt }) {
+  const existing = dedupKey ? (state.alerts || []).find(alert => alert.dedupKey === dedupKey && alert.status === 'open') : null;
+  if (existing) {
+    existing.times = (existing.times || 1) + 1;
+    existing.level = level; existing.title = title; existing.detail = detail;
+    existing.source = source || existing.source;
+    existing.createdAt = createdAt || nowLabel();
+    existing.notify = buildNotifyLog(level);
+    saveState(); renderHomeAlerts();
+    return existing;
+  }
+  const alert = { id: `alert-${state.nextAlertId++}`, level, title, detail, source: source || '规则引擎', createdAt: createdAt || nowLabel(), memberName: memberName || '', dedupKey: dedupKey || '', status: 'open', times: 1, ackedAt: '', resolvedAt: '', resolvedNote: '', notify: buildNotifyLog(level) };
+  state.alerts.unshift(alert);
+  saveState(); renderHomeAlerts();
+  if (typeof window !== 'undefined' && window.Notification?.permission === 'granted') new window.Notification(`康伴${ALERT_META[level].label}预警：${title}`, { body: detail, tag: alert.id });
+  return alert;
+}
+function createAlert(level, title, detail, source, dedupKey, memberName) {
+  return raiseAlert({ level, title, detail, source, dedupKey, memberName });
+}
+/* 恢复判定：某指标最新读数回到日常范围时，自动关闭该成员该指标的未处理预警并留档一条恢复记录 */
+function settleRecovered(memberId, ruleKey, label, note, memberName) {
+  const open = (state.alerts || []).filter(alert => alert.status === 'open' && (alert.dedupKey || '').startsWith(`${memberId}|${ruleKey}|`) && !(alert.dedupKey || '').includes('|恢复|'));
+  if (!open.length) return false;
+  open.forEach(alert => { alert.status = 'resolved'; alert.resolvedAt = nowLabel(); alert.resolvedNote = note; });
+  raiseAlert({ level: 'blue', title: `${label}已恢复日常范围`, detail: `${memberName ? `${memberName} ` : ''}${note}。原预警已自动关闭并归档。`, source: '规则引擎 · 自动恢复', dedupKey: `${memberId}|${ruleKey}|恢复|${dateOffset(0)}`, memberName });
+  return true;
+}
+/* 统一入口：读数入库后调用（保存读数 / 硬件同步 / 历史重放），返回触发的文案列表；来源开关关闭的渠道不产生预警 */
+function evaluateAndRaise(memberId, memberName, rows, source, dedupDate, createdAt) {
+  const fromDevice = /硬件|设备|手表/.test(source || '');
+  const sources = state.alertSources || {};
+  if (fromDevice ? sources.device !== true : sources.manual === false) return [];
+  const messages = [];
+  evaluateMetricAlerts(memberId, rows).forEach(result => {
+    raiseAlert({ level: result.level, title: result.title, detail: result.detail, source: `${source} · ${result.metricLabel}`, dedupKey: dedupDate ? `${memberId}|${result.ruleKey}|${dedupDate}` : '', memberName, createdAt });
+    messages.push(`${result.title}（${ALERT_META[result.level].label}）`);
+  });
+  const get = metric => rows.find(row => row.metric === metric)?.value;
+  const bp = ALERT_RULES[0];
+  const sys = get('收缩压'), dia = get('舒张压');
+  if (sys != null && dia != null && !bp.level(Number(sys), Number(dia)) && settleRecovered(memberId, 'bp', '血压', `血压回落至日常范围（最新 ${sys}/${dia} mmHg）`, memberName)) messages.push('血压已恢复日常范围');
+  ALERT_RULES.slice(1).forEach(rule => {
+    const value = get(rule.key);
+    if (value == null || rule.level(Number(value))) return;
+    if (settleRecovered(memberId, rule.key, rule.label, `${rule.label}恢复日常范围（最新 ${value}${rule.unit}）`, memberName)) messages.push(`${rule.label}已恢复日常范围`);
+  });
+  return messages;
 }
 function nowLabel() {
   const now = new Date();
   return `${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 }
-function createAlert(level, title, detail, source) {
-  const alert = { id: `alert-${state.nextAlertId++}`, level, title, detail, source: source || '规则引擎', createdAt: nowLabel(), notify: NOTIFY_PLAN[level] || NOTIFY_PLAN.blue };
-  state.alerts.unshift(alert);
-  saveState(); renderHomeAlerts();
-  if ('Notification' in window && Notification.permission === 'granted') new Notification(`康伴${ALERT_META[level].label}预警：${title}`, { body: detail, tag: alert.id });
-  return alert;
-}
+/* 设备注册表定义：接入开关 + 该设备的预警阈值说明（真机接入后换成真实绑定流程，前端结构不变） */
+const DEVICES = [
+  ['glucose', '🩸', '血糖监测仪', '预警：血糖 ≤ 3.9 警惕低血糖 · ≤ 2.8 紧急 · ≥ 16.7 紧急'],
+  ['bp', '🩺', '血压监测仪', '预警：≥180/110 紧急 · ≥160/100 需关注'],
+  ['watch', '⌚', '智能手表', '预警：疑似跌倒 · 心率异常 · 血氧过低']
+];
+const deviceAlert = alert => /硬件|设备|手表|跌倒/.test(alert.source || '');
 function renderHomeAlerts() {
   const host = document.getElementById('homeAlerts');
+  const section = document.getElementById('homeAlertsSection');
   if (!host) return;
-  const latest = state.alerts[0];
-  if (!latest) {
-    host.innerHTML = `<div class="alert-card alert-card-calm"><span class="alert-icon">✓</span><div><strong>近期没有需要处理的预警</strong><small>录入血压读数或同步手表数据后，规则引擎会自动评估。</small></div><button class="text-button" data-action="add-reading">录入 →</button></div>`;
+  /* 首页「设备预警」窗口：只承载设备上报的危险预警（血糖危险低值 / 血压危险值 / 跌倒）；
+     手动录入的异常只进预警中心，不上首页——未接入任何设备时整块隐藏 */
+  const devicesOn = Object.values(state.devices || {}).some(Boolean);
+  const open = (state.alerts || []).filter(alert => alert.status !== 'resolved' && deviceAlert(alert));
+  const serve = open.sort((a, b) => ({ red: 0, yellow: 1 }[a.level] ?? 2) - ({ red: 0, yellow: 1 }[b.level] ?? 2));
+  /* 铃铛红点：全局未处理红/黄预警（含手动渠道），点开预警中心可处理 */
+  document.querySelectorAll('.notify-dot').forEach(dot => dot.classList.toggle('show', (state.alerts || []).some(alert => alert.status !== 'resolved' && (alert.level === 'red' || alert.level === 'yellow'))));
+  if (section) section.hidden = !devicesOn;
+  if (!devicesOn) { host.innerHTML = ''; return; }
+  const onlineList = DEVICES.filter(([key]) => state.devices[key]);
+  const statusRows = onlineList.map(([, icon, name]) => `<div class="dev-row"><span class="dev-ic">${icon}</span><div style="flex:1"><b>${esc(name)}</b><div class="mut"><span class="on-dot"></span>在线 · 已接入</div></div></div>`).join('');
+  if (!serve.length) {
+    host.innerHTML = `<div class="dev-online-card">${statusRows}<p class="dev-calm">设备已接入，暂无危险预警。设备上报异常时会在这里立即提醒。</p></div>`;
     return;
   }
-  const meta = ALERT_META[latest.level];
-  const counts = { red: 0, yellow: 0, blue: 0 };
-  state.alerts.forEach(alert => { counts[alert.level] = (counts[alert.level] || 0) + 1; });
-  const countText = counts.red ? `${counts.red} 条紧急` : counts.yellow ? `${counts.yellow} 条需要关注` : `${counts.blue || 0} 条一般记录`;
-  host.innerHTML = `<div class="alert-card alert-card-${latest.level}"><span class="alert-icon alert-icon-${latest.level}">${latest.level === 'red' ? '!' : latest.level === 'yellow' ? '△' : '·'}</span><div><strong>${esc(latest.title)}</strong><small>${esc(latest.detail.split('。')[0])}。</small><small class="alert-time">${esc(latest.createdAt)} · ${countText}</small></div><button class="text-button" data-action="alerts">查看 →</button></div>`;
+  const latest = serve[0];
+  const moreCount = open.length - 1;
+  const moreLine = moreCount > 0 ? `<p class="more-line">另有 ${moreCount} 条设备预警记录，已在预警中心 <button class="text-button" data-action="alerts">查看</button></p>` : '';
+  host.innerHTML = `<div class="dev-online-card">${statusRows}</div><div class="alert-card alert-card-${latest.level}"><span class="alert-icon alert-icon-${latest.level}">${latest.level === 'red' ? '!' : '△'}</span><div><strong>${esc(latest.title)}${latest.level === 'red' ? '（紧急）' : ''}</strong><small>${esc(latest.detail.split('。')[0])}。</small><small class="alert-time">${esc(latest.createdAt)} · 设备主动上报${latest.times > 1 ? ` · 同日 ${latest.times} 条已合并` : ''}</small></div><button class="text-button" data-action="alerts">处理 →</button></div>${moreLine}`;
 }
-function showAlertCenter() {
-  const alerts = state.alerts;
-  const list = alerts.length ? alerts.map(alert => {
+let alertCenterFilter = 'open';
+/* 预警来源开关：设备渠道由下方设备注册表联动（任一设备接入即开）；这里只列非设备渠道 */
+const ALERT_SOURCES = [
+  ['missedDose', '💊 漏服监测', '服药提醒后 90 分钟未记录'],
+  ['checkup', '📋 体检异常', '导入体检单自动比对参考范围'],
+  ['manual', '✍️ 手动读数异常', '家人录入 / 拍照 / 语音识别']
+];
+function showAlertCenter(filter) {
+  alertCenterFilter = filter || 'open';
+  const all = state.alerts || [];
+  const openCount = all.filter(alert => alert.status !== 'resolved').length;
+  const resolvedCount = all.length - openCount;
+  const tabs = [['open', `未处理 ${openCount}`], ['resolved', `已处理 ${resolvedCount}`], ['all', `全部 ${all.length}`]];
+  const list = all.filter(alert => alertCenterFilter === 'all' ? true : alertCenterFilter === 'open' ? alert.status !== 'resolved' : alert.status === 'resolved').map(alert => {
     const meta = ALERT_META[alert.level];
-    return `<article class="alert-detail-card"><div class="alert-detail-head"><span class="alert-badge ${meta.badge}">${meta.label}</span><strong>${esc(alert.title)}</strong><small>${esc(alert.createdAt)}</small></div><p>${esc(alert.detail)}</p><small class="alert-source">来源：${esc(alert.source)}</small><div class="alert-notify"><strong>分级告知记录</strong>${(alert.notify || []).map(entry => `<small>› ${esc(entry)}</small>`).join('')}</div></article>`;
-  }).join('') : '<p class="privacy-small" style="margin-top:18px">还没有预警记录。下面录入一次血压读数试试。</p>';
-  openModal(`${modalHead('规则版 · 本机演示', '健康预警中心', '预警由血压读数和服药记录按固定规则生成，不构成医疗判断。红色立即电话告知，黄色推送提醒，蓝色进入每日汇总。')}
-    ${list}
-    <div class="reading-form">
-      <strong>有新读数？</strong>
-      <button class="primary-button" data-action="add-reading">＋ 录入读数（手动 / 语音 / 拍照 / 硬件）</button>
-      <p class="privacy-small">录入后由规则引擎自动评估并分级告知；也可在硬件同步里模拟手表读数与跌倒事件。</p>
-    </div>`);
+    const statusChip = alert.status === 'resolved' ? '<span class="alert-status-chip resolved">已处理</span>' : alert.status === 'acked' ? '<span class="alert-status-chip acked">已确认</span>' : '';
+    const timesText = alert.times > 1 ? ` · 同日合并 ${alert.times} 条` : '';
+    const resolvedLine = alert.status === 'resolved'
+      ? `<small class="alert-source">处理记录：${esc(alert.resolvedNote || '已处理')} · ${esc(alert.resolvedAt || '')}</small>`
+      : alert.status === 'acked' ? `<small class="alert-source">已确认持续关注 · ${esc(alert.ackedAt || '')}</small>` : '';
+    const actions = alert.status !== 'resolved'
+      ? `<div class="alert-actions"><button class="secondary-button" data-alert-act="ack" data-alert-id="${alert.id}">知道了，持续关注</button><button class="primary-button" data-alert-act="resolve" data-alert-id="${alert.id}">标记已处理</button></div>`
+      : '';
+    return `<article class="alert-detail-card"><div class="alert-detail-head"><span class="alert-badge ${meta.badge}">${meta.label}</span><strong>${esc(alert.title)}</strong><small>${esc(alert.createdAt)}${timesText}</small>${statusChip}</div><p>${esc(alert.detail)}</p><small class="alert-source">来源：${esc(alert.source)}</small>${resolvedLine}<div class="alert-notify"><strong>分级告知记录</strong>${(alert.notify || []).map(entry => `<small>› ${esc(entry)}</small>`).join('')}</div>${actions}</article>`;
+  }).join('');
+  const sources = state.alertSources || {};
+  const srcRows = ALERT_SOURCES.map(([key, label, desc]) => `<div class="src-row"><div><b>${label}</b><small>${desc}</small></div><span class="sw ${sources[key] ? 'on' : ''}" data-src-toggle="${key}" role="switch" aria-checked="${!!sources[key]}" aria-label="${label}"></span></div>`).join('');
+  const devRows = DEVICES.map(([key, icon, name, desc]) => `<div class="src-row"><span class="dev-ic">${icon}</span><div><b>${name}</b><small>${desc}</small></div><span class="sw ${state.devices?.[key] ? 'on' : ''}" data-dev-toggle="${key}" role="switch" aria-checked="${!!state.devices?.[key]}" aria-label="接入${name}"></span></div>`).join('');
+  openModal(`${modalHead('预警自动生成 · 本页仅汇总与处理', '健康预警中心', '预警由健康档案的日常记录、体检单导入和服药提醒自动评估生成，指标恢复日常范围会自动关闭对应预警；这里只做汇总展示与处理，录入请到健康档案。')}
+    <div class="src-block">
+      <b>设备管理</b>
+      <small>接入监测设备后，设备上报的危险预警会显示在首页「设备预警」窗口；未接入任何设备时首页不显示该区块（演示：录入读数 · 硬件同步里可模拟设备事件）</small>
+      ${devRows}
+    </div>
+    <div class="src-block">
+      <b>预警来源</b>
+      <small>关掉的来源不再产生、也不再显示预警</small>
+      ${srcRows}
+    </div>
+    <div class="alert-filter-chips">${tabs.map(([key, label]) => `<button class="metric-chip ${alertCenterFilter === key ? 'selected' : ''}" data-alert-filter="${key}">${label}</button>`).join('')}</div>
+    ${list || '<p class="privacy-small" style="margin-top:18px">该状态下暂无预警记录。</p>'}`);
+  document.querySelectorAll('[data-dev-toggle]').forEach(el => el.addEventListener('click', () => {
+    const key = el.dataset.devToggle;
+    state.devices = { ...(state.devices || {}), [key]: !(state.devices || {})[key] };
+    state.alertSources = { ...(state.alertSources || {}), device: Object.values(state.devices).some(Boolean) };
+    saveState(); renderHomeAlerts(); showAlertCenter();
+    toast(state.devices[key] ? '设备已接入（演示）：设备上报的预警将显示在首页' : '设备已断开');
+  }));
+  document.querySelectorAll('[data-src-toggle]').forEach(el => el.addEventListener('click', () => {
+    const key = el.dataset.srcToggle;
+    state.alertSources = { ...(state.alertSources || {}), [key]: !(state.alertSources || {})[key] };
+    saveState(); renderHomeAlerts(); showAlertCenter();
+    toast(state.alertSources[key] ? '该预警来源已开启' : '该预警来源已关闭，之后不再产生此类预警');
+  }));
+  document.querySelectorAll('[data-alert-filter]').forEach(btn => btn.addEventListener('click', () => showAlertCenter(btn.dataset.alertFilter)));
+  document.querySelectorAll('[data-alert-act]').forEach(btn => btn.addEventListener('click', () => {
+    const alert = (state.alerts || []).find(item => item.id === btn.dataset.alertId);
+    if (!alert) return;
+    if (btn.dataset.alertAct === 'ack') { alert.status = 'acked'; alert.ackedAt = nowLabel(); toast('已确认为持续关注项'); }
+    else { alert.status = 'resolved'; alert.resolvedAt = nowLabel(); alert.resolvedNote = '家人手动确认处理'; toast('已处理并归档'); }
+    saveState(); renderHomeAlerts(); showAlertCenter();
+  }));
 }
 /* ============ 录入读数（多通道：手动 / 语音 / 拍照 / 硬件，读数按成员归属） ============ */
 let readingMemberId = 'm1';   // 当前录入读数的目标成员（设备数据各归各人）
@@ -2704,7 +3173,7 @@ function showReadingEntry(memberId) {
         <div class="entry-capture-icon">⌚</div>
         <strong>硬件设备同步（演示）· 全指标通用</strong>
         <p>智能手表、血压计、血糖仪各自通过厂商接口同步，多指标一次进表；跌倒检测自动触发紧急预警。</p>
-        <div class="entry-result" id="deviceResult">已绑定设备（演示）：智能手表 · 血压计 · 血糖仪 · 上次同步 ${nowLabel().split(' ')[1]}</div>
+        <div class="entry-result" id="deviceResult">${Object.entries(state.devices || {}).filter(([, on]) => on).length ? `已接入设备：${DEVICES.filter(([key]) => state.devices[key]).map(([, , name]) => name).join(' · ')} · 上次同步 ${nowLabel().split(' ')[1]}` : '尚未接入监测设备：到预警中心 · 设备管理里接入后可同步'}</div>
         <button class="primary-button" id="mockWatchSync">同步一次设备读数（血压 + 心率 + 血氧）</button>
         <button class="secondary-button" id="mockFallEvent">模拟手表跌倒事件（红色预警）</button>
         <p class="privacy-small">真实接入走华为 Health Kit / 小米运动健康等开放接口；同步数据同样人工可改、确认后入库。</p>
@@ -2785,6 +3254,7 @@ function showReadingEntry(memberId) {
     toast(`识别出 ${rows.length} 项指标，请核对`);
   });
   document.getElementById('mockWatchSync')?.addEventListener('click', () => {
+    if (!state.devices?.watch) { toast('智能手表未接入：先到预警中心 · 设备管理里接入'); return; }
     const pool = [ [128, 82, 72, 98], [146, 92, 78, 96], [168, 104, 86, 95], [122, 80, 70, 97] ];
     const [sys, dia, pulse, spo2] = pool[Math.floor(Math.random() * pool.length)];
     const rows = [
@@ -2800,8 +3270,11 @@ function showReadingEntry(memberId) {
     toast(`设备同步 ${rows.length} 项指标，请核对`);
   });
   document.getElementById('mockFallEvent')?.addEventListener('click', () => {
-    createAlert('red', '疑似跌倒事件', `模拟手表上报一次疑似跌倒（${nowLabel()}），设备定位：家中客厅（演示数据）。请立即联系妈妈确认情况，必要时就医。`, '模拟手表 · 跌倒监测');
-    closeModal(); toast('已生成红色预警，家人已收到电话外呼演示');
+    if (!state.devices?.watch) { toast('智能手表未接入：先到预警中心 · 设备管理里接入'); return; }
+    const member = state.familyMembers.find(item => item.id === readingMemberId) || currentMember();
+    const who = member?.name || '本人';
+    createAlert('red', '疑似跌倒事件', `已绑定的智能手表上报一次疑似跌倒（${nowLabel()}），定位：家中客厅。请立即联系 ${who} 确认情况，必要时就医。`, '硬件同步 · 跌倒监测', `${member?.id || 'x'}|跌倒|${Math.floor(Date.now() / 600000)}`, who);
+    closeModal(); toast('已生成红色预警，已通过应用内强提醒通知全部家庭成员');
     showAlertCenter();
   });
   document.getElementById('saveDailyEntries')?.addEventListener('click', () => {
@@ -2819,17 +3292,10 @@ function saveDailyEntries(memberId, rows, source) {
   rows.forEach(row => {
     state.bodyMetrics.push({ id: `bm-${state.nextMetricId++}`, memberId, metric: row.metric, value: row.value, unit: row.unit || metricDef(row.metric)?.unit || '', date, time, source, channel: 'daily' });
   });
-  const sys = rows.find(row => row.metric === '收缩压');
-  const dia = rows.find(row => row.metric === '舒张压');
+  /* 全指标统一预警评估：触发分级预警 + 异常恢复时自动关闭旧预警 */
+  const messages = evaluateAndRaise(memberId, member.name, rows, source, dateOffset(0));
   let message = `${member.name} 的 ${rows.length} 项日常记录已保存`;
-  if (sys && dia) {
-    const pulse = rows.find(row => row.metric === '心率')?.value || 0;
-    const result = evaluateReading({ systolic: sys.value, diastolic: dia.value, pulse });
-    if (result) {
-      createAlert(result.level, result.title, result.detail, `${source} · 血压 ${sys.value}/${dia.value}`);
-      message += `，血压触发${ALERT_META[result.level].label}预警并完成分级告知`;
-    }
-  }
+  if (messages.length) message += `：${messages.join('、')}`;
   saveState(); renderHomeAlerts(); renderHealth();
   /* 若数据看板正开着，就地刷新，保证「日常记录 + 体检单」联动可见 */
   const boardTitle = document.getElementById('modalTitle')?.textContent || '';
@@ -2880,6 +3346,17 @@ function showDailyLog(memberId) {
     <p class="privacy-small">正式版中血糖仪、血压计、体温计、手表各自通过厂商接口接入，数据自动归到对应家庭成员名下。</p>`);
 }
 
+/* 陪诊 Tab 子页签：'mine' = 我的陪诊（履约） / 'hall' = 社区大厅（撮合）；家庭端社区已并入陪诊 Tab */
+let companionSub = 'mine';
+function setCompanionSub(sub, push = true) {
+  companionSub = sub === 'hall' ? 'hall' : 'mine';
+  document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === (companionSub === 'hall' ? 'view-community' : 'view-companion')));
+  document.querySelectorAll('[data-csub]').forEach(el => el.classList.toggle('sel', el.dataset.csub === companionSub));
+  if (companionSub === 'hall') renderCommunity();
+  else if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family') { try { renderCloudFamilyOrders(); } catch { /* 忽略 */ } }
+  if (push) { try { history.pushState({ kangbanTab: 'companion', kangbanSub: companionSub }, ''); } catch { /* 忽略 */ }
+    window.scrollTo({ top: 0, behavior: 'smooth' }); }
+}
 function navigate(tab, fromPop = false) {
   if (window.KangbanAuth?.role === 'guest' && tab !== 'community') tab = 'community';
   /* 云端陪诊师：工作台 / 社区 / 我的 三页可去，其余一律回工作台 */
@@ -2887,26 +3364,39 @@ function navigate(tab, fromPop = false) {
   if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family' && tab.startsWith('escort')) tab = 'home';
   if (state.currentRole === 'escort' && !['escort', 'community', 'escort-profile', 'escort-hall'].includes(tab) && window.KangbanAuth?.mode !== 'cloud') tab = 'escort';
   if (state.currentRole !== 'escort' && tab.startsWith('escort')) tab = 'home';
+  /* 家庭端（本地 + 云端）：社区并入陪诊 Tab 的「社区大厅」子页签；游客与陪诊师不受影响 */
+  const isEscortRole = window.KangbanAuth?.mode === 'cloud' ? window.KangbanAuth.role === 'escort' : state.currentRole === 'escort';
+  const isGuestRole = window.KangbanAuth?.role === 'guest';
+  if (tab === 'community' && !isGuestRole && !isEscortRole) { companionSub = 'hall'; tab = 'companion'; }
+  else if (tab === 'companion' && !fromPop) companionSub = 'mine';
   const changed = currentTab !== tab;
   currentTab = tab;
   document.body.classList?.toggle('guest-mode', window.KangbanAuth?.role === 'guest');
-  document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === `view-${tab}`));
+  const activeViewId = tab === 'companion' && companionSub === 'hall' ? 'view-community' : `view-${tab}`;
+  document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === activeViewId));
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
   document.querySelectorAll(`.tab[data-tab="${tab}"]`).forEach(el => el.classList.remove('has-dot'));
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  if (tab === 'community') renderCommunity();
+  if (tab === 'community' || (tab === 'companion' && companionSub === 'hall')) renderCommunity();
   if (tab === 'escort' && window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'escort') renderCloudWorkbench();
-  if (tab === 'companion' && window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family') renderCloudFamilyOrders();
+  if (tab === 'companion' && companionSub === 'mine' && window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family') renderCloudFamilyOrders();
   if (tab === 'escort-profile' && window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'escort') renderCloudEscortProfile();
-  /* 页面切换进历史栈：浏览器/手机返回手势可回上一层 */
-  if (!fromPop && changed) { try { history.pushState({ kangbanTab: tab }, ''); } catch { /* 历史接口不可用时静默降级 */ } }
+  /* 页面切换进历史栈：浏览器/手机返回手势可回上一层（子页签一并入栈） */
+  if (!fromPop && changed) { try { history.pushState({ kangbanTab: tab, kangbanSub: tab === 'companion' ? companionSub : undefined }, ''); } catch { /* 历史接口不可用时静默降级 */ }
+  }
 }
 /* 返回上一层：浏览器历史统一接管（页面 Tab + 弹窗） */
 let modalHistoryActive = false;
 window.addEventListener('popstate', event => {
   if (modalHistoryActive) { closeModal(true); return; }
   const tab = event.state?.kangbanTab;
-  if (tab && tab !== currentTab) navigate(tab, true);
+  if (tab && tab !== currentTab) {
+    if (event.state?.kangbanSub) companionSub = event.state.kangbanSub === 'hall' ? 'hall' : 'mine';
+    navigate(tab, true);
+  } else if (tab === 'companion' && event.state?.kangbanSub && event.state.kangbanSub !== companionSub) {
+    /* 同一 Tab 内的子页签返回（我的陪诊 ↔ 社区大厅） */
+    setCompanionSub(event.state.kangbanSub, false);
+  }
 });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && modalHistoryActive) closeModal();
@@ -3621,6 +4111,13 @@ document.addEventListener('click', async event => {
     return;
   }
   if (event.target.closest('[data-action="logout"]')) { try { await window.KangbanAuth.signOut(); } catch (error) { toast(error.message || '退出失败'); } return; }
+  /* 首页待办「去处理」：跳我的陪诊并展开我的发布抽屉 */
+  if (event.target.closest('[data-open-my-posts]')) familyMyPostsOpen = true;
+  const myPostsToggle = event.target.closest('#familyMyPostsToggle');
+  if (myPostsToggle) { familyMyPostsOpen = !familyMyPostsOpen; renderFamilyMyPosts(); return; }
+  /* 陪诊师「我的发布」抽屉（工作台）：同一套收缩交互 */
+  const escortMyPostsToggle = event.target.closest('#escortMyPostsToggle');
+  if (escortMyPostsToggle) { escortMyPostsOpen = !escortMyPostsOpen; renderEscortMyPosts(); return; }
   if (event.target.closest('[data-action="local-import"]')) { showLocalImportPreview(); return; }
   if (event.target.closest('#confirmLocalImport')) { importLocalWorkspace(); return; }
   if (event.target.closest('#cancelLocalImport')) { closeModal(); return; }
@@ -3645,13 +4142,23 @@ document.addEventListener('click', async event => {
   const tab = event.target.closest('[data-tab]');
   if (tab) { navigate(tab.dataset.tab); return; }
   const nav = event.target.closest('[data-nav]');
-  if (nav) { navigate(nav.dataset.nav); return; }
+  /* 卡内更近处有 data-action（如成员卡里的「去录入」）时，动作优先于整卡跳转 */
+  const innerAction = event.target.closest('[data-action]');
+  if (nav && !(innerAction && nav.contains(innerAction))) { navigate(nav.dataset.nav); return; }
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'home-share') { showHomeSharePicker(); return; }
   if (action === 'home-demand') { navigate('companion'); showDemandForm(); return; }
+  const csubBtn = event.target.closest('[data-csub]');
+  if (csubBtn) {
+    const auth = window.KangbanAuth;
+    const escortView = auth?.mode === 'cloud' ? auth.role === 'escort' : state.currentRole === 'escort';
+    if (auth?.role === 'guest') { toast('游客模式只可浏览社区，登录后可用我的陪诊'); return; }
+    if (!escortView) setCompanionSub(csubBtn.dataset.csub);
+    return;
+  }
   if (event.target.closest('#todayBarToggle')) {
     const detail = document.getElementById('todayDetail');
-    if (detail) { detail.hidden = !detail.hidden; event.target.closest('.today-bar')?.classList.toggle('open', !detail.hidden); }
+    if (detail) { todayBarOpen = detail.hidden; detail.hidden = !detail.hidden; event.target.closest('.today-bar')?.classList.toggle('open', !detail.hidden); }
     return;
   }
   if (action === 'family-member-add') { showFamilyMemberAdd(); return; }
@@ -3665,12 +4172,24 @@ document.addEventListener('click', async event => {
   if (action === 'health-card') showHealthCard(event.target.closest('[data-card-member]')?.dataset.cardMember || '');
   if (action === 'share') showShare(event.target.closest('[data-share-member]')?.dataset.shareMember || '');
   if (action === 'alerts') showAlertCenter();
+  if (action === 'device-mgr') showAlertCenter();
   if (action === 'add-reading') showReadingEntry();
+  if (action === 'docs-upload') navigate('docs');
   if (action === 'insurance-entry') showPolicyEntry();
   if (action === 'insurance-social' || action === 'insurance-commercial') showPolicyEntry();
   if (action === 'ai-assistant') showInfo('AI 管理助手（规划中）', '规划能力：自动总结父母健康周报、回答健康咨询、生成就医准备清单，并支持「小康，今天该吃什么药」式语音交互。当前演示版可在「我的 · 健康趋势」查看固定统计。');
   if (action === 'devices') showInfo('设备管理（规划中）', '计划预留华为运动健康、小米运动健康等智能手表接入入口，同步睡眠、运动与跌倒监测数据。当前演示版可在预警中心「模拟手表同步」体验。');
   if (action === 'companion') navigate('companion');
+  /* 「我的」页 v4：纯文字行动作 */
+  if (action === 'family') { navigate('health'); return; }
+  if (action === 'account-security') { showAccountSecurity(); return; }
+  if (action === 'notify-settings') {
+    if (!('Notification' in window)) { toast('当前浏览器不支持系统通知，提醒在应用内展示'); return; }
+    if (Notification.permission === 'granted') { toast('系统通知已开启'); renderMePage(); return; }
+    Notification.requestPermission().then(permission => { toast(permission === 'granted' ? '系统通知已开启' : '未开启通知，提醒仍在应用内展示'); renderMePage(); }).catch(() => toast('浏览器未能开启通知，请检查权限设置'));
+    return;
+  }
+  if (action === 'about') { showInfo('关于康伴', '康伴 v0.9 演示版\n\n康伴帮助家庭整理就医资料、协同就诊准备，并提供经过审核的陪诊服务撮合。\n\n本原型为演示作品，病例均为虚构数据，不连接任何医疗机构或真实患者信息。'); return; }
   if (action === 'book-profile') showCompanionForm('全程陪诊');
   if (action === 'demand-form') showDemandForm();
   if (action === 'toggle-availability') {
@@ -3766,7 +4285,16 @@ document.addEventListener('click', async event => {
   const snoozeReminder = event.target.closest('[data-reminder-snooze]');
   if (snoozeReminder) snoozeCustomReminder(snoozeReminder.dataset.reminderSnooze, snoozeReminder.dataset.reminderTime);
   const skipReminder = event.target.closest('[data-reminder-skip]');
-  if (skipReminder) skipCustomReminder(skipReminder.dataset.reminderSkip, skipReminder.dataset.reminderTime);
+  if (skipReminder) showSkipConfirm(skipReminder.dataset.reminderSkip, skipReminder.dataset.reminderTime);
+  const skipReasonBtn = event.target.closest('[data-skip-reason]');
+  if (skipReasonBtn) {
+    skipCustomReminder(skipReasonBtn.dataset.skipReason, skipReasonBtn.dataset.skipTime, skipReasonBtn.dataset.reason || '');
+    closeModal(); renderMedicationReminders();
+  }
+  if (event.target.closest('[data-done-toggle]')) {
+    todayDoneOpen = !todayDoneOpen;
+    renderHomeTodayBar();
+  }
   const markTaken = event.target.closest('[data-med-taken]');
   if (markTaken) {
     const key = `${dateOffset(0)}|${markTaken.dataset.medTaken}|${markTaken.dataset.medTime}`;
@@ -4182,7 +4710,7 @@ document.addEventListener('submit', async event => {
           p_service_type: service, p_summary: `需要${service}服务，协助院内就医流程`, p_need_text: String(data.get('need') || '').trim() || '具体需求待家庭与陪诊师沟通',
           p_budget_min: budgetMin, p_budget_max: budgetMax
         });
-        closeModal(); toast('需求已发布到云端社区，公开摘要未包含患者资料'); await renderCommunity();
+        closeModal(); toast('需求已发布，等陪诊师报名；有新报名会提醒你'); await refreshCloudAfterAction();
       } catch (error) { toast(`发布失败：${error.message || error}`); }
       return;
     }
@@ -4205,7 +4733,7 @@ document.addEventListener('submit', async event => {
       createdAt: new Date().toLocaleString('zh-CN', { hour12: false })
     };
     state.demandPosts = [post, ...(state.demandPosts || [])];
-    saveState(); renderRecords(); closeModal();
+    saveState(); renderRecords(); renderCompanionViews(); closeModal();
     toast('需求已发布，陪诊员在需求大厅可见');
   }
   if (event.target.id === 'availabilityForm') {
@@ -4231,7 +4759,7 @@ document.addEventListener('submit', async event => {
           start_time:payload.start, end_time:payload.end, service_type:payload.serviceType,
           summary:payload.summary || '可预约陪诊时段，服务范围由陪诊师本人确认', status:'open'
         });
-        closeModal(); toast('可预约时段已发布');
+        closeModal(); toast('陪诊服务已发布');
       }
       await renderCommunity();
     } catch(error) { toast(`操作失败：${error.message||error}`); }
@@ -4350,19 +4878,25 @@ document.querySelectorAll('.filter-chip').forEach(chip => chip.addEventListener(
 }));
 if (!state.alertsSeeded) {
   state.alertsSeeded = true;
-  /* 唯一数据源是 bodyMetrics：按「同成员 + 同日期 + 同时刻」配对收缩压/舒张压生成初始预警 */
-  const pool = state.bodyMetrics || [];
-  const seedReadings = [];
-  pool.filter(entry => entry.metric === '收缩压').forEach(sys => {
-    const dia = pool.find(entry => entry.metric === '舒张压' && entry.memberId === sys.memberId && entry.date === sys.date && (entry.time || '') === (sys.time || ''));
-    if (dia) seedReadings.push({ date: sys.date, time: sys.time, systolic: sys.value, diastolic: dia.value, source: sys.source });
-  });
-  for (const reading of seedReadings.reverse()) {
-    const result = evaluateReading(reading);
-    if (result) {
-      state.alerts.unshift({ id: `alert-${state.nextAlertId++}`, level: result.level, title: result.title, detail: result.detail, source: `${reading.source || '手动录入'} · 血压 ${reading.systolic}/${reading.diastolic}`, createdAt: `${formatDate(reading.date)} ${reading.time || ''}`.trim(), notify: NOTIFY_PLAN[result.level] || NOTIFY_PLAN.blue });
+  /* 历史读数重放：按时间正序走同一套统一规则引擎（评估 / 同日去重合并 / 恢复自动关闭），与实时录入口径完全一致 */
+  const buckets = new Map();
+  (state.bodyMetrics || []).forEach(entry => {
+    if (entry.metric === '舒张压') return; // 舒张压与同时刻收缩压合成一组评估
+    const key = `${entry.memberId}|${entry.date}|${entry.time || ''}`;
+    const bucket = buckets.get(key) || { memberId: entry.memberId, date: entry.date, time: entry.time || '', rows: [], source: entry.source || '手动录入' };
+    if (entry.metric === '收缩压') {
+      const dia = (state.bodyMetrics || []).find(d => d.metric === '舒张压' && d.memberId === entry.memberId && d.date === entry.date && (d.time || '') === (entry.time || ''));
+      if (dia) bucket.rows.push({ metric: '收缩压', value: entry.value, unit: 'mmHg' }, { metric: '舒张压', value: dia.value, unit: 'mmHg' });
+    } else {
+      bucket.rows.push({ metric: entry.metric, value: entry.value, unit: entry.unit });
     }
-  }
+    buckets.set(key, bucket);
+  });
+  [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)).forEach(bucket => {
+    if (!bucket.rows.length) return;
+    const member = state.familyMembers.find(item => item.id === bucket.memberId);
+    evaluateAndRaise(bucket.memberId, member?.name || '', bucket.rows, bucket.source, bucket.date, `${formatDate(bucket.date)} ${bucket.time}`.trim());
+  });
   saveState();
 }
 function setPasswordRecoveryView(enabled) {
@@ -4433,7 +4967,7 @@ document.getElementById('authForm')?.addEventListener('submit', async event => {
 async function applyAuthSession(session) {
   const gate = document.getElementById('authGate');
   if (window.KangbanAuth?.isPasswordRecovery) {
-    document.body.classList.remove('authenticated','guest-mode');
+    document.body.classList.remove('authenticated','guest-mode','family-mode');
     gate.hidden = false;
     window.authRegisterMode = false;
     setPasswordRecoveryView(true);
@@ -4441,7 +4975,7 @@ async function applyAuthSession(session) {
     return;
   }
   if (!session) {
-    document.body.classList.remove('authenticated','guest-mode'); gate.hidden = false;
+    document.body.classList.remove('authenticated','guest-mode','family-mode'); gate.hidden = false;
     setAuthRegistrationView(false);
     unsubscribeCloudRealtime();
     document.getElementById('familyTabs').hidden = false; document.getElementById('escortTabs').hidden = true;
