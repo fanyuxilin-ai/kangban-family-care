@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=22" />
+  <link rel="stylesheet" href="styles.css?v=28" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -72,36 +72,26 @@
           <button class="icon-button" id="bellButton" aria-label="通知">♧<span class="notify-dot"></span></button>
         </div>
 
-        <div id="homeTodayBar"></div>
-        <div id="homeTodoQueue"></div>
-
         <div class="hero-card" id="homeHeroCard">
           <div id="homeHeroBody"></div>
           <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
         </div>
+
+        <section class="section-block alerts-section collapsible" data-panel="home-alerts" id="homeAlertsSection" hidden>
+          <div class="section-heading"><div><h2>设备预警 <span class="local-data-badge" hidden>⌂ 本机数据</span></h2></div><button class="text-button" data-action="device-mgr">设备管理 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-alerts" aria-label="折叠或展开">▾</button></div>
+          <div class="section-body"><div id="homeAlerts"></div></div>
+        </section>
+
+        <div id="homeTodayBar"></div>
 
         <section class="section-block" id="homeMemberSection" hidden>
           <div class="section-heading"><div><p class="eyebrow">家人今天怎么样</p><h2>成员状态</h2></div><button class="text-button" data-nav="health">健康档案 <span>→</span></button></div>
           <div id="homeMemberStrip" class="member-strip"></div>
         </section>
 
-        <section class="section-block alerts-section collapsible" data-panel="home-alerts">
-          <div class="section-heading"><div><p class="eyebrow">规则版 · 血压与漏服监测 <span class="local-data-badge" hidden>⌂ 本机数据</span></p><h2>健康预警</h2></div><button class="text-button" data-action="alerts">预警中心 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-alerts" aria-label="折叠或展开">▾</button></div>
-          <div class="section-body"><div id="homeAlerts"></div></div>
-        </section>
-
         <section class="section-block quick-section">
           <div class="section-heading"><div><p class="eyebrow">现在可以做</p><h2>常用服务</h2></div></div>
-          <div class="quick-grid">
-            <button class="quick-item" data-action="add-reading"><span class="quick-icon icon-upload">↥</span><strong>录入读数</strong><small>手动 / 语音 / 拍照</small></button>
-            <button class="quick-item" data-action="home-share"><span class="quick-icon icon-share">⌁</span><strong>生成分享码</strong><small>给陪诊师临时授权</small></button>
-            <button class="quick-item" data-action="home-demand"><span class="quick-icon icon-heart">♡</span><strong>发布陪诊需求</strong><small>社区发单等报名</small></button>
-          </div>
-        </section>
-
-        <section class="section-block medication-section collapsible" data-panel="home-medication">
-          <div class="section-heading"><div><p class="eyebrow">服药、测量、活动与自定义事项 <span class="local-data-badge" hidden>⌂ 本机数据</span></p><h2>今日提醒</h2></div><button class="text-button" data-action="reminders">查看全部 <span>→</span></button><button class="section-collapse" data-panel-toggle="home-medication" aria-label="折叠或展开">▾</button></div>
-          <div class="section-body"><div id="homeMedicationReminders"></div><button class="secondary-button reminder-add-home" data-action="add-reminder">＋ 新增自定义提醒</button></div>
+          <div class="quick-grid" id="quickGrid"></div>
         </section>
         <div class="privacy-note"><span>✳</span><span>健康资料仅在你授权后分享，你可以随时撤回。</span></div>
       </section>
@@ -119,19 +109,24 @@
       </section>
 
       <section class="view" id="view-companion">
+        <div class="companion-seg" id="companionSeg">
+          <button type="button" class="cseg-btn sel" data-csub="mine">我的陪诊</button>
+          <button type="button" class="cseg-btn" data-csub="hall">社区大厅</button>
+        </div>
         <div class="page-heading"><p class="eyebrow">有人同行，心里更踏实</p><h1>陪诊服务</h1><p class="subtle">先把需要说清楚，服务人员会与你确认安排。</p></div>
         <div id="companionLiveOrders" hidden></div>
-        <div class="companion-intro"><div class="companion-art"><span class="sun"></span><span class="person person-a"></span><span class="person person-b"></span><span class="bench"></span><span class="leaf leaf-a">✦</span><span class="leaf leaf-b">✳</span></div><div class="companion-intro-copy"><strong>就诊当天，安心有人陪</strong><p>陪同取号、院内引导、检查陪同和就诊后信息交接。</p></div></div>
-        <section class="section-block collapsible" data-panel="companion-profile">
+        <div class="companion-intro" id="companionIntro"><div class="companion-art"><span class="sun"></span><span class="person person-a"></span><span class="person person-b"></span><span class="bench"></span><span class="leaf leaf-a">✦</span><span class="leaf leaf-b">✳</span></div><div class="companion-intro-copy"><strong>就诊当天，安心有人陪</strong><p>陪同取号、院内引导、检查陪同和就诊后信息交接。</p></div></div>
+        <section class="section-block collapsible" id="companionProfileSection" data-panel="companion-profile">
           <div class="section-heading"><div><p class="eyebrow">演示陪诊员</p><h2>认识服务人员</h2></div><button class="section-collapse" data-panel-toggle="companion-profile" aria-label="折叠或展开">▾</button></div>
           <div class="section-body"><article class="escort-profile-card" id="familyEscortProfile"></article></div>
         </section>
         <div id="companionOrders"></div>
-        <section class="section-block collapsible" data-panel="demand-posts">
-          <div class="section-heading"><div><p class="eyebrow">社区需求区 · 招募陪诊</p><h2>陪诊需求大厅</h2></div><div class="community-publish-group"><button class="text-button compact-button" data-action="my-posts" id="familyMyPostsButton" hidden>我的发布</button><button class="text-button" data-action="demand-form">发布需求 →</button></div><button class="section-collapse" data-panel-toggle="demand-posts" aria-label="折叠或展开">▾</button></div>
+        <div id="familyMyPostsArea" hidden></div>
+        <section class="section-block collapsible" id="demandPostsSection" data-panel="demand-posts" hidden>
+          <div class="section-heading"><div><p class="eyebrow">社区需求区 · 招募陪诊</p><h2>陪诊需求大厅</h2></div><button class="section-collapse" data-panel-toggle="demand-posts" aria-label="折叠或展开">▾</button></div>
           <div class="section-body"><div id="demandPostList"></div></div>
         </section>
-        <section class="section-block collapsible" data-panel="companion-services">
+        <section class="section-block collapsible" id="companionServicesSection" data-panel="companion-services">
           <div class="section-heading"><div><p class="eyebrow">演示服务</p><h2>选择需要的帮助</h2></div><button class="section-collapse" data-panel-toggle="companion-services" aria-label="折叠或展开">▾</button></div>
           <div class="section-body">
           <div class="service-list">
@@ -145,13 +140,17 @@
       </section>
 
       <section class="view" id="view-community">
-        <div class="page-heading"><p class="eyebrow">康伴社区 · 隐私优先</p><h1>社区</h1><p class="subtle">家庭发布陪诊需求，审核通过的陪诊师报名；患者资料仅在家庭选定并确认后开放。</p></div>
+        <div class="companion-seg" id="communitySeg">
+          <button type="button" class="cseg-btn" data-csub="mine">我的陪诊</button>
+          <button type="button" class="cseg-btn sel" data-csub="hall">社区大厅</button>
+        </div>
+        <div class="page-heading"><p class="eyebrow">康伴社区 · 隐私优先</p><h1>社区大厅</h1><p class="subtle">家庭发布陪诊需求，审核通过的陪诊师报名；患者资料仅在家庭选定并确认后开放。</p></div>
         <div class="community-toolbar"><div class="community-filters"><button class="selected" data-community-filter="all">全部</button><button data-community-filter="demand">陪诊需求</button><button data-community-filter="availability">可预约时段</button><select id="communityRegion" class="community-region-select"><option value="all">全部区域</option></select></div></div>
       <div class="community-status" id="communityStatus"></div>
       <div id="migrationStatus" class="migration-status" hidden></div>
       <div class="community-cloud-orders" id="communityOrders"></div>
       <div id="communityFeed"></div>
-        <div class="boundary-note"><strong>社区与工作台的分工</strong><p>社区负责「撮合」：发需求、发时段、报名与预约。成单之后，家庭在「陪诊」Tab、陪诊师在「工作台」跟踪进度与回传状态。</p></div>
+        <div class="boundary-note"><strong>社区与工作台的分工</strong><p>社区大厅负责「撮合」：发需求、发时段、报名与预约。成单之后，在「我的陪诊」子页签跟踪进度与回传状态。</p></div>
       </section>
 
       <section class="view" id="view-escort">
@@ -194,15 +193,11 @@
       </section>
 
       <section class="view" id="view-me">
-        <div class="page-heading"><p class="eyebrow">照顾家人的同时，也照顾好自己</p><h1>我的家庭</h1></div>
-        <div class="family-card"><div class="family-avatar-large">陈</div><div><strong>陈兰英</strong><span>妈妈 · 68岁</span><small>档案由小林协助管理</small></div><button class="quiet-action" data-action="health-card">查看档案 →</button></div>
-        <div class="settings-list">
-          <button class="settings-row" data-action="share"><span class="settings-icon">⌁</span><span>授权与访问记录</span><span class="service-arrow">→</span></button>
-          <button class="settings-row" data-action="ai-assistant"><span class="settings-icon">✳</span><span>AI 管理助手</span><span class="service-arrow">→</span></button>
-          <button class="settings-row" data-action="devices"><span class="settings-icon">⌚</span><span>设备管理（手表接入）</span><span class="service-arrow">→</span></button>
-          <button class="settings-row" data-action="privacy"><span class="settings-icon">◈</span><span>隐私与资料管理</span><span class="service-arrow">→</span></button>
-          <button class="settings-row" data-action="help"><span class="settings-icon">?</span><span>帮助与服务说明</span><span class="service-arrow">→</span></button>
-        </div>
+        <div class="page-heading"><p class="eyebrow">照顾家人的同时，也照顾好自己</p><h1>我的</h1></div>
+        <div class="me-idcard" id="meIdCard"></div>
+        <div class="me-grp" id="mePrimaryRows"></div>
+        <div class="me-grp" id="meGeneralRows"></div>
+        <p class="me-ver">康伴 · 陪伴家人就医的每一步</p>
         <p class="demo-disclaimer">康伴演示版 · 病例为虚构数据<br>本原型仅用于产品演示，不连接医疗机构或真实患者信息。</p>
       </section>
     </main>
@@ -213,7 +208,6 @@
       <button class="tab" data-tab="docs"><span class="tab-icon">▤</span><span>医疗资料</span></button>
       <button class="tab" data-tab="companion"><span class="tab-icon">♡</span><span>陪诊</span></button>
       <button class="tab" data-tab="me"><span class="tab-icon">◉</span><span>我的</span></button>
-      <button class="tab" data-tab="community"><span class="tab-icon">◎</span><span>社区</span></button>
     </nav>
     <nav class="tabbar" aria-label="陪诊员端主导航" id="escortTabs" hidden>
       <button class="tab active" data-tab="escort"><span class="tab-icon">▦</span><span>工作台</span></button>
@@ -256,6 +250,6 @@
   <script src="supabase-config.js"></script>
   <script src="api.js?v=4"></script>
   <script src="auth.js?v=5"></script>
-  <script src="app.js?v=30"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
