@@ -56,3 +56,16 @@ test('profile role and review status are not user-editable columns', () => {
   assert.doesNotMatch(sql, /grant\s+update\s+on\s+public\.profiles\s+to\s+authenticated/i);
   assert.match(sql, /handle_new_auth_user/i);
 });
+
+test('resume storage paths bypass legacy UUID casts and upsert stays owner scoped', () => {
+  const migrationName = '20261106020000_fix_resume_storage_policy_path_cast.sql';
+  const sql = fs.readFileSync(path.join(migrationDirectory, migrationName), 'utf8');
+  for (const operation of ['select', 'insert', 'update']) {
+    const policy = sql.match(new RegExp(`create\\s+policy\\s+kangban_storage_${operation === 'select' ? 'read_family_or_assigned_escort' : operation === 'insert' ? 'insert_family_or_assigned_escort' : 'update_owned_family_or_escort'}[\\s\\S]*?;`, 'i'))?.[0];
+    assert.ok(policy, `missing guarded ${operation} policy`);
+    assert.match(policy, /case[\s\S]*?split_part\(name,\s*'\/',\s*1\)\s*=\s*'resumes'/i);
+    assert.match(policy, /split_part\(name,\s*'\/',\s*1\)\s*~\*/i, 'legacy UUID conversion must follow UUID validation');
+  }
+  assert.match(sql, /split_part\(name,\s*'\/',\s*2\)\s*=\s*\(select auth\.uid\(\)\)::text[\s\S]*?public\.is_active_escort\(\)/i);
+  assert.match(sql, /owner_id\s*=\s*\(select auth\.uid\(\)\)::text/i);
+});
