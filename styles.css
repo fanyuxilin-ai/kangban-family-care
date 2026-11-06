@@ -474,8 +474,8 @@ body:not(.authenticated) .app-shell{display:none}
 .signup-review{display:grid;gap:10px}
 .signup-review-label{font-size:9px;font-weight:700;letter-spacing:.08em;color:#8fa093;text-transform:uppercase;margin-top:2px}
 /* 发布与管理操作归位：我的页/需求大厅的操作行 */
-.profile-action-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:9px}
-.profile-action-row .primary-button,.profile-action-row .secondary-button{margin:0;min-height:40px}
+/* 陪诊师工作台抽屉内发布按钮 */
+.mp-head .primary-button,.mp-head .text-button{margin:0}
 /* 首页统领区：今日总览条 / 待我处理 / 成员状态行 / 本机数据标注 */
 .today-bar{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fffefa;border:1px solid #e9eae2;border-radius:13px;padding:11px 14px;margin-top:2px;box-shadow:0 3px 12px rgba(62,92,68,.05)}
 .today-bar .tb-date{font-size:12px;font-weight:800;color:#31443a;flex:none}
