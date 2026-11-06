@@ -92,7 +92,7 @@ npx supabase@latest link --project-ref sytwoulwwzfuslrgorvw
 npx supabase@latest db push
 ```
 
-本机 `.env` 与 Supabase CLI 链接均指向上述项目。仓库的十份迁移已全部登记在当前项目：前三份后续迁移于 2026-11-06 在 Dashboard SQL Editor 中与版本记录一并事务提交，并通过迁移历史和数据库对象查询复核。不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移记录与浏览器验收边界见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
+本机 `.env` 与 Supabase CLI 链接均指向上述项目。仓库的十一份迁移已全部登记在当前项目；最后四份于 2026-11-06 在 Dashboard SQL Editor 中与版本记录一并事务提交，并通过迁移历史和数据库对象查询复核。不要对旧项目 `vlxdgdrjbomdarrkrctc` 执行后续配置。迁移记录与浏览器验收边界见 [`docs/M1数据层运行说明.md`](docs/M1数据层运行说明.md)。云端演示账号可用下方脚本重复初始化。
 
 4. 运行 `python3 -m http.server 4173` 并打开 `http://localhost:4173`。家庭/陪诊师入口支持邮箱密码注册登录；陪诊师注册初始为待审核，审核前不能报名或发布可约时段。
 5. 配置可信管理员：在 Supabase Auth 找到受信任账号的用户 ID，在 SQL Editor 由项目所有者执行以下语句。该声明保存在 Auth `app_metadata`，普通用户不能自行修改；管理员需退出并重新登录以刷新 JWT。
@@ -114,7 +114,7 @@ where id = '<trusted-auth-user-uuid>';
 
 ## 本次里程碑与已知边界
 
-- **M1 数据层：**核心 17 表、RLS、私有 bucket 与事务 RPC 已部署到当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）；十份迁移均已登记。最后三份通过 Dashboard SQL Editor 在同一事务中执行并写入版本记录，结构已复核。
+- **M1 数据层：**核心 17 表、RLS、私有 bucket 与事务 RPC 已部署到当前统一项目 `kangban-demo`（`sytwoulwwzfuslrgorvw`）；十一份迁移均已登记。最后四份通过 Dashboard SQL Editor 在同一事务中执行并写入版本记录，结构已复核。简历路径 cast 冲突的 Storage 策略已更新；新的真实客户端简历上传/下载仍待端到端验收。
 - **M2 登录与角色：**邮箱注册/登录、退出、家庭/陪诊师入口、游客脱敏模式。本机演示账号仅在本浏览器使用；云端演示账号由管理员脚本创建，脚本只从环境变量读取 service-role key。
 - **M3 双端与社区：**增加第六个家庭社区 Tab；社区与 Pink 需求大厅合并到同一个云端 feed；云端支持报名、选人、双方确认、开始/完成/取消、标准清单、受分享码保护的任务详情、双方私有互评。Pink 本机大厅、分享码及收入模拟保留；收入仍是模拟金额，不涉及真实支付。
 - **M4 迁移：**应用已实现列出类别数量、确认后导入、附件上传私有 Storage、`migration_runs` 游标与失败状态。云端附件权限与续传已有虚构数据验证记录；当前公开站点的浏览器端跨账号附件和 IndexedDB 中断恢复仍需最终人工验收。
