@@ -516,6 +516,10 @@ function renderHealth() {
 }
 
 function showFamilyMemberAdd() {
+  const cloudFamily = window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth?.role === 'family';
+  const saveNote = cloudFamily
+    ? '只填写你愿意在家庭档案中共同维护的信息；保存后会同步到当前家庭云端。'
+    : '只填写你愿意在家庭档案中共同维护的信息。本机演示内容保存在当前浏览器；登录家庭账号后可同步至家庭空间。';
   openModal(`${modalHead('家庭健康档案', '新增家庭成员', '新成员加入后，可单独维护健康档案，并在医疗资料和陪诊预约中选择。年龄与健康信息可稍后补充。')}
     <form class="member-edit-form" id="familyMemberAddForm">
       <label><span class="field-label-block">姓名</span><input class="input-field" name="name" maxlength="40" required placeholder="请输入姓名" /></label>
@@ -526,7 +530,7 @@ function showFamilyMemberAdd() {
       <label><span class="field-label-block">长期用药（选填）</span><input class="input-field" name="medications" maxlength="300" placeholder="药名及用法，按医嘱填写" /></label>
       <label><span class="field-label-block">手术史（选填）</span><input class="input-field" name="surgeries" maxlength="200" placeholder="无手术史可填写无" /></label>
       <button class="primary-button" type="submit">保存并加入家庭</button>
-    </form><p class="privacy-small">只填写你愿意在家庭档案中共同维护的信息。演示数据保存在当前浏览器；登录家庭账号后保存至该家庭空间。</p>`);
+    </form><p class="privacy-small">${saveNote}</p>`);
   const form = document.getElementById('familyMemberAddForm');
   form?.addEventListener('submit', async event => {
     event.preventDefault();
@@ -1571,6 +1575,9 @@ async function renderCommunity() {
   const host = document.getElementById('communityFeed');
   if (!host) return;
   const auth = window.KangbanAuth;
+  host.innerHTML = auth?.mode === 'cloud'
+    ? '<div class="empty-hint community-loading" role="status" aria-live="polite">正在加载云端社区…</div>'
+    : '';
   const guest = auth?.role === 'guest';
   const escort = auth?.role === 'escort';
   const status = document.getElementById('communityStatus');
@@ -1587,8 +1594,8 @@ async function renderCommunity() {
         window.KangbanAPI.select('escort_profiles').catch(() => []),
         window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => [])
       ]);
-      posts = cloudPosts;
-      const profileById = Object.fromEntries(profiles.map(profile => [profile.user_id, profile]));
+      posts = cloudPosts.filter(post => !isVisibleTestFixture(post));
+      const profileById = Object.fromEntries(profiles.map(profile => [profile.user_id, escortProfileForDisplay(profile)]));
       const myUserId = auth.session?.user?.id;
       const myFamilyId = auth.session?.familyId;
       if (escort) auth.session.escortProfile = profileById[myUserId] || null;
@@ -1649,7 +1656,8 @@ async function renderMigrationSummary() {
 async function renderCloudEscortProfile() {
   const host=document.getElementById('cloudEscortProfileView'); if(!host) return;
   try {
-    const [profile]=await window.KangbanAPI.select('escort_profiles',{filters:{user_id:window.KangbanAuth.session.user.id},limit:1});
+    const [rawProfile]=await window.KangbanAPI.select('escort_profiles',{filters:{user_id:window.KangbanAuth.session.user.id},limit:1});
+    const profile = escortProfileForDisplay(rawProfile);
     if(!profile){host.innerHTML='<div class="empty-hint">陪诊师资料尚未初始化，请重新登录。</div>';return;}
     const approved=profile.review_status==='approved';
     const paused=profile.available===false;
@@ -1677,6 +1685,23 @@ function showBookAvailabilityModal(post) {
 }
 /* ===== 云端订单时间线（双端共用）：已确认→已到场→服务中→履约清单→完成互评 ===== */
 function fmtClock(iso) { return iso ? new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : ''; }
+function isVisibleTestFixture(record = {}) {
+  const sample = ['service_type', 'hospital_name', 'region', 'summary', 'need_summary', 'author_label', 'requester', 'patient_label']
+    .map(key => String(record[key] || '')).join(' ');
+  return /E2E|虚构演示(?:医院|区域|资料)|测试专用/i.test(sample);
+}
+function isDemoEscortAccount() {
+  return String(window.KangbanAuth?.session?.user?.email || '').toLowerCase() === 'kangban-escort-demo@example.com';
+}
+function escortProfileForDisplay(profile) {
+  if (!profile || !isDemoEscortAccount()) return profile;
+  return {
+    ...profile,
+    experience: profile.experience || '5 年门诊陪诊服务经验',
+    service_area: profile.service_area || '深圳 · 南山区、福田区',
+    bio: profile.bio || '熟悉门诊检查、取药与报告领取流程，可协助整理就诊材料；不提供诊断、治疗或用药建议。'
+  };
+}
 function cloudOrderTimeline(order, isEscort) {
   const arrived = Boolean(order.arrived_at);
   const inService = order.status === 'in_service';
@@ -1719,7 +1744,10 @@ function renderCloudOrderCard(order, isEscort) {
     ? `<button class="secondary-button" data-cloud-order-review="${esc(order.id)}" data-review-role="${isEscort ? 'escort' : 'family'}">评价本次服务</button>` : '';
   const escortPrivacy = isEscort && !order.share_authorized && active ? '<small class="privacy-small">患者信息与详细需求需由家属通过本次任务分享码授权。</small>' : '';
   const reviewed = order.status === 'completed' && order.reviews?.[isEscort ? 'family' : 'escort'] ? '<small class="privacy-small">对方已提交本单评价。</small>' : '';
-  return `<article class="demand-post-card cloud-order-card${active ? ' is-active' : ''}"><div class="family-order-top"><strong>${esc(order.service_type)} · ${esc(chip[0])}</strong><span class="supply-status-chip ${chip[1]}">${esc(chip[0])}</span></div><p class="community-meta">${whoLine}</p>${cloudOrderTimeline(order, isEscort)}${checklist}${escortPrivacy}${actions}${cancel}${familyShare}${review}${reviewed}</article>`;
+  const timeline = order.status === 'cancelled'
+    ? '<p class="privacy-small order-cancelled-note">订单已取消，后续服务与履约已结束。</p>'
+    : cloudOrderTimeline(order, isEscort);
+  return `<article class="demand-post-card cloud-order-card${active ? ' is-active' : ''}"><div class="family-order-top"><strong>${esc(order.service_type)} · ${esc(chip[0])}</strong><span class="supply-status-chip ${chip[1]}">${esc(chip[0])}</span></div><p class="community-meta">${whoLine}</p>${timeline}${checklist}${escortPrivacy}${actions}${cancel}${familyShare}${review}${reviewed}</article>`;
 }
 /* ===== 云端陪诊师工作台（接真数据） ===== */
 async function renderCloudWorkbench() {
@@ -1735,24 +1763,29 @@ async function renderCloudWorkbench() {
       window.KangbanAPI.select('post_signups', { filters: { escort_id: window.KangbanAuth.session.user.id }, order: { column: 'created_at', ascending: false }, limit: 20 }).catch(() => []),
       window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 }).catch(() => [])
     ]);
-    const profile = profileRows[0] || null;
+    const profile = escortProfileForDisplay(profileRows[0] || null);
     if (profile) window.KangbanAuth.session.escortProfile = profile;
-    cloudOrderCache = new Map(orders.map(order => [order.id, order]));
-    const pendingBookings = (bookings || []).filter(booking => booking.status === 'applied');
-    const activeOrders = orders.filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service'].includes(order.status));
-    const completedOrders = orders.filter(order => order.status === 'completed');
+    const visibleOrders = orders.filter(order => !isVisibleTestFixture(order));
+    const visibleBookings = (bookings || []).filter(booking => !isVisibleTestFixture(booking));
+    const visiblePosts = (myPosts || []).filter(post => !isVisibleTestFixture(post));
+    const fixturePostIds = new Set((allPosts || []).filter(post => isVisibleTestFixture(post)).map(post => post.id));
+    const visibleSignups = (mySignups || []).filter(signup => !fixturePostIds.has(signup.post_id));
+    cloudOrderCache = new Map(visibleOrders.map(order => [order.id, order]));
+    const pendingBookings = visibleBookings.filter(booking => booking.status === 'applied');
+    const activeOrders = visibleOrders.filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service'].includes(order.status));
+    const completedOrders = visibleOrders.filter(order => order.status === 'completed');
     const paused = profile && profile.available === false;
     const shareLookup = `<section class="section-block"><div class="section-heading"><div><p class="eyebrow">家庭授权</p><h2>输入本次任务分享码</h2></div></div><form class="order-form" id="cloudTaskShareLookup"><label><span class="field-label-block">6 位分享码</span><input class="input-field" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><button class="primary-button" type="submit">验证并查看授权内容</button></form><div id="cloudTaskShareResult"></div></section>`;
     host.innerHTML = `
       <div class="escort-status-card"><div><span class="cloud-pill">云端生效 · 预约申请实时校验</span><strong>${paused ? '暂停接单' : '可预约'}</strong><small>${paused ? '家庭暂时不能预约你的服务时段' : '社区页可被家庭预约你的服务时段'}</small></div><button class="status-btn" data-escort-toggle-availability="${paused ? '1' : '0'}">${paused ? '恢复接单' : '暂停接单'}</button></div>
       ${profile && profile.review_status !== 'approved' ? '<div class="boundary-note"><strong>审核中</strong><p>审核通过前不能发布时段或报名需求。</p></div>' : ''}
-      <div class="escort-stat-grid"><div><strong>${pendingBookings.length + orders.filter(order => order.status === 'pending_escort_confirmation').length}</strong><span>待确认</span></div><div><strong>${activeOrders.filter(order => order.status !== 'pending_escort_confirmation').length}</strong><span>进行中</span></div><div><strong>${completedOrders.length}</strong><span>已完成</span></div></div>
+      <div class="escort-stat-grid"><div><strong>${pendingBookings.length + visibleOrders.filter(order => order.status === 'pending_escort_confirmation').length}</strong><span>待确认</span></div><div><strong>${activeOrders.filter(order => order.status !== 'pending_escort_confirmation').length}</strong><span>进行中</span></div><div><strong>${completedOrders.length}</strong><span>已完成</span></div></div>
       ${pendingBookings.length ? `<section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>新的预约申请</h2></div>${pendingBookings.map(booking => `<div class="invite-card"><div class="family-order-top"><strong>${esc(booking.booker_label || '家庭用户')} 预约了你的时段</strong><span class="supply-status-chip is-pending">待确认</span></div><p class="community-meta">${esc(booking.note || '未附言')} · ${esc(new Date(booking.created_at).toLocaleString('zh-CN'))}</p><div class="order-actions-2"><button class="secondary-button compact" data-community-respond="${esc(booking.id)}" data-accept="0">婉拒</button><button class="primary-button compact" data-community-respond="${esc(booking.id)}" data-accept="1">接受预约</button></div></div>`).join('')}</section>` : ''}
-      <section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>我的陪诊安排</h2></div>${orders.length ? `<div class="demand-post-list">${orders.map(order => renderCloudOrderCard(order, true)).join('')}</div>` : `<div class="empty-link">还没有订单。发布陪诊服务等家庭预约，或去社区报名别人的需求 <b data-nav="community">→ 打开社区</b></div>`}</section>
+      <section class="section-block" style="margin-top:4px"><div class="section-heading"><h2>我的陪诊安排</h2></div>${visibleOrders.length ? `<div class="demand-post-list">${visibleOrders.map(order => renderCloudOrderCard(order, true)).join('')}</div>` : `<div class="empty-link">还没有订单。发布陪诊服务等家庭预约，或去社区报名别人的需求 <b data-nav="community">→ 打开社区</b></div>`}</section>
       <div id="escortMyPostsArea"></div>
       ${shareLookup}
       <div class="boundary-note"><strong>服务边界</strong><p>陪诊员协助就医流程，不提供诊断、治疗或用药建议。患者资料仅经家庭分享码授权后可见。</p></div>`;
-    renderEscortMyPosts(myPosts || [], pendingBookings.length, mySignups || [], Object.fromEntries((allPosts || []).map(post => [post.id, post])));
+    renderEscortMyPosts(visiblePosts, pendingBookings.length, visibleSignups, Object.fromEntries((allPosts || []).filter(post => !isVisibleTestFixture(post)).map(post => [post.id, post])));
   } catch (error) { host.innerHTML = `<div class="empty-hint">工作台加载失败：${esc(error.message || error)} <button class="text-button" data-action="escort-reload">重试</button></div>`; }
 }
 /* ===== 陪诊师「我的发布」抽屉（对称家庭端：发布管理归事务中心）：默认收缩一行，有新预约时高亮；
@@ -1797,7 +1830,7 @@ async function renderCloudFamilyOrders() {
   if (auth?.mode !== 'cloud' || auth.role !== 'family') return;
   const host = document.getElementById('companionLiveOrders');
   try {
-    const orders = await window.KangbanAPI.rpc('list_my_companion_orders');
+    const orders = (await window.KangbanAPI.rpc('list_my_companion_orders')).filter(order => !isVisibleTestFixture(order));
     cloudOrderCache = new Map(orders.map(order => [order.id, order]));
     const active = orders.filter(order => ['pending_escort_confirmation', 'confirmed', 'in_service'].includes(order.status));
     const needReview = orders.filter(order => order.status === 'completed' && !order.reviews?.family);
@@ -2450,19 +2483,25 @@ async function fetchCloudFamilyMatch() {
       window.KangbanAPI.rpc('list_my_availability_bookings').catch(() => []),
       window.KangbanAPI.select('community_posts', { order: { column: 'created_at', ascending: false }, limit: 100 }).catch(() => [])
     ]);
-    const openPosts = posts.filter(post => ['open', 'has_applicants'].includes(post.status));
+    const visiblePosts = posts.filter(post => !isVisibleTestFixture(post));
+    const openPosts = visiblePosts.filter(post => ['open', 'has_applicants'].includes(post.status));
     const counts = await Promise.all(openPosts.map(async post => ({ post, signups: await window.KangbanAPI.select('post_signups', { filters: { post_id: post.id, status: 'applied' } }).catch(() => []) })));
     let profileById = {};
     const escortIds = [...new Set(counts.flatMap(({ signups }) => signups.map(signup => signup.escort_id).filter(Boolean)))];
     if (escortIds.length) {
       const profiles = await window.KangbanAPI.select('escort_profiles').catch(() => []);
-      profileById = Object.fromEntries(profiles.map(profile => [profile.user_id, profile]));
+      profileById = Object.fromEntries(profiles.map(profile => [profile.user_id, escortProfileForDisplay(profile)]));
     }
     for (const { post, signups } of counts) {
       post._applicants = signups.map(signup => { const p = profileById[signup.escort_id] || {}; return { ...signup, display_name: p.display_name || '待核验陪诊师', experience: p.experience || '', service_area: p.service_area || '', bio: p.bio || '' }; });
     }
     const items = counts.filter(({ signups }) => signups.length).map(({ post }) => ({ level: 'mid', title: `${post.service_type || '陪诊需求'} · ${post._applicants.length} 位陪诊师报名`, sub: `${post.hospital_name || ''}${post.service_date ? ` · ${post.service_date}` : ''}`, action: '<button class="text-button" data-nav="companion" data-open-my-posts>去处理 →</button>' }));
-    return { items, posts, bookings: bookings || [], postById: Object.fromEntries((allPosts || []).map(post => [post.id, post])) };
+    return {
+      items,
+      posts: visiblePosts,
+      bookings: (bookings || []).filter(booking => !isVisibleTestFixture(booking)),
+      postById: Object.fromEntries((allPosts || []).filter(post => !isVisibleTestFixture(post)).map(post => [post.id, post]))
+    };
   } catch { return { items: [], posts: [], bookings: [], postById: {} }; }
 }
 /* ===== 家庭端「我的发布」抽屉（撮合中事务归我的陪诊）：默认收缩一行，有新报名时高亮；
@@ -2476,8 +2515,15 @@ function renderFamilyMyPosts(posts = familyMyPostsCache.posts, orders = familyMy
   if (!host) return;
   const auth = window.KangbanAuth;
   if (auth?.role === 'escort' || auth?.role === 'guest') { host.hidden = true; return; }
-  familyMyPostsCache = { posts: posts || [], orders: orders || [], bookings: bookings || [], postById: postById || {} };
   const cloud = auth?.mode === 'cloud';
+  familyMyPostsCache = cloud
+    ? {
+      posts: (posts || []).filter(post => !isVisibleTestFixture(post)),
+      orders: (orders || []).filter(order => !isVisibleTestFixture(order)),
+      bookings: (bookings || []).filter(booking => !isVisibleTestFixture(booking)),
+      postById: Object.fromEntries(Object.entries(postById || {}).filter(([, post]) => !isVisibleTestFixture(post)))
+    }
+    : { posts: posts || [], orders: orders || [], bookings: bookings || [], postById: postById || {} };
   let rows;
   if (cloud) {
     rows = familyMyPostsCache.posts.map(post => ({ post, applicants: post._applicants || [] }));
@@ -3719,12 +3765,16 @@ function showPreVisitDescription(memberId = '') {
   if (memberId) preVisitMemberId = memberId;
   const member = state.familyMembers.find(item => item.id === preVisitMemberId) || state.familyMembers.find(item => item.id === appointmentMemberId) || state.familyMembers[0];
   const entries = preVisitEntries(member.id);
+  const cloudFamily = window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth?.role === 'family';
+  const attachmentNote = cloudFamily
+    ? '可添加多张照片或录音；内容将同步至家庭私有云端，家庭成员可在授权范围内查看。'
+    : '可添加多张照片或录音；演示内容仅保存在当前设备。登录家庭账号后可上传到家庭云端。';
   const history = entries.length ? `<div class="previsit-history">${entries.map(entry => `<article><small>${esc(entry.createdAt)}</small><p>${esc(entry.text || '未添加文字说明')}</p><div class="previsit-files">${(entry.attachments || []).map(file => `<button class="text-button" data-previsit-attachment="${esc(file.id)}" data-previsit-type="${esc(file.type)}">查看附件：${esc(file.name)}</button>`).join('') || '<small>无附件</small>'}</div></article>`).join('')}</div>` : '<p class="privacy-small">还没有诊前描述。可记录这次不舒服从什么时候开始、出现频率、饮食睡眠和已采取的处理。</p>';
   openModal(`${modalHead(`${esc(member.name)} · 就诊前记录`, '诊前自我描述', '把病人的主观感受和近期情况先记下来，方便就诊时向医生说明。可拍照、录音或语音转文字。')}
     ${history}
     <label class="ocr-text-label" for="preVisitText">病情、饮食及其他情况</label><textarea class="ocr-text-area" id="preVisitText" placeholder="例如：从周一开始饭后腹胀，近两天食欲下降；饮食、睡眠、排便或活动有哪些变化？"></textarea>
     <div class="voice-controls"><button class="secondary-button" id="preVisitDictate">语音转文字</button><button class="secondary-button" id="preVisitRecord">录制语音</button><button class="secondary-button" id="preVisitPhoto">添加照片</button><button class="secondary-button" id="preVisitAudioFile">上传录音</button></div>
-    <small id="preVisitStatus" class="privacy-small">可添加多张照片或录音；内容仅保存在本机。</small>
+    <small id="preVisitStatus" class="privacy-small">${attachmentNote}</small>
     <button class="primary-button" id="savePreVisitDescription">保存诊前描述</button>
     <button class="text-button" id="backToAppointment">返回就诊准备清单</button>`);
 }

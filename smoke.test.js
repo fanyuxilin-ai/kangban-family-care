@@ -60,6 +60,57 @@ const test = `
   delete window.KangbanAuth;
   delete window.KangbanAPI;
 
+  /* 1b. 云端登录时新增成员与诊前描述必须明确说明家庭云端保存范围 */
+  const oldGetElementById = document.getElementById;
+  const modalNodes = { modalContent: fakeEl(), modalBackdrop: fakeEl() };
+  document.getElementById = id => modalNodes[id] || fakeEl();
+  window.KangbanAuth = { mode: 'cloud', role: 'family', session: { familyId: 'family-demo' } };
+  showFamilyMemberAdd();
+  ok('云端新增家庭成员不显示本机演示保存提示', modalNodes.modalContent.innerHTML.includes('同步到当前家庭云端') && !modalNodes.modalContent.innerHTML.includes('演示数据保存在当前浏览器'));
+  showPreVisitDescription(state.familyMembers[0]?.id || 'm1');
+  ok('云端诊前描述提示家庭云端保存', modalNodes.modalContent.innerHTML.includes('同步至家庭私有云端') && !modalNodes.modalContent.innerHTML.includes('内容仅保存在本机'));
+  modalHistoryActive = false;
+  document.getElementById = oldGetElementById;
+  delete window.KangbanAuth;
+
+  /* 1c. 社区等待云端响应时不保留上一个角色的帖子 */
+  const communityHost = fakeEl();
+  communityHost.innerHTML = '<article>旧游客帖子</article>';
+  const oldCommunityGetElementById = document.getElementById;
+  document.getElementById = id => id === 'communityFeed' ? communityHost : fakeEl();
+  window.KangbanAuth = { mode: 'cloud', role: 'family', session: { familyId: 'family-demo', user: { id: 'family-user' } } };
+  window.KangbanAPI = {
+    select: async table => table === 'community_posts' ? [
+      { id: 'fixture-e2e', family_id: 'another-family', type: 'demand', status: 'open', service_type: 'E2E演示家庭陪诊需求', hospital_name: '虚构演示医院', service_date: '2026-11-10' },
+      { id: 'real-post', family_id: 'another-family', type: 'demand', status: 'open', service_type: '检查陪同', hospital_name: '市第一人民医院', service_date: '2026-11-10', summary: '陪同复诊' }
+    ] : [],
+    rpc: async () => []
+  };
+  const communityLoad = renderCommunity();
+  ok('云端社区加载期间清除旧角色帖子并显示加载态', communityHost.innerHTML.includes('community-loading') && !communityHost.innerHTML.includes('旧游客帖子'));
+  await communityLoad;
+  ok('社区仅隐藏明确标记的测试帖，保留正常内容', !communityHost.innerHTML.includes('E2E演示家庭') && communityHost.innerHTML.includes('市第一人民医院'));
+  document.getElementById = oldCommunityGetElementById;
+  delete window.KangbanAuth;
+  delete window.KangbanAPI;
+
+  /* 1d. 已取消的订单只能显示终止态，不能出现待履约指引 */
+  const cancelledCard = renderCloudOrderCard({ id: 'cancelled-test', status: 'cancelled', service_type: '全程陪诊', hospital_name: '虚构医院', service_date: '2026-11-10' }, true);
+  ok('已取消订单不再显示到场、服务中或完成服务提示', cancelledCard.includes('已取消') && !/我已到场|确认到场后开始服务|完成服务 · 互评/.test(cancelledCard));
+  ok('只将明确带 E2E / 虚构演示标记的数据识别为测试数据', isVisibleTestFixture({ service_type: 'E2E演示家庭陪诊需求' }) && isVisibleTestFixture({ hospital_name: '虚构演示医院' }) && !isVisibleTestFixture({ hospital_name: '市第一人民医院', summary: '检查陪同' }));
+
+  /* 1e. 云端陪诊师演示资料缺字段时展示清晰的虚构示例资料 */
+  const profileHost = fakeEl();
+  const oldProfileGetElementById = document.getElementById;
+  document.getElementById = id => id === 'cloudEscortProfileView' ? profileHost : fakeEl();
+  window.KangbanAuth = { mode: 'cloud', role: 'escort', session: { user: { id: 'demo-escort', email: 'kangban-escort-demo@example.com' } } };
+  window.KangbanAPI = { select: async () => [{ user_id: 'demo-escort', display_name: '康伴演示陪诊师', review_status: 'approved', experience: '', service_area: '', bio: '' }] };
+  await renderCloudEscortProfile();
+  ok('陪诊师演示账号资料缺失时预填虚构经验、区域和介绍', profileHost.innerHTML.includes('5 年门诊陪诊服务经验') && profileHost.innerHTML.includes('深圳 · 南山区、福田区') && profileHost.innerHTML.includes('不提供诊断、治疗或用药建议'));
+  document.getElementById = oldProfileGetElementById;
+  delete window.KangbanAuth;
+  delete window.KangbanAPI;
+
   /* 2. 标准化履约清单（FR-09-2 / 4.1 模板） */
   const order = { id: 'order-t1', service: '全程陪诊', status: 'accepted', patient: '陈兰英', patientMemberId: 'm1', hospital: '市第一人民医院', date: '2026-11-10', need: '复诊陪同', reviews: { family: null, escort: null } };
   state.companionOrders.unshift(order);
