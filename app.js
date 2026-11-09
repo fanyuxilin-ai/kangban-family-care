@@ -4877,11 +4877,18 @@ document.addEventListener('submit', async event => {
   }
   if (event.target.id === 'bookAvailabilityForm') {
     event.preventDefault();
-    const data = new FormData(event.target);
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton?.disabled) return;
+    if (submitButton) { submitButton.disabled = true; submitButton.textContent = '正在提交…'; }
+    const data = new FormData(form);
     try {
-      await window.KangbanAPI.rpc('book_availability', { p_post_id: event.target.dataset.postId, p_note: String(data.get('note') || '').trim() });
+      await window.KangbanAPI.rpc('book_availability', { p_post_id: form.dataset.postId, p_note: String(data.get('note') || '').trim() });
       closeModal(); toast('预约申请已提交，等待陪诊师确认'); await refreshCloudAfterAction();
-    } catch (error) { toast(`预约失败：${error.message || error}`); }
+    } catch (error) {
+      if (submitButton) { submitButton.disabled = false; submitButton.textContent = '提交预约申请'; }
+      toast(`预约失败：${error.message || error}`);
+    }
   }
   if (event.target.id === 'demandApplyForm') {
     event.preventDefault();
