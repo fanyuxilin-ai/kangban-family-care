@@ -1539,7 +1539,7 @@ function escortTrustLine(post) {
   const approved = profile.review_status === 'approved';
   return `<div class="escort-line"><span class="escort-ava">${esc(name.slice(0, 1))}</span><span><b>${esc(name)}</b>${profile.experience ? ` · ${esc(profile.experience)}` : ''}${approved ? ' <span class="tag-verified">✓ 已审核</span>' : ''}</span></div>`;
 }
-function renderCommunityPost(post, { guest = false, escort = false } = {}) {
+function renderCommunityPost(post, { guest = false, escort = false, signupLookupFailed = false } = {}) {
   const isDemand = post.type === 'demand' || !post.type;
   const privateActions = !guest && post.id && !String(post.id).startsWith('guest-');
   const kindChip = `<span class="community-kind-chip ${isDemand ? 'kind-demand' : 'kind-supply'}">${isDemand ? '需求' : '服务'}</span>`;
@@ -1575,6 +1575,16 @@ function renderCommunityPost(post, { guest = false, escort = false } = {}) {
   /* 需求卡：医院 · 日期 · 区域 + 摘要 + 预算/报名数信息行 */
   const budget = post.budget || (post.budget_min ? `¥${post.budget_min}${post.budget_max ? `–${post.budget_max}` : ''}` : '');
   const cancelDemand = privateActions && !escort && post._mine && ['open', 'has_applicants'].includes(post.status) ? `<div class="order-actions"><button class="text-button" data-community-cancel-post="${esc(post.id)}">取消需求</button></div>` : '';
+  const mySignup = post._mySignup;
+  let signupAction = '';
+  if (privateActions && escort && ['open','has_applicants'].includes(post.status)) {
+    if (signupLookupFailed) signupAction = '<small class="privacy-small">暂时无法确认报名状态，请刷新后再试，避免重复提交。</small>';
+    else if (mySignup?.status === 'applied') signupAction = '<small class="privacy-small">你已报名，等待家庭查看你的介绍与简历。</small>';
+    else if (mySignup?.status === 'selected') signupAction = '<small class="privacy-small">家庭已选中你，请到「我的陪诊」确认安排。</small>';
+    else if (mySignup?.status === 'declined') signupAction = '<small class="privacy-small">家庭已选择其他陪诊师。</small>';
+    else if (mySignup?.status === 'withdrawn') signupAction = `<button class="primary-button" data-community-apply="${esc(post.id)}">重新报名</button>`;
+    else signupAction = `<button class="primary-button" data-community-apply="${esc(post.id)}">报名陪诊需求</button>`;
+  }
   return `<article class="demand-post-card community-post" data-community-type="demand">
     <div class="family-order-top"><strong>${esc(post.service_type || post.service || '陪诊需求')} · ${esc(guest ? '家庭用户' : (post.author_label || post.requester || '家庭用户'))}</strong>${demandPostStatusChip(post.status)}</div>
     <p class="community-meta">${kindChip}${esc(post.hospital_name || post.hospital || '医院待补充')}${post.region && post.region !== '本地' ? ` · ${esc(post.region)}` : ''} · ${esc(post.service_date || post.date || '时间待沟通')}</p>
@@ -1582,7 +1592,7 @@ function renderCommunityPost(post, { guest = false, escort = false } = {}) {
     ${budget || applicantCount ? `<p class="community-facts">${budget ? `<span>预算 <b>${esc(budget)}</b></span>` : ''}${applicantCount ? `<span>${applicantCount} 位陪诊师已报名</span>` : ''}</p>` : ''}
     ${postTimeLine(post)}
     ${guest ? '<small class="privacy-small">游客仅浏览脱敏虚构内容；登录陪诊师账号后，此处下方会出现「报名」按钮。</small>' : ''}
-    ${privateActions && escort && ['open','has_applicants'].includes(post.status) ? `<button class="primary-button" data-community-apply="${esc(post.id)}">报名陪诊需求</button>` : ''}
+    ${signupAction}
     ${privateActions && !escort && post.status === 'has_applicants' ? `<div class="community-applicants" data-applicants-for="${esc(post.id)}"><small>加载报名信息…</small></div>` : ''}
     ${privateActions && !escort && ['awaiting_confirmation','confirmed','in_service'].includes(post.status) ? `<small class="privacy-small">家庭确认陪诊员后，患者资料只对家庭成员和已选陪诊员开放。</small>` : ''}
     ${cancelDemand}
@@ -1603,6 +1613,7 @@ async function renderCommunity() {
   if (status) status.innerHTML = guest ? '游客模式 · 仅展示脱敏虚构社区内容 <button class="text-button" data-action="logout">切换登录 →</button>' : auth?.mode === 'cloud' ? '正在加载云端社区…' : '本机演示社区 · 数据保存在当前浏览器';
   /* 社区大厅人人一致：家庭/陪诊师/游客看到同一份帖子流，区别只在卡上按钮；家庭发布与管理入口在「陪诊 · 我的发布」 */
   let posts = [];
+  let signupLookupFailed = false;
   try {
     if (guest) posts = GUEST_COMMUNITY_FEED;
     else if (auth?.mode === 'cloud') {
@@ -1615,10 +1626,17 @@ async function renderCommunity() {
       const profileById = Object.fromEntries(profiles.map(profile => [profile.user_id, escortProfileForDisplay(profile)]));
       const myUserId = auth.session?.user?.id;
       const myFamilyId = auth.session?.familyId;
+      let mySignups = [];
+      if (escort && myUserId) {
+        try { mySignups = await window.KangbanAPI.select('post_signups', { filters: { escort_id: myUserId } }); }
+        catch (error) { signupLookupFailed = true; console.warn('无法读取当前陪诊师的报名状态', error); }
+      }
+      const mySignupByPost = new Map(mySignups.map(signup => [signup.post_id, signup]));
       if (escort) auth.session.escortProfile = profileById[myUserId] || null;
       for (const post of posts) {
         post._profile = profileById[post.author_id] || null;
         post._mine = escort ? post.author_id === myUserId : post.family_id === myFamilyId;
+        if (escort) post._mySignup = mySignupByPost.get(post.id) || null;
       }
       if (escort) {
         const incoming = (bookingContext || []).filter(booking => booking.status === 'applied');
@@ -1650,7 +1668,7 @@ async function renderCommunity() {
     demand: '还没有陪诊需求帖。家庭登录后点「发布需求」，把医院、日期和需要帮忙的事写清楚。',
     availability: '还没有陪诊师发布陪诊服务。通过审核的陪诊师登录后，点「发布陪诊服务」即可发布。'
   };
-  host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => renderCommunityPost(post, { guest, escort })).join('')}</div>` : `<div class="empty-hint">${emptyHints[communityFilter] || emptyHints.all}</div>`;
+  host.innerHTML = posts.length ? `<div class="demand-post-list">${posts.map(post => renderCommunityPost(post, { guest, escort, signupLookupFailed })).join('')}</div>` : `<div class="empty-hint">${emptyHints[communityFilter] || emptyHints.all}</div>`;
   if (auth?.mode === 'cloud' && !escort) {
     for (const post of posts.filter(item => item._applicants?.length)) {
       const applicantBox = host.querySelector(`[data-applicants-for="${CSS.escape(post.id)}"]`);
@@ -4867,7 +4885,11 @@ document.addEventListener('submit', async event => {
   }
   if (event.target.id === 'demandApplyForm') {
     event.preventDefault();
-    const data = new FormData(event.target);
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton?.disabled) return;
+    if (submitButton) { submitButton.disabled = true; submitButton.textContent = '正在提交…'; }
+    const data = new FormData(form);
     const note = String(data.get('note') || '').trim();
     try {
       let resumePath = null;
@@ -4877,9 +4899,12 @@ document.addEventListener('submit', async event => {
         await window.KangbanAPI.uploadPrivateFile(demandApplyFile, resumePath);
       }
       demandApplyFile = null;
-      await window.KangbanAPI.rpc('apply_to_demand', { p_post_id: event.target.dataset.postId, p_note: note, p_resume_path: resumePath });
+      await window.KangbanAPI.rpc('apply_to_demand', { p_post_id: form.dataset.postId, p_note: note, p_resume_path: resumePath });
       closeModal(); toast('报名已提交，家庭会看到你的介绍与简历'); await refreshCloudAfterAction();
-    } catch (error) { toast(`报名失败：${error.message || error}`); }
+    } catch (error) {
+      if (submitButton) { submitButton.disabled = false; submitButton.textContent = '提交报名'; }
+      toast(`报名失败：${error.message || error}`);
+    }
   }
   if (event.target.id === 'cloudEscortProfileForm') {
     event.preventDefault(); const data=new FormData(event.target); const auth=window.KangbanAuth.session;
