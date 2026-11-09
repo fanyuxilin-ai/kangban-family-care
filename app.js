@@ -275,24 +275,41 @@ function attachmentDb() {
   });
 }
 async function putAttachment(id, file) {
-  if (!file) return;
+  if (!file) return { cloudSaved: false, localSaved: false };
   const auth = window.KangbanAuth;
+  let cloudSaved = false;
+  let localSaved = false;
   if (auth?.mode === 'cloud') {
     const familyId = auth.session?.familyId;
     if (auth.role !== 'family' || !familyId) throw new Error('只有已登录的家庭账号可以上传家庭附件。');
     const path = `${familyId}/attachments/${encodeURIComponent(id)}-${encodeURIComponent(file.name || 'attachment')}`;
     await window.KangbanAPI.uploadPrivateFile(file, path);
     state.cloudAttachmentPaths = { ...(state.cloudAttachmentPaths || {}), [id]: path };
-    saveState();
+    cloudSaved = true;
   }
   if ('indexedDB' in window) {
-    const db = await attachmentDb();
-    await new Promise((resolve, reject) => {
-      const request = db.transaction('files', 'readwrite').objectStore('files').put({ id, name: file.name, type: file.type, blob: file, savedAt: new Date().toISOString() });
-      request.onsuccess = resolve; request.onerror = () => reject(request.error);
-    });
-    db.close();
-  }
+    let db;
+    try {
+      db = await attachmentDb();
+      await new Promise((resolve, reject) => {
+        const request = db.transaction('files', 'readwrite').objectStore('files').put({ id, name: file.name, type: file.type, blob: file, savedAt: new Date().toISOString() });
+        request.onsuccess = resolve; request.onerror = () => reject(request.error);
+      });
+      localSaved = true;
+    } catch (error) {
+      // A cloud copy is still usable when the browser blocks local IndexedDB storage.
+      if (!cloudSaved) throw error;
+    } finally { db?.close(); }
+  } else if (!cloudSaved) throw new Error('当前浏览器不支持本机附件存储。');
+  if (auth?.mode === 'cloud') saveState();
+  return { cloudSaved, localSaved };
+}
+async function persistWorkspaceNow() {
+  clearTimeout(workspaceSaveTimer);
+  const auth = window.KangbanAuth;
+  if (auth?.mode !== 'cloud' || !auth.session?.familyId) return { cloudSaved: false };
+  await window.KangbanAPI.saveFamilyWorkspace(auth.session.familyId, state);
+  return { cloudSaved: true };
 }
 async function getAttachment(id) {
   const auth = window.KangbanAuth;
@@ -4306,6 +4323,9 @@ document.addEventListener('click', async event => {
     const file = selectedFile; showExtraction(file);
   }
   if (event.target.closest('#saveRecord')) {
+    const saveButton = event.target.closest('#saveRecord');
+    if (saveButton.disabled) return;
+    saveButton.disabled = true;
     const date = document.getElementById('extractDate')?.value || new Date().toISOString().slice(0,10);
     const title = document.getElementById('extractType')?.value.trim() || '就医资料';
     const hospital = document.getElementById('extractHospital')?.value.trim() || '家属补充';
@@ -4315,11 +4335,32 @@ document.addEventListener('click', async event => {
     const record = { id: recordId, memberId, type: inferType[0], title, hospital, date, state: '已核对', icon: inferType[1], summary: autoSummary(inferType[0], title), ocrText: document.getElementById('extractText')?.value || '' };
     state.records.unshift(record);
     state.voiceNote = document.getElementById('extractNote')?.value || ''; saveState(); renderRecords(); closeModal();
-    if (selectedFile) putAttachment(recordId, selectedFile).then(() => toast('资料和原始文件已保存在本机')).catch(() => toast('资料已保存，原始文件未能存入本机'));
-    else toast('资料已加入家庭档案');
     /* 报销联动：入库后自动检索该成员保单，符合条件则弹报销提醒 */
     showReimbursementMatches(record);
+    const attachment = selectedFile;
     selectedFile = null;
+    let attachmentResult = null;
+    let attachmentError = null;
+    if (attachment) {
+      try { attachmentResult = await putAttachment(recordId, attachment); }
+      catch (error) { attachmentError = error; }
+    }
+    let workspaceError = null;
+    try { await persistWorkspaceNow(); }
+    catch (error) { workspaceError = error; }
+    const cloudMode = window.KangbanAuth?.mode === 'cloud';
+    if (workspaceError) {
+      toast(`记录暂存在当前设备，云端保存失败：${workspaceError.message || workspaceError}`);
+    } else if (cloudMode) {
+      if (attachmentResult?.cloudSaved) toast('就诊记录和原始图片已保存到云端');
+      else if (attachmentError) toast(`就诊记录已保存到云端，原始图片上传失败：${attachmentError.message || attachmentError}`);
+      else if (attachmentResult?.localSaved) toast('就诊记录已保存到云端，原始图片保存在当前设备');
+      else if (attachment) toast('就诊记录已保存到云端，但原始图片未能保存');
+      else toast('就诊记录已保存到云端');
+    } else if (attachmentError) {
+      toast(`资料已保存在本机，原始图片保存失败：${attachmentError.message || attachmentError}`);
+    } else if (attachmentResult?.localSaved) toast('资料和原始图片已保存在本机');
+    else toast('资料已加入本机家庭档案');
   }
   if (event.target.closest('#backToUpload')) showUpload();
   if (event.target.closest('#openShareFromCard')) showShare(event.target.closest('[data-share-member]')?.dataset.shareMember || appointmentMemberId);
@@ -4753,6 +4794,8 @@ document.addEventListener('submit', async event => {
         await window.KangbanAPI.rpc('update_availability', { p_post_id: editId, p_region: payload.region, p_service_type: payload.serviceType, p_service_date: payload.date, p_start_time: payload.start, p_end_time: payload.end, p_summary: payload.summary });
         closeModal(); toast('时段已更新');
       } else {
+        const [escortProfile] = await window.KangbanAPI.select('escort_profiles', { filters: { user_id: auth.user.id }, limit: 1 });
+        if (escortProfile?.review_status !== 'approved' || auth.status !== 'active') throw new Error('陪诊师账号尚未审核通过，暂不能发布可约时段。');
         await window.KangbanAPI.insert('community_posts', {
           type:'availability', author_id:auth.user.id, family_id:null, author_label:auth.displayName||'陪诊师',
           region:payload.region, hospital_name:'', service_date:payload.date,
@@ -4791,7 +4834,7 @@ document.addEventListener('submit', async event => {
   if (event.target.id === 'cloudEscortProfileForm') {
     event.preventDefault(); const data=new FormData(event.target); const auth=window.KangbanAuth.session;
     try {
-      await window.KangbanAPI.updateWhere('escort_profiles', { user_id: auth.user.id }, {display_name:String(data.get('display_name')||'').trim(),experience:String(data.get('experience')||'').trim(),service_area:String(data.get('service_area')||'').trim(),bio:String(data.get('bio')||'').trim(),updated_at:new Date().toISOString()});
+      await window.KangbanAPI.updateWhere('escort_profiles', { user_id: auth.user.id }, {display_name:String(data.get('display_name')||'').trim(),experience:String(data.get('experience')||'').trim(),service_area:String(data.get('service_area')||'').trim(),bio:String(data.get('bio')||'').trim()});
       toast('陪诊师介绍已保存'); await refreshCloudAfterAction();
     } catch(error){toast(`保存失败：${error.message||error}`);}
   }
