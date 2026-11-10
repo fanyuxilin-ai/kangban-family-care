@@ -2372,6 +2372,26 @@ async function renderCompanionViews() {
   if (state.currentRole !== 'escort') renderFamilyMyPosts([], state.companionOrders);
 }
 
+/* 旧页面兜底：Service Worker 可能让老访客拿到没有 #guestBar 的旧 HTML，
+   而脚本已经是最新的（app.js?v=N 会取到最新内容）。这时就地补一条同样能用的出口，
+   否则游客被锁在没有底部导航的社区大厅里，页面上找不回登录页。
+   样式走行内兜底，不依赖 styles.css 是否也是新版；注意不要写 display，否则 [hidden] 会失效。 */
+function ensureGuestBar() {
+  const existing = document.getElementById('guestBar');
+  if (existing) return existing;
+  const host = document.getElementById('view-community');
+  if (!host) return null;
+  const bar = document.createElement('div');
+  bar.id = 'guestBar';
+  bar.className = 'guest-bar';
+  bar.hidden = true;
+  bar.setAttribute('style', 'align-items:center;gap:12px;margin:0 0 16px;padding:12px 14px;border-radius:14px;background:#eef2e6;border:1px solid #dde5d0');
+  bar.innerHTML = '<div style="display:flex;flex-direction:column;gap:3px;min-width:0"><strong style="font-size:13px;color:#3f5a3f;font-weight:700">游客浏览中</strong><span style="font-size:11px;color:#7d857a;line-height:1.5">仅展示脱敏虚构内容，不含真实患者信息</span></div>'
+    + '<button type="button" class="guest-bar-btn" data-action="logout" style="flex:none;margin-left:auto;border:1px solid #3f5a3f;background:#3f5a3f;color:#fff;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer">登录 / 注册</button>';
+  host.insertBefore(bar, host.firstChild);
+  return bar;
+}
+
 function renderRole() {
   if (window.KangbanAuth?.mode === 'cloud') state.currentRole = window.KangbanAuth.role;
   const isEscort = state.currentRole === 'escort';
@@ -2383,8 +2403,9 @@ function renderRole() {
   document.getElementById('roleLabel').textContent = isEscort ? `陪诊员端 · ${state.companionProfile.name}` : `家庭端 · ${member?.name || '家人'}`;
   document.body.classList?.toggle('cloud-escort-mode',cloudEscort);
   /* 游客：没有任何底部导航（三个 tabbar 全隐藏），社区大厅就是唯一落点。
-     顶部给一条明确的「游客浏览中 / 登录注册」横条，否则只能靠筛选器下面那行小字退出去。 */
-  const guestBar = document.getElementById('guestBar');
+     顶部给一条明确的「游客浏览中 / 登录注册」横条，否则只能靠筛选器下面那行小字退出去。
+     ensureGuestBar() 负责在最坏情况下（老访客拿到的是旧 HTML）就地补出这条横条。 */
+  const guestBar = ensureGuestBar();
   if (guestBar) guestBar.hidden = !guest;
   const communitySeg = document.getElementById('communitySeg');
   if (communitySeg) communitySeg.hidden = guest;
@@ -5194,7 +5215,20 @@ setInterval(checkMedicationReminders, 60000);
 setTimeout(checkMedicationReminders, 1500);
 setInterval(checkCustomReminders, 60000);
 setTimeout(checkCustomReminders, 1800);
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+  /* 老访客的页面最初由旧 Service Worker 托管，可能一直停在旧 HTML 上。
+     新版本接管（controllerchange）时自动刷新一次，避免「新脚本 + 旧结构」的混搭页面。
+     仅在已经存在 controller 时监听：首次访问不会有 controller，不会触发多余刷新。 */
+  if (navigator.serviceWorker.controller) {
+    let swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (swReloading) return;
+      swReloading = true;
+      location.reload();
+    });
+  }
+}
 
 /* Netlify 免费版角标避让
    线上访问时 Netlify 会注入 iframe#nl-badge-frame（固定右下角 202×64，z-index 极高），
