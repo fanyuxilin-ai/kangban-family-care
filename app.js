@@ -2000,7 +2000,12 @@ async function showCloudEvidencePreview(path, label) {
 /* 陪诊师报名页：自我介绍（预填资料页简介）+ 简历/资质上传，家庭据此判断是否选择 */
 let demandApplyFile = null;
 async function showDemandApplyForm(postId) {
-  const post = (communityPostCache || []).find(item => item.id === postId);
+  let post = (communityPostCache || []).find(item => item.id === postId);
+  if (!post) {
+    /* 工作台直接报名时社区缓存可能未填充，回云端补读一次 */
+    try { post = await window.KangbanAPI.select('community_posts', { filters: { id: postId }, limit: 1 }).then(list => list[0] || null); }
+    catch (error) { console.warn('补读需求帖失败', error); }
+  }
   if (!post) { toast('需求不存在或已刷新，请重试'); return; }
   let bio = '', experience = '';
   try { const [profile] = await window.KangbanAPI.select('escort_profiles', { filters: { user_id: window.KangbanAuth.session.user.id }, limit: 1 }); bio = profile?.bio || ''; experience = profile?.experience || ''; } catch { /* 预填失败不阻断报名 */ }
@@ -2017,10 +2022,31 @@ async function showDemandApplyForm(postId) {
     document.getElementById('demandApplyFileLabel').textContent = demandApplyFile ? `已选择：${demandApplyFile.name}` : '未选择文件';
   });
 }
+/* 报名记录补全展示字段（缓存里已带，兜底直查时需要自己拼） */
+function signupForDisplay(signup, profile) {
+  const shown = escortProfileForDisplay(profile) || {};
+  return {
+    ...signup,
+    display_name: shown.display_name || signup.display_name || '待核验陪诊师',
+    experience: shown.experience || signup.experience || '',
+    service_area: shown.service_area || signup.service_area || '',
+    bio: shown.bio || signup.bio || ''
+  };
+}
 /* 家庭端审阅报名者：完整介绍 + 资质 + 简历预览，确认后才锁定 */
-function showSignupConfirmModal(signupId) {
-  const post = (communityPostCache || []).find(item => item._applicants?.some(signup => signup.id === signupId));
-  const signup = post?._applicants?.find(item => item.id === signupId);
+async function showSignupConfirmModal(signupId) {
+  let signup = (communityPostCache || []).find(item => item._applicants?.some(applicant => applicant.id === signupId))?._applicants?.find(item => item.id === signupId);
+  if (!signup) {
+    /* 抽屉可以从首页直接进入：没逛过社区大厅时 communityPostCache 是空的，
+       这里回云端补读一次，避免「报名信息已刷新」空壳弹窗 */
+    try {
+      const [row] = await window.KangbanAPI.select('post_signups', { filters: { id: signupId }, limit: 1 });
+      if (row) {
+        const profile = await window.KangbanAPI.select('escort_profiles', { filters: { user_id: row.escort_id }, limit: 1 }).then(list => list[0] || null).catch(() => null);
+        signup = signupForDisplay(row, profile);
+      }
+    } catch (error) { console.warn('补读报名信息失败', error); }
+  }
   if (!signup) { toast('报名信息已刷新，请重新打开'); return; }
   openModal(`${modalHead('审阅报名者', signup.display_name, `${esc(signup.experience || '经验待补充')}${signup.service_area ? ` · ${esc(signup.service_area)}` : ''}`)}
     <div class="signup-review">
@@ -2094,7 +2120,7 @@ function renderEscortHall() {
       </article>`).join('')}</div>` : ''}`;
 }
 function acceptDemandPost(postId) {
-  if (window.KangbanAuth?.mode === 'cloud') { showDemandApplyForm(postId); return; }
+  if (window.KangbanAuth?.mode === 'cloud') { showDemandApplyForm(postId).catch(error => toast(error.message || '打开报名表单失败')); return; }
   const post = (state.demandPosts || []).find(item => item.id === postId);
   if (!post || post.status !== '招募中') { toast('这条需求已被处理'); return; }
   if (!state.companionProfile.available) { toast('你已暂停接单，请先在工作台恢复接单'); return; }
@@ -4154,7 +4180,7 @@ document.addEventListener('click', async event => {
     return;
   }
   const communityConfirm = event.target.closest('[data-community-confirm]');
-  if (communityConfirm) { showSignupConfirmModal(communityConfirm.dataset.communityConfirm); return; }
+  if (communityConfirm) { showSignupConfirmModal(communityConfirm.dataset.communityConfirm).catch(error => toast(error.message || '打开报名信息失败')); return; }
   const signupResume = event.target.closest('[data-signup-resume]');
   if (signupResume) { await showCloudEvidencePreview(signupResume.dataset.signupResume, '报名简历 / 资质材料'); return; }
   const cloudOrderConfirm = event.target.closest('[data-cloud-order-confirm]');
