@@ -12,7 +12,7 @@
 
 康伴是一个手机优先的家庭就医协同原型，包含 Supabase 云端登录、社区订单及私有附件演示。没有接入真实医院、支付或医疗服务；内置病例与公开演示订单均为虚构样例。
 
-**公开体验：**[打开当前 main 版本](https://fanyuxilin-ai.github.io/kangban-family-care/)。代码合并到 `main` 后，GitHub Actions 会自动更新该页面；无需选择旧功能分支预览。
+**公开体验：**[打开线上最新版本](https://kangban.netlify.app)。代码合并到 `main` 后，镜像仓库会自动同步并触发 Netlify 部署（每日两次）；演示前如需立即生效，可在 Netlify 站点页手动 Trigger deploy。
 
 ## 当前功能
 
