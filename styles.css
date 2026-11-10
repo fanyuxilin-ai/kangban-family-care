@@ -637,3 +637,31 @@ body:not(.authenticated) .app-shell{display:none}
 .me-row .arr{margin-left:8px;color:#c9cec4;font-size:13px}
 .me-ver{text-align:center;font-size:9.5px;color:#b3bab0;margin:26px 0 0}
 .account-security{display:grid;gap:8px;margin-top:4px}
+
+/* ===== Netlify 免费版角标避让 =====
+   线上由 Netlify 注入 iframe#nl-badge-frame（固定右下角 202×64，z-index 2147483645），
+   会压住底部 Tab 栏与弹窗主操作按钮。app.js 检测到该 iframe 后给 <html> 加 .nl-badge-on。
+   只在窄屏生效：桌面宽屏时应用列（480px 居中）与右下角角标不重叠。 */
+@media (max-width:720px){
+  .nl-badge-on .tabbar{
+    height:calc(132px + env(safe-area-inset-bottom));
+    align-items:flex-start;
+    padding-bottom:calc(73px + env(safe-area-inset-bottom));
+  }
+  .nl-badge-on .app-shell{
+    padding-bottom:calc(156px + env(safe-area-inset-bottom));
+  }
+  .nl-badge-on .modal{
+    padding-bottom:calc(102px + env(safe-area-inset-bottom));
+  }
+  .nl-badge-on .toast{
+    bottom:calc(148px + env(safe-area-inset-bottom));
+  }
+  .nl-badge-on .auth-gate{
+    padding-bottom:calc(96px + env(safe-area-inset-bottom));
+  }
+  .nl-badge-on.guest-mode .app-shell,
+  .nl-badge-on .guest-mode .app-shell{
+    padding-bottom:calc(96px + env(safe-area-inset-bottom));
+  }
+}
