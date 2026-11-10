@@ -12,6 +12,11 @@
   function readLocal() {
     try { return JSON.parse(root.localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
   }
+  /* 游客身份只在本标签页有效：用 sessionStorage 存，关掉页面/新开窗口就回登录页。
+     否则点过一次「游客体验」会永久停在社区大厅（那里没有底部导航，用户会以为退不出去）。 */
+  function readGuest() {
+    try { return JSON.parse(root.sessionStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; }
+  }
   function emit() { root.dispatchEvent(new CustomEvent('kangban:auth-change', { detail: { session, mode } })); }
   async function loadProfile(user, fallbackRole) {
     const profiles = await root.KangbanAPI.select('profiles', { filters: { id: user.id }, limit: 1 });
@@ -58,7 +63,12 @@
       }
       const saved = readLocal();
       if (saved?.mode === 'local-demo' && ['family', 'escort'].includes(saved.role)) { session = saved; mode = 'local-demo'; }
-      else if (saved?.mode === 'guest') { session = saved; mode = 'guest'; }
+      else {
+        const guest = readGuest();
+        if (guest?.mode === 'guest') { session = guest; mode = 'guest'; }
+        /* 旧版本把游客身份写进了 localStorage：清掉，避免继续被永久锁在社区大厅 */
+        if (saved?.mode === 'guest') { try { root.localStorage.removeItem(SESSION_KEY); } catch { /* 忽略 */ } }
+      }
       emit(); return session;
     },
     async signIn(email, password) {
@@ -118,7 +128,8 @@
     },
     enterGuest() {
       session = { mode: 'guest', role: 'guest', status: 'active', label: '游客体验' }; mode = 'guest';
-      root.localStorage.setItem(SESSION_KEY, JSON.stringify(session)); emit(); return session;
+      try { root.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); root.localStorage.removeItem(SESSION_KEY); } catch { /* 忽略 */ }
+      emit(); return session;
     },
     enterLocalDemo(role) {
       if (!['family', 'escort'].includes(role)) throw new Error('未知演示角色。');
@@ -127,7 +138,9 @@
     },
     async signOut() {
       if (mode === 'cloud') { const { error } = await root.KangbanAPI.client.auth.signOut(); if (error) throw error; }
-      session = null; mode = 'guest'; root.localStorage.removeItem(SESSION_KEY); emit();
+      session = null; mode = 'guest';
+      try { root.localStorage.removeItem(SESSION_KEY); root.sessionStorage.removeItem(SESSION_KEY); } catch { /* 忽略 */ }
+      emit();
     }
   };
   root.KangbanAuth = api;

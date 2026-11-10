@@ -591,6 +591,15 @@ body:not(.authenticated) .app-shell{display:none}
 .skip-reasons{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
 .skip-reason-btn{border:1.5px solid #e9eae2;background:#fbfaf6;border-radius:20px;padding:9px 15px;font-size:11.5px;font-weight:700;color:#5a655a;cursor:pointer}
 .skip-reason-btn:active,.skip-reason-btn:hover{border-color:#c26a5a;background:#fdf0ee;color:#c2483a}
+/* 游客横条：游客态没有任何底部导航，这里是唯一的「回登录页」入口，必须显眼 */
+.guest-bar{display:flex;align-items:center;gap:12px;margin:0 0 16px;padding:12px 14px;border-radius:14px;background:#eef2e6;border:1px solid #dde5d0;box-shadow:0 2px 10px rgba(63,90,63,.06)}
+.guest-bar[hidden]{display:none}
+.guest-bar-text{display:flex;flex-direction:column;gap:3px;min-width:0}
+.guest-bar-text strong{font-size:13px;color:#3f5a3f;font-weight:700}
+.guest-bar-text span{font-size:11px;color:#7d857a;line-height:1.5}
+.guest-bar-btn{flex:none;margin-left:auto;border:1px solid #3f5a3f;background:#3f5a3f;color:#fff;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.guest-bar-btn:active{transform:scale(.97)}
+@media (max-width:420px){.guest-bar-text span{display:none}}
 /* 陪诊 Tab 子页签：我的陪诊 / 社区大厅（仅家庭端显示） */
 .companion-seg{display:none}
 .family-mode .companion-seg{display:flex;background:#e7e8dd;border-radius:22px;padding:3px;gap:2px;margin-bottom:14px}

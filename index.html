@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=32" />
+  <link rel="stylesheet" href="styles.css?v=33" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -140,6 +140,10 @@
       </section>
 
       <section class="view" id="view-community">
+        <div class="guest-bar" id="guestBar" hidden>
+          <div class="guest-bar-text"><strong>游客浏览中</strong><span>仅展示脱敏虚构内容，不含真实患者信息</span></div>
+          <button type="button" class="guest-bar-btn" data-action="logout">登录 / 注册</button>
+        </div>
         <div class="companion-seg" id="communitySeg">
           <button type="button" class="cseg-btn" data-csub="mine">我的陪诊</button>
           <button type="button" class="cseg-btn sel" data-csub="hall">社区大厅</button>
@@ -249,7 +253,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="api.js?v=5"></script>
-  <script src="auth.js?v=5"></script>
-  <script src="app.js?v=44"></script>
+  <script src="auth.js?v=6"></script>
+  <script src="app.js?v=45"></script>
 </body>
 </html>
