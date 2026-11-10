@@ -1610,12 +1610,12 @@ async function renderCommunity() {
   host.innerHTML = auth?.mode === 'cloud'
     ? '<div class="empty-hint community-loading" role="status" aria-live="polite">正在加载云端社区…</div>'
     : '';
-  const guest = auth?.role === 'guest';
-  const escort = auth?.role === 'escort';
+  const guest = auth?.session?.role === 'guest';
+  const escort = auth?.session?.role === 'escort';
   const status = document.getElementById('communityStatus');
   /* 发布与管理操作已归位：家庭在「陪诊·需求大厅」，陪诊师在「我的」页；社区只负责浏览与筛选 */
   const reviewNotice = escort && auth?.mode === 'cloud' && auth.session?.status === 'pending_review' ? '陪诊师账号正在等待审核；审核通过前不能发布时段或报名。' : '';
-  if (status) status.innerHTML = guest ? '游客模式 · 仅展示脱敏虚构社区内容 <button class="text-button" data-action="logout">切换登录 →</button>' : auth?.mode === 'cloud' ? '正在加载云端社区…' : '本机演示社区 · 数据保存在当前浏览器';
+  if (status) status.innerHTML = guest ? '游客模式 · 仅展示脱敏虚构社区内容，登录后可发布与预约' : auth?.mode === 'cloud' ? '正在加载云端社区…' : '本机演示社区 · 数据保存在当前浏览器';
   /* 社区大厅人人一致：家庭/陪诊师/游客看到同一份帖子流，区别只在卡上按钮；家庭发布与管理入口在「陪诊 · 我的发布」 */
   let posts = [];
   let signupLookupFailed = false;
@@ -2376,11 +2376,18 @@ function renderRole() {
   if (window.KangbanAuth?.mode === 'cloud') state.currentRole = window.KangbanAuth.role;
   const isEscort = state.currentRole === 'escort';
   const cloudEscort = window.KangbanAuth?.mode === 'cloud' && isEscort;
-  const guest = window.KangbanAuth?.role === 'guest';
+  /* 游客会话（不是「未登录」的兜底 role）才显示游客条、隐藏家庭子页签 */
+  const guest = window.KangbanAuth?.session?.role === 'guest';
   const member = currentMember();
   document.getElementById('roleAvatar').textContent = isEscort ? state.companionProfile.name.slice(0, 1) : (member?.name.slice(0, 1) || '家');
   document.getElementById('roleLabel').textContent = isEscort ? `陪诊员端 · ${state.companionProfile.name}` : `家庭端 · ${member?.name || '家人'}`;
   document.body.classList?.toggle('cloud-escort-mode',cloudEscort);
+  /* 游客：没有任何底部导航（三个 tabbar 全隐藏），社区大厅就是唯一落点。
+     顶部给一条明确的「游客浏览中 / 登录注册」横条，否则只能靠筛选器下面那行小字退出去。 */
+  const guestBar = document.getElementById('guestBar');
+  if (guestBar) guestBar.hidden = !guest;
+  const communitySeg = document.getElementById('communitySeg');
+  if (communitySeg) communitySeg.hidden = guest;
   /* 陪诊 Tab 子页签（我的陪诊/社区大厅）只在家庭端显示 */
   document.body.classList?.toggle('family-mode', !guest && !isEscort);
   document.getElementById('familyTabs').hidden = guest || isEscort;
@@ -3470,7 +3477,10 @@ function setCompanionSub(sub, push = true) {
     window.scrollTo({ top: 0, behavior: 'smooth' }); }
 }
 function navigate(tab, fromPop = false) {
-  if (window.KangbanAuth?.role === 'guest' && tab !== 'community') tab = 'community';
+  /* 只有「真的处于游客会话」才强制留在社区大厅。
+     未登录时 KangbanAuth.role 的兜底值也是 'guest'，用它判断会把登录页背后的视图误设成社区。 */
+  const guestSession = window.KangbanAuth?.session?.role === 'guest';
+  if (guestSession && tab !== 'community') tab = 'community';
   /* 云端陪诊师：工作台 / 社区 / 我的 三页可去，其余一律回工作台 */
   if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'escort' && !['escort', 'community', 'escort-profile'].includes(tab)) tab = 'escort';
   if (window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family' && tab.startsWith('escort')) tab = 'home';
@@ -3478,12 +3488,12 @@ function navigate(tab, fromPop = false) {
   if (state.currentRole !== 'escort' && tab.startsWith('escort')) tab = 'home';
   /* 家庭端（本地 + 云端）：社区并入陪诊 Tab 的「社区大厅」子页签；游客与陪诊师不受影响 */
   const isEscortRole = window.KangbanAuth?.mode === 'cloud' ? window.KangbanAuth.role === 'escort' : state.currentRole === 'escort';
-  const isGuestRole = window.KangbanAuth?.role === 'guest';
+  const isGuestRole = guestSession;
   if (tab === 'community' && !isGuestRole && !isEscortRole) { companionSub = 'hall'; tab = 'companion'; }
   else if (tab === 'companion' && !fromPop) companionSub = 'mine';
   const changed = currentTab !== tab;
   currentTab = tab;
-  document.body.classList?.toggle('guest-mode', window.KangbanAuth?.role === 'guest');
+  document.body.classList?.toggle('guest-mode', guestSession);
   const activeViewId = tab === 'companion' && companionSub === 'hall' ? 'view-community' : `view-${tab}`;
   document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === activeViewId));
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -5191,6 +5201,8 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigat
    会压住底部 Tab 栏与弹窗主操作按钮。检测到就给 <html> 打标记，由 styles.css 让出安全区。
    iframe 由 Netlify 在页面加载后异步插入，所以用 MutationObserver 等它出现。 */
 (function watchNetlifyBadge() {
+  /* 单元测试在 Node 里直接 eval 本文件，没有 DOM 与 MutationObserver，直接跳过 */
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return;
   const selector = '#nl-badge-frame, iframe[id^="nl-badge"]';
   const mark = () => {
     if (!document.querySelector(selector)) return false;
