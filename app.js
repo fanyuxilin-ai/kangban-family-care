@@ -5169,3 +5169,20 @@ setTimeout(checkMedicationReminders, 1500);
 setInterval(checkCustomReminders, 60000);
 setTimeout(checkCustomReminders, 1800);
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+
+/* Netlify 免费版角标避让
+   线上访问时 Netlify 会注入 iframe#nl-badge-frame（固定右下角 202×64，z-index 极高），
+   会压住底部 Tab 栏与弹窗主操作按钮。检测到就给 <html> 打标记，由 styles.css 让出安全区。
+   iframe 由 Netlify 在页面加载后异步插入，所以用 MutationObserver 等它出现。 */
+(function watchNetlifyBadge() {
+  const selector = '#nl-badge-frame, iframe[id^="nl-badge"]';
+  const mark = () => {
+    if (!document.querySelector(selector)) return false;
+    document.documentElement.classList.add('nl-badge-on');
+    return true;
+  };
+  if (mark()) return;
+  const observer = new MutationObserver(() => { if (mark()) observer.disconnect(); });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 20000);
+})();
