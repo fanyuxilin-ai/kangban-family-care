@@ -348,8 +348,13 @@ const APPOINTMENT_ITEMS = [
   ['questions', '想问医生的问题', '提前记下最关心的几件事'],
   ['selfDescription', '诊前自我描述', '记录近期症状、变化、饮食和生活情况']
 ];
+/* 清单勾选状态：早期全局 appointmentChecks 作为基线，按成员勾选覆盖。
+   早前两套状态源互斥（byMember 一旦有值就丢掉全局默认），会导致 UI 显示 5/5、闸门却只算到 4 项 */
+function memberChecks(memberId) {
+  return { ...(state.appointmentChecks || {}), ...((state.appointmentChecksByMember || {})[memberId] || {}) };
+}
 function appointmentProgress(member) {
-  const checks = (state.appointmentChecksByMember || {})[member.id] || state.appointmentChecks || {};
+  const checks = memberChecks(member.id);
   return APPOINTMENT_ITEMS.filter(([key]) => key === 'selfDescription' ? (checks[key] || preVisitEntries(member.id).length > 0) : checks[key]).length;
 }
 function displayToday() {
@@ -3801,8 +3806,7 @@ function showHealthCard(memberId = '') {
 function showAppointment(memberId = '') {
   appointmentMemberId = memberId;
   const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
-  const memberChecks = (state.appointmentChecksByMember || (state.appointmentChecksByMember = {}))[member.id];
-  const checks = memberChecks || state.appointmentChecks || {};
+  const checks = memberChecks(member.id);
   const hasDescription = preVisitEntries(member.id).length > 0;
   const items = APPOINTMENT_ITEMS;
   const count = items.filter(([key]) => key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]).length;
@@ -3811,11 +3815,28 @@ function showAppointment(memberId = '') {
     <div class="checklist-progress"><strong id="checklistCount">已准备 ${count} / ${items.length} 项</strong><span>${ready ? '已就绪 · 可生成分享码' : '逐项确认'}</span></div>
     <div class="appointment-checklist">${items.map(([key, title, hint]) => `<label class="checklist-row"><input type="checkbox" data-checklist="${key}" data-appointment-member="${member.id}" ${(key === 'selfDescription' ? (checks[key] || hasDescription) : checks[key]) ? 'checked' : ''} ${key === 'selfDescription' && hasDescription ? 'disabled' : ''}><span class="checkmark"></span><span class="checklist-copy"><strong>${title}</strong><small>${hint}</small></span></label>`).join('')}</div>
     <button class="secondary-button" id="openPreVisitDescription">${hasDescription ? '查看 / 补充诊前描述' : '添加诊前自我描述'}</button>
-    <div class="health-highlight">${ready ? '清单已全部确认，可以生成就诊分享码了。' : `还差 ${items.length - count} 项：全部勾选后解锁「生成就诊分享码」。`}</div>
-    ${ready
-      ? `<button class="primary-button" data-action="share" data-share-member="${member.id}">生成就诊分享码</button>`
-      : `<button class="secondary-button" data-action="share" data-share-member="${member.id}" style="opacity:.6">🔒 生成就诊分享码（完成清单后解锁）</button>`}
+    <div class="health-highlight" id="appointmentHint">${ready ? '清单已全部确认，可以生成就诊分享码了。' : `还差 ${items.length - count} 项：全部勾选后解锁「生成就诊分享码」。`}</div>
+    <button class="primary-button${ready ? '' : ' locked'}" id="appointmentShareBtn" data-action="share" data-share-member="${member.id}">${ready ? '生成就诊分享码' : `🔒 生成就诊分享码（还差 ${items.length - count} 项）`}</button>
     <button class="secondary-button" id="appointmentCard" data-card-member="${member.id}">打开${esc(member.name)}的就医信息卡</button>`);
+}
+/* 勾选后原地刷新计数、提示与解锁状态，不重建弹窗以免滚动位置跳动 */
+function refreshAppointmentGate(memberId = appointmentMemberId) {
+  const member = state.familyMembers.find(item => item.id === memberId) || state.familyMembers.find(item => item.id === state.currentMemberId) || state.familyMembers[0];
+  if (!member) return;
+  const total = APPOINTMENT_ITEMS.length;
+  const count = appointmentProgress(member);
+  const ready = count === total;
+  const counter = document.getElementById('checklistCount');
+  if (counter) counter.textContent = `已准备 ${count} / ${total} 项`;
+  const status = document.querySelector('.checklist-progress span');
+  if (status) status.textContent = ready ? '已就绪 · 可生成分享码' : '逐项确认';
+  const hint = document.getElementById('appointmentHint');
+  if (hint) hint.textContent = ready ? '清单已全部确认，可以生成就诊分享码了。' : `还差 ${total - count} 项：全部勾选后解锁「生成就诊分享码」。`;
+  const button = document.getElementById('appointmentShareBtn');
+  if (button) {
+    button.classList.toggle('locked', !ready);
+    button.textContent = ready ? '生成就诊分享码' : `🔒 生成就诊分享码（还差 ${total - count} 项）`;
+  }
 }
 /* 诊前描述按成员隔离；早期演示数据未带成员标记，归到首位长辈名下 */
 function preVisitEntries(memberId) {
@@ -4468,12 +4489,7 @@ document.addEventListener('click', async event => {
       state.appointmentChecks = { ...(state.appointmentChecks || {}), [checklistInput.dataset.checklist]: checklistInput.checked };
     }
     saveState();
-    const total = document.querySelectorAll('[data-checklist]').length;
-    const done = document.querySelectorAll('[data-checklist]:checked').length;
-    const counter = document.getElementById('checklistCount');
-    if (counter) counter.textContent = `已准备 ${done} / ${total} 项`;
-    const status = document.querySelector('.checklist-progress span');
-    if (status) status.textContent = done === total ? '准备好了' : '逐项确认';
+    refreshAppointmentGate(checklistMember);
   }
   if (event.target.closest('#revokeShare')) { state.shares.push({ who: '演示分享已撤销', when: `${new Date().getMonth()+1}月${new Date().getDate()}日 ${new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}` }); saveState(); closeModal(); toast('已撤销演示分享'); }
   const service = event.target.closest('[data-service]')?.dataset.service;
