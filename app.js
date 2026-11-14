@@ -1938,6 +1938,14 @@ function subscribeCloudRealtime() {
         refreshCloudAfterAction();
       }
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'member_safety_alerts', filter: `family_id=eq.${auth.session.familyId}` }, payload => {
+      const isNew = payload.eventType === 'INSERT' && ['open','contacting','unable_to_reach'].includes(payload.new?.status);
+      if (isNew) toast('安心守护提醒：未收到平安信号，请联系核实');
+      if (currentTab === 'home') renderHomeSafety();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'member_safety_settings', filter: `family_id=eq.${auth.session.familyId}` }, () => {
+      if (currentTab === 'home') renderHomeSafety();
+    })
     .subscribe();
 }
 function unsubscribeCloudRealtime() {
@@ -2705,6 +2713,91 @@ function readingTimeLabel(entry) {
   if (entry.date === dateOffset(-1)) return entry.time ? `昨天 ${entry.time}` : '昨天';
   return formatDate(entry.date);
 }
+let memberSafetySnapshot = { settings: [], alerts: [], signals: [], members: [], recipients: [], selectedMemberId: '' };
+function safetyTime(value) { return value ? new Date(value).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '尚无记录'; }
+async function cloudSafetyMember(member) {
+  const auth = window.KangbanAuth;
+  if (!member || auth?.mode !== 'cloud' || auth.role !== 'family' || !auth.session?.familyId) return null;
+  const rows = await window.KangbanAPI.select('family_members', { filters: { family_id: auth.session.familyId } });
+  return rows.find(row => row.id === member.id || row.legacy_id === String(member.id)) || null;
+}
+async function renderHomeSafety() {
+  const host = document.getElementById('homeSafetySection');
+  const auth = window.KangbanAuth;
+  if (!host || auth?.role === 'escort' || auth?.role === 'guest') { if (host) host.hidden = true; return; }
+  if (auth?.mode !== 'cloud' || !auth.session?.familyId) {
+    host.hidden = false;
+    host.innerHTML = `<div class="safety-card safety-local"><div><p class="eyebrow">安心守护 · 本机演示</p><strong>远程平安提醒尚未启用</strong><small>本机模式不会在后台监测或联系家人。登录云端家庭账号后可设置。</small></div></div>`;
+    return;
+  }
+  try {
+    const familyId = auth.session.familyId;
+    const [members, settings, alerts, signals, deliveryStatus] = await Promise.all([
+      window.KangbanAPI.select('family_members', { filters: { family_id: familyId } }),
+      window.KangbanAPI.select('member_safety_settings', { filters: { family_id: familyId } }),
+      window.KangbanAPI.select('member_safety_alerts', { filters: { family_id: familyId }, order: { column: 'created_at', ascending: false }, limit: 20 }),
+      window.KangbanAPI.select('member_safety_signals', { filters: { family_id: familyId }, order: { column: 'recorded_at', ascending: false }, limit: 100 }),
+      window.KangbanAPI.getMemberSafetyDeliveryStatus()
+    ]);
+    memberSafetySnapshot = { ...memberSafetySnapshot, members, settings, alerts, signals, deliveryStatus };
+    const activeAlerts = alerts.filter(alert => ['open','contacting','unable_to_reach'].includes(alert.status));
+    const alertCards = activeAlerts.map(alert => {
+      const member = members.find(item => item.id === alert.member_id);
+      const label = { open: '待联系', contacting: '正在联系', unable_to_reach: '暂时联系不上' }[alert.status] || '待处理';
+      return `<article class="safety-alert-card"><div class="safety-alert-title"><b>${esc(member?.name || '家庭成员')} · 未收到平安信号，请联系核实</b><span>${label}</span></div><small>最后信号：${safetyTime(alert.last_signal_at)} · 告警时间：${safetyTime(alert.created_at)}</small><div class="safety-alert-actions"><button class="secondary-button" data-safety-resolve="contacting" data-alert-id="${alert.id}">正在联系</button><button class="secondary-button" data-safety-resolve="unable_to_reach" data-alert-id="${alert.id}">暂时联系不上</button><button class="primary-button" data-safety-resolve="confirmed_safe" data-alert-id="${alert.id}">已联系，确认平安</button></div></article>`;
+    }).join('');
+    const cloudMember = members.find(item => item.id === memberSafetySnapshot.selectedMemberId)
+      || members.find(item => item.id === state.currentMemberId || item.legacy_id === String(state.currentMemberId))
+      || members[0] || null;
+    const target = cloudMember && ((state.familyMembers || []).find(item => item.id === cloudMember.id || item.id === cloudMember.legacy_id) || { id: cloudMember.id, name: cloudMember.name });
+    if (cloudMember && !memberSafetySnapshot.selectedMemberId) memberSafetySnapshot.selectedMemberId = cloudMember.id;
+    const setting = settings.find(item => item.member_id === cloudMember?.id);
+    const signal = signals.find(item => item.member_id === cloudMember?.id);
+    const memberActiveAlert = activeAlerts.find(alert => alert.member_id === cloudMember?.id);
+    host.hidden = false;
+    const serviceReady = deliveryStatus?.ready === true;
+    const selfCheckAccount = setting?.self_check_user_id === auth.session.user.id;
+    host.innerHTML = `${alertCards}${cloudMember ? `<div class="safety-card ${setting?.enabled && serviceReady ? 'is-enabled' : ''}"><div class="safety-card-copy"><p class="eyebrow">安心守护</p><label class="safety-member-picker"><span>守护成员</span><select data-safety-member-select>${members.map(item => `<option value="${item.id}" ${item.id === cloudMember.id ? 'selected' : ''}>${esc(item.name)}</option>`).join('')}</select></label><strong>${setting?.enabled && serviceReady ? (selfCheckAccount ? (memberActiveAlert ? '请先联系家人，核实当前情况' : '今天也记得报个平安') : '请由指定的本人账号报平安') : setting?.enabled ? '邮件提醒服务尚未就绪' : '让家人及时知道你平安'}</strong><small>${setting?.enabled && serviceReady ? `远程守护已开启 · 最近信号 ${safetyTime(setting.last_signal_at || signal?.recorded_at)}` : setting?.enabled ? '当前无法承诺后台邮件告警送达，请管理员完成邮件服务配置和测试。' : '开启后连续 48 小时没有平安信号，会提醒家庭联系人。'}</small></div><div class="safety-card-actions">${setting?.enabled && serviceReady && selfCheckAccount ? `<button class="safety-checkin-button" data-safety-checkin="${cloudMember.id}">✓ 我平安</button>` : ''}<button class="text-button" data-safety-settings="${cloudMember.id}">${setting?.enabled ? '管理设置' : '设置安心守护'} →</button></div></div>` : '<div class="safety-card safety-local"><strong>请先为家庭成员建立云端档案</strong></div>'}<p class="safety-disclaimer">未收到信号只代表系统暂时没有记录，不代表发生意外；请家人主动联系核实。</p>`;
+  } catch (error) {
+    host.hidden = false;
+    host.innerHTML = `<div class="safety-card safety-local"><strong>安心守护状态暂时无法读取</strong><small>${esc(error.message || '请确认数据库迁移已部署后刷新页面。')}</small></div>`;
+  }
+}
+async function showMemberSafetySettings(memberId) {
+  const auth = window.KangbanAuth;
+  if (auth?.mode !== 'cloud' || auth.role !== 'family') { toast('远程安心守护仅支持登录后的云端家庭账号'); return; }
+  const member = memberSafetySnapshot.members.find(item => item.id === memberId);
+  if (!member) { toast('未找到云端家庭成员，请刷新后再试'); return; }
+  try {
+    const settingId = memberSafetySnapshot.settings.find(item => item.member_id === memberId)?.id;
+    const [accounts, selected, deliveryStatus] = await Promise.all([
+      window.KangbanAPI.listMemberSafetyRecipients(auth.session.familyId),
+      settingId ? window.KangbanAPI.select('member_safety_recipients', { filters: { setting_id: settingId } }) : Promise.resolve([]),
+      window.KangbanAPI.getMemberSafetyDeliveryStatus()
+    ]);
+    const selectedIds = new Set(selected.map(row => row.recipient_user_id));
+    const recipientAccounts = accounts.filter(row => row.user_id !== auth.session.user.id);
+    const selectedSelfCheckUserId = memberSafetySnapshot.settings.find(item => item.member_id === memberId)?.self_check_user_id || auth.session.user.id;
+    memberSafetySnapshot.recipients = accounts;
+    openModal(`${modalHead('安心守护', `为 ${esc(member.name)} 设置平安提醒`, '连续 48 小时没有收到信号时，系统会提醒你选择的家庭联系人。开启前请确认已告知该成员并获得同意，或你有权代为管理。')}
+      <form id="memberSafetySettingsForm" data-member-id="${memberId}">
+        <label class="safety-account-select"><span>谁的账号代表 ${esc(member.name)} 本人点「我平安」？</span><select name="selfCheckUserId" required>${accounts.map(row => `<option value="${row.user_id}" ${row.user_id === selectedSelfCheckUserId ? 'selected' : ''}>${esc(row.display_name || '家庭联系人')} · ${esc(row.email || '')}</option>`).join('')}</select><small>只有这个账号能用「我平安」关闭告警。其他家属保存健康读数只会刷新计时。</small></label>
+        <div class="safety-recipient-list">${recipientAccounts.length ? recipientAccounts.map(row => `<label class="safety-recipient"><input type="checkbox" name="recipient" value="${row.user_id}" ${selectedIds.has(row.user_id) ? 'checked' : ''}><span><b>${esc(row.display_name || '家庭联系人')}</b><small>${esc(row.email || '')}</small></span></label>`).join('') : '<p class="safety-empty">没有其他已验证邮箱的家庭账号。请先邀请家人加入家庭并验证邮箱。</p>'}</div>
+        <label class="safety-consent"><input type="checkbox" name="consent" required><span>我已告知该成员并获得同意，或我有权代为管理；所选家庭联系人也知晓会收到平安提醒。</span></label>
+        <div class="health-highlight">邮件仅说明成员称呼、最后信号时间和提醒状态，不包含血压、血糖、诊断、处方或附件。</div>
+        ${deliveryStatus?.ready ? '' : '<div class="safety-service-not-ready">远程邮件提醒尚未部署并通过发送测试。完成服务配置前不能开启守护。</div>'}
+        <button class="primary-button" type="submit" ${deliveryStatus?.ready ? '' : 'disabled'}>${selectedIds.size ? '保存并开启安心守护' : '开启安心守护'}</button>
+        ${selectedIds.size ? '<button class="secondary-button" type="button" data-safety-pause="' + memberId + '">暂停远程守护</button>' : ''}
+      </form>`);
+  } catch (error) { toast(`安心守护设置读取失败：${error.message || error}`); }
+}
+async function sendMemberSafetySignal(memberId, source) {
+  const auth = window.KangbanAuth;
+  if (auth?.mode !== 'cloud' || auth.role !== 'family' || !auth.session?.familyId) throw new Error('请登录云端家庭账号后使用远程安心守护。');
+  const row = memberSafetySnapshot.members.find(item => item.id === memberId) || await cloudSafetyMember((state.familyMembers || []).find(item => item.id === memberId || item.id === state.currentMemberId));
+  if (!row) throw new Error('找不到对应的云端家庭成员，请先同步成员档案。');
+  return window.KangbanAPI.recordMemberSafetySignal({ familyId: auth.session.familyId, memberId: row.id, source });
+}
 function renderHomeMemberStrip() {
   const host = document.getElementById('homeMemberStrip');
   const section = document.getElementById('homeMemberSection');
@@ -2736,6 +2829,7 @@ function renderHomeMemberStrip() {
     return { attention, html: `<button type="button" class="member-strip-card ${attention ? 'ms-attention' : 'ms-calm'}" data-nav="health"><span class="ms-head"><b>${esc(member.name)}</b>${headTag}</span>${readingLine}${emptyCta}${medLine}</button>` };
   }).sort((a, b) => (b.attention ? 1 : 0) - (a.attention ? 1 : 0));
   host.innerHTML = cards.map(card => card.html).join('');
+  renderHomeSafety();
 }
 function showHomeSharePicker() {
   openModal(`${modalHead('生成就诊分享码', '选择成员', '分享码按成员生成；需先完成该成员的就诊准备清单，全部勾选后才能生成。')}
@@ -2886,7 +2980,7 @@ function showReminderCompletion(id, time) {
       <button class="primary-button" type="submit">保存记录</button>
     </form><p class="privacy-small">测量值按原样记录，不自动判断是否正常。</p>`);
 }
-function completeCustomReminder(reminder, time, formData) {
+async function completeCustomReminder(reminder, time, formData) {
   const today = dateOffset(0);
   const key = reminderOccurrenceKey(reminder, time, today);
   const member = state.familyMembers.find(item => item.id === reminder.memberId);
@@ -2910,7 +3004,15 @@ function completeCustomReminder(reminder, time, formData) {
     state.measurementRecords.unshift({ id: `measure-${Date.now()}`, reminderId: reminder.id, memberId: reminder.memberId, memberName: member?.name || '陈兰英', title: reminder.title, value: entry.value, unit: entry.unit, date: today, time: new Date().toTimeString().slice(0,5), note: entry.note });
   }
   state.reminderLogs = { ...(state.reminderLogs || {}), [key]: entry };
-  saveState(); renderRecords(); closeModal(); toast(reminder.kind === 'measurement' ? '测量结果已保存' : '已记录完成');
+  saveState(); renderRecords(); closeModal();
+  if (reminder.kind === 'measurement' && window.KangbanAuth?.mode === 'cloud' && window.KangbanAuth.role === 'family') {
+    try {
+      await window.KangbanAPI.saveFamilyWorkspace(window.KangbanAuth.session.familyId, state);
+      await sendMemberSafetySignal(reminder.memberId, 'health_measurement');
+      await renderHomeSafety();
+      toast('测量结果已保存，平安信号已同步');
+    } catch (error) { toast(`测量结果已保存，但云端同步未确认，未刷新远程平安计时：${error.message || error}`); }
+  } else toast(reminder.kind === 'measurement' ? '测量结果已保存；本机记录不产生远程平安信号' : '已记录完成');
 }
 function snoozeCustomReminder(id, time) {
   const reminder = state.customReminders.find(item => item.id === id);
@@ -3424,7 +3526,7 @@ function showReadingEntry(memberId) {
   });
 }
 /* 通用日常录入：任意指标行入库；若包含收缩压+舒张压则联动血压预警引擎 */
-function saveDailyEntries(memberId, rows, source) {
+async function saveDailyEntries(memberId, rows, source) {
   const member = state.familyMembers.find(item => item.id === memberId);
   if (!member || !rows.length) return;
   const date = dateOffset(0);
@@ -3441,7 +3543,17 @@ function saveDailyEntries(memberId, rows, source) {
   const boardTitle = document.getElementById('modalTitle')?.textContent || '';
   if (!document.getElementById('modalBackdrop')?.hidden && boardTitle.includes('数据看板')) showMemberDashboard(memberId);
   closeModal();
-  toast(`${message}，可在数据看板查看趋势`);
+  const auth = window.KangbanAuth;
+  if (auth?.mode === 'cloud' && auth.role === 'family' && auth.session?.familyId) {
+    try {
+      await window.KangbanAPI.saveFamilyWorkspace(auth.session.familyId, state);
+      await sendMemberSafetySignal(memberId, 'health_measurement');
+      await renderHomeSafety();
+      toast(`${message}，已同步平安信号，可在数据看板查看趋势`);
+    } catch (error) {
+      toast(`${message}，但云端同步未确认，未刷新远程平安计时：${error.message || error}`);
+    }
+  } else toast(`${message}，本机记录不产生远程平安信号，可在数据看板查看趋势`);
 }
 /* 日常记录数据源：channel = daily 的指标（血压合并为一条展示用） */
 function dailyEntries(memberId) {
@@ -4274,6 +4386,28 @@ document.addEventListener('click', async event => {
     return;
   }
   if (event.target.closest('[data-action="logout"]')) { try { await window.KangbanAuth.signOut(); } catch (error) { toast(error.message || '退出失败'); } return; }
+  const safetyCheckin = event.target.closest('[data-safety-checkin]');
+  if (safetyCheckin) {
+    safetyCheckin.disabled = true;
+    try { await sendMemberSafetySignal(safetyCheckin.dataset.safetyCheckin, 'self_check'); toast('已记录平安信号，家人可以放心一些了'); await renderHomeSafety(); }
+    catch (error) { toast(`平安信号没有保存：${error.message || error}`); }
+    finally { safetyCheckin.disabled = false; }
+    return;
+  }
+  const safetySettings = event.target.closest('[data-safety-settings]');
+  if (safetySettings) { await showMemberSafetySettings(safetySettings.dataset.safetySettings); return; }
+  const safetyPause = event.target.closest('[data-safety-pause]');
+  if (safetyPause) {
+    try { await window.KangbanAPI.configureMemberSafety({ familyId: window.KangbanAuth.session.familyId, memberId: safetyPause.dataset.safetyPause, enabled: false, consentConfirmed: true }); closeModal(); toast('已暂停远程安心守护'); await renderHomeSafety(); }
+    catch (error) { toast(`暂停失败：${error.message || error}`); }
+    return;
+  }
+  const safetyResolve = event.target.closest('[data-safety-resolve]');
+  if (safetyResolve) {
+    try { await window.KangbanAPI.resolveMemberSafetyAlert({ alertId: safetyResolve.dataset.alertId, resolution: safetyResolve.dataset.safetyResolve }); toast(safetyResolve.dataset.safetyResolve === 'confirmed_safe' ? '已记录：已联系并确认平安' : '处理状态已记录'); await renderHomeSafety(); }
+    catch (error) { toast(`告警处理失败：${error.message || error}`); }
+    return;
+  }
   /* 首页待办「去处理」：跳我的陪诊并展开我的发布抽屉 */
   if (event.target.closest('[data-open-my-posts]')) familyMyPostsOpen = true;
   const myPostsToggle = event.target.closest('#familyMyPostsToggle');
@@ -4744,10 +4878,28 @@ document.addEventListener('input', event => {
 /* 社区地区筛选 */
 document.addEventListener('change', event => {
   if (event.target.id === 'communityRegion') { communityRegion = event.target.value; renderCommunity(); }
+  if (event.target.matches('[data-safety-member-select]')) {
+    memberSafetySnapshot.selectedMemberId = event.target.value;
+    renderHomeSafety();
+  }
 });
 
 
 document.addEventListener('submit', async event => {
+  if (event.target.id === 'memberSafetySettingsForm') {
+    event.preventDefault();
+    const form = event.target;
+    const recipientUserIds = [...form.querySelectorAll('input[name="recipient"]:checked')].map(input => input.value);
+    const selfCheckUserId = form.querySelector('[name="selfCheckUserId"]')?.value || null;
+    const consentConfirmed = form.querySelector('input[name="consent"]')?.checked === true;
+    try {
+      const delivery = await window.KangbanAPI.getMemberSafetyDeliveryStatus();
+      if (!delivery?.ready) throw new Error('邮件提醒服务尚未通过配置与发送测试，暂不能开启远程守护。');
+      await window.KangbanAPI.configureMemberSafety({ familyId: window.KangbanAuth.session.familyId, memberId: form.dataset.memberId, enabled: true, consentConfirmed, recipientUserIds, selfCheckUserId });
+      closeModal(); toast('安心守护已开启，系统会按规则监测平安信号并联系所选家庭联系人。'); await renderHomeSafety();
+    } catch (error) { toast(`保存安心守护失败：${error.message || error}`); }
+    return;
+  }
   if (event.target.id === 'cloudTaskShareForm') {
     event.preventDefault();
     try { await createCloudTaskShare(event.target); }
@@ -4805,7 +4957,7 @@ document.addEventListener('submit', async event => {
     const form = event.target;
     const reminder = state.customReminders.find(item => item.id === form.dataset.reminderId);
     if (!reminder) { toast('找不到这条提醒'); return; }
-    completeCustomReminder(reminder, form.dataset.reminderTime, new FormData(form));
+    await completeCustomReminder(reminder, form.dataset.reminderTime, new FormData(form));
     return;
   }
   if (event.target.id === 'companionForm') {
@@ -5198,6 +5350,7 @@ async function applyAuthSession(session) {
     state.currentRole = 'family';
   }
   renderRole();
+  if (session.role === 'family') renderHomeMemberStrip();
   if (session.role === 'guest') navigate('community');
   else navigate(session.role === 'escort' ? 'escort' : 'home');
   /* 登录后重置历史栈基线：从这里开始记录返回层级 */

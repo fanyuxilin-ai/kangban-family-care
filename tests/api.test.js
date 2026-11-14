@@ -48,6 +48,8 @@ test('local mode blocks server RPC and unsupported tables', async () => {
   const { api } = boot();
   await assert.rejects(api.rpc('apply_to_demand', { p_post_id: 'x' }), /本机演示模式/);
   await assert.rejects(api.select('users'), /不支持的数据表/);
+  assert.equal((await api.recordMemberSafetySignal({ familyId: 'f', memberId: 'm', source: 'self_check' })).supported, false);
+  await assert.rejects(api.configureMemberSafety({ familyId: 'f', memberId: 'm', enabled: true }), /仅支持登录后的云端家庭账号/);
 });
 
 test('cloud mode routes CRUD and surfaces Supabase errors without local fallback', async () => {
@@ -75,6 +77,23 @@ test('cloud mode routes CRUD and surfaces Supabase errors without local fallback
   nextResult = { data: null, error: { message: 'RLS denied', code: '42501' } };
   await assert.rejects(api.insert('medical_records', {}), /RLS denied/);
   assert.equal(storage.get('kangban-demo-v7'), '{}', 'failed cloud writes must not modify local data');
+});
+
+test('cloud safety actions use restricted RPCs and readiness stays server controlled', async () => {
+  const calls = [];
+  const client = {
+    rpc: (name, args) => { calls.push([name, args]); return Promise.resolve({ data: '2026-11-14T00:00:00Z', error: null }); },
+    functions: { invoke: async (name, options) => { calls.push([name, options]); return { data: { ready: true }, error: null }; } }
+  };
+  const config = { url: 'https://example.supabase.co', publishableKey: 'sb_publishable_demo' };
+  const { api } = boot({ config, client });
+  await api.recordMemberSafetySignal({ familyId: 'f1', memberId: 'm1', source: 'health_measurement' });
+  await api.configureMemberSafety({ familyId: 'f1', memberId: 'm1', enabled: true, consentConfirmed: true, recipientUserIds: ['u2'] });
+  assert.equal((await api.getMemberSafetyDeliveryStatus()).ready, true);
+  assert.deepEqual(calls.map(call => call[0]), ['record_member_safety_signal', 'configure_member_safety', 'process-member-safety-alerts']);
+  assert.equal(calls[0][1].p_source, 'health_measurement');
+  assert.equal(calls[1][1].p_recipient_user_ids[0], 'u2');
+  assert.equal(calls[2][1].body.action, 'status');
 });
 
 test('private file downloads use the authenticated private bucket and surface access errors', async () => {

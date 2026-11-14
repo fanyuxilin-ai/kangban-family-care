@@ -5,7 +5,8 @@
   const TABLES = new Set([
     'profiles','families','family_memberships','family_members','escort_profiles','body_metrics','daily_entries',
     'medical_encounters','medical_records','insurance_policies','reimbursements','attachments','community_posts',
-    'community_post_details','post_signups','companion_orders','migration_runs'
+    'community_post_details','post_signups','companion_orders','migration_runs',
+    'member_safety_settings','member_safety_signals','member_safety_alerts','member_safety_recipients'
   ]);
   const LOCAL_COLLECTIONS = {
     family_members: 'familyMembers', body_metrics: 'bodyMetrics', daily_entries: 'dailyEntries',
@@ -34,7 +35,7 @@
   }) : null;
   let mode = cloudConfigured ? 'supabase' : 'local';
   if (mode === 'local') announce('local', '当前为本机演示模式，数据仅保存在此浏览器。配置 Supabase 后可启用云端数据。');
-  else announce('supabase', 'Supabase 已配置。登录后可使用云端社区与订单；健康预警和提醒仍来自本机演示数据。');
+  else announce('supabase', 'Supabase 已配置，登录后可使用云端社区与订单；常规健康预警和提醒仍来自本机演示数据。安心守护状态请查看首页，邮件未完成部署与验证前不能开启。');
 
   function assertTable(table) {
     if (!TABLES.has(table)) throw new Error(`不支持的数据表：${table}`);
@@ -123,9 +124,31 @@
       state[key] = next; writeState(state); return { removed: rows.length - next.length };
     },
     async rpc(name, args = {}) {
-      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user','list_my_companion_orders','create_order_task_share','revoke_order_task_share','lookup_order_task_share','submit_companion_order_review','list_pending_escorts','review_escort_account','book_availability','respond_availability_booking','cancel_my_booking','cancel_my_post','update_availability','list_my_availability_bookings'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
+      if (!['create_demand_post','apply_to_demand','confirm_post_signup','respond_companion_order','transition_companion_order','update_order_checklist','ensure_family_for_current_user','list_my_companion_orders','create_order_task_share','revoke_order_task_share','lookup_order_task_share','submit_companion_order_review','list_pending_escorts','review_escort_account','book_availability','respond_availability_booking','cancel_my_booking','cancel_my_post','update_availability','list_my_availability_bookings','configure_member_safety','list_member_safety_recipients','record_member_safety_signal','resolve_member_safety_alert'].includes(name)) throw new Error(`不支持的 RPC：${name}`);
       if (!client) throw new Error('本机演示模式不执行云端事务 RPC。');
       return runCloud(client.rpc(name, args));
+    },
+    async recordMemberSafetySignal({ familyId, memberId, source }) {
+      if (!client) return { supported: false, message: '远程安心守护仅支持登录后的云端家庭账号；本机演示不会触发后台预警。' };
+      return runCloud(client.rpc('record_member_safety_signal', { p_family_id: familyId, p_member_id: memberId, p_source: source }));
+    },
+    async resolveMemberSafetyAlert({ alertId, resolution, note = '' }) {
+      if (!client) throw new Error('本机演示模式不支持处理云端安心守护告警。');
+      return runCloud(client.rpc('resolve_member_safety_alert', { p_alert_id: alertId, p_resolution: resolution, p_note: note }));
+    },
+    async configureMemberSafety({ familyId, memberId, enabled, consentConfirmed, recipientUserIds = [], selfCheckUserId = null }) {
+      if (!client) throw new Error('远程安心守护仅支持登录后的云端家庭账号。');
+      return runCloud(client.rpc('configure_member_safety', { p_family_id: familyId, p_member_id: memberId, p_enabled: enabled, p_consent_confirmed: consentConfirmed, p_recipient_user_ids: recipientUserIds, p_self_check_user_id: selfCheckUserId }));
+    },
+    async listMemberSafetyRecipients(familyId) {
+      if (!client) return [];
+      return runCloud(client.rpc('list_member_safety_recipients', { p_family_id: familyId }));
+    },
+    async getMemberSafetyDeliveryStatus() {
+      if (!client) return { ready: false, reason: '当前为本机演示模式。' };
+      const { data, error } = await client.functions.invoke('process-member-safety-alerts', { body: { action: 'status' } });
+      if (error) return { ready: false, reason: '云端邮件提醒尚未部署或配置。' };
+      return data || { ready: false, reason: '未收到邮件服务状态。' };
     },
     async uploadPrivateFile(file, path) {
       if (!client) throw new Error('本机演示模式不支持上传到私有云端存储。');

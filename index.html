@@ -7,7 +7,7 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=33" />
+  <link rel="stylesheet" href="styles.css?v=34" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -83,6 +83,8 @@
         </section>
 
         <div id="homeTodayBar"></div>
+
+        <section class="section-block safety-home-section" id="homeSafetySection" hidden aria-live="polite"></section>
 
         <section class="section-block" id="homeMemberSection" hidden>
           <div class="section-heading"><div><p class="eyebrow">家人今天怎么样</p><h2>成员状态</h2></div><button class="text-button" data-nav="health">健康档案 <span>→</span></button></div>
@@ -254,6 +256,6 @@
   <script src="supabase-config.js"></script>
   <script src="api.js?v=5"></script>
   <script src="auth.js?v=6"></script>
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
 </body>
 </html>
