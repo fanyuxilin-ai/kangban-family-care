@@ -7,7 +7,10 @@
   <meta name="description" content="康伴：为家人整理就医资料，让重要信息在就诊时清楚交接。" />
   <title>康伴 · 家庭就医助手</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=33" />
+  <script>
+    try { if (localStorage.getItem('kangban-elder-care-mode') === 'on') document.documentElement.classList.add('elder-care-mode'); } catch {}
+  </script>
+  <link rel="stylesheet" href="styles.css?v=34" />
 </head>
 <body>
   <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
@@ -15,6 +18,10 @@
       <a class="brand" href="#home" aria-label="康伴"><span class="brand-mark"><i></i><b></b></span><span>康伴</span></a>
       <p class="eyebrow">家庭就医协同</p><h1 id="authTitle">和家人一起，把就医准备做好</h1>
       <p class="subtle">登录后使用家庭资料与社区。游客只能浏览脱敏的虚构内容。</p>
+      <div class="elder-care-entry">
+        <div><strong>老人关爱版</strong><small>字体更大、按钮更清楚；选择后进入大字版</small></div>
+        <button type="button" data-elder-care-toggle aria-pressed="false"><span data-elder-care-label>选择</span></button>
+      </div>
       <form id="authForm" class="auth-form">
         <div class="auth-login-panel" id="authLoginPanel">
           <label><span>邮箱</span><input class="input-field" name="email" type="email" autocomplete="username" required placeholder="name@example.com"></label>
@@ -254,6 +261,6 @@
   <script src="supabase-config.js"></script>
   <script src="api.js?v=5"></script>
   <script src="auth.js?v=6"></script>
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
 </body>
 </html>

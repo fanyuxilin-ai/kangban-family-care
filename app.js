@@ -1,5 +1,24 @@
 const STORAGE_KEY = 'kangban-demo-v7';
+const ELDER_CARE_MODE_KEY = 'kangban-elder-care-mode';
 let activeStorageKey = STORAGE_KEY;
+function isElderCareModeOn() {
+  try { return localStorage.getItem(ELDER_CARE_MODE_KEY) === 'on'; } catch { return false; }
+}
+function syncElderCareModeUI() {
+  const enabled = isElderCareModeOn();
+  document.documentElement.classList.toggle('elder-care-mode', enabled);
+  document.querySelectorAll('[data-elder-care-toggle]').forEach(button => {
+    button.setAttribute('aria-pressed', String(enabled));
+    button.classList.toggle('is-selected', enabled);
+    const label = button.querySelector('[data-elder-care-label]');
+    if (label) label.textContent = button.closest('#view-me') ? (enabled ? '已开启' : '未开启') : (enabled ? '已选择' : '选择');
+  });
+}
+function setElderCareMode(enabled) {
+  try { localStorage.setItem(ELDER_CARE_MODE_KEY, enabled ? 'on' : 'off'); } catch { /* 无法持久化时仍在当前页面应用 */ }
+  document.documentElement.classList.toggle('elder-care-mode', enabled);
+  syncElderCareModeUI();
+}
 function dateOffset(days) {
   const date = new Date(); date.setHours(12,0,0,0); date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -2458,6 +2477,8 @@ function renderMePage() {
     document.getElementById('mePrimaryRows').innerHTML = meRow('家庭成员', memberCount ? String(memberCount) : '', 'family') + meRow('设备管理', deviceCount ? String(deviceCount) : '', 'devices');
     document.getElementById('meGeneralRows').innerHTML = meRow('分享码与授权', '', 'share') + meRow('帮助与服务说明', '', 'help') + meRow('关于康伴', 'v0.9', 'about');
   }
+  document.getElementById('meGeneralRows').insertAdjacentHTML('afterbegin', `<button class="me-row" type="button" data-elder-care-toggle aria-pressed="${isElderCareModeOn()}"><b>老人关爱版</b><span class="v" data-elder-care-label>${isElderCareModeOn() ? '已开启' : '未开启'}</span><span class="arr">›</span></button>`);
+  syncElderCareModeUI();
 }
 function showAccountSecurity() {
   const auth = window.KangbanAuth;
@@ -4130,6 +4151,14 @@ function setAuthRegistrationView(enabled, step = 'role') {
 }
 
 document.addEventListener('click', async event => {
+  const elderCareToggle = event.target.closest('[data-elder-care-toggle]');
+  if (elderCareToggle) {
+    const enabled = !isElderCareModeOn();
+    setElderCareMode(enabled);
+    renderMePage();
+    toast(enabled ? '已开启老人关爱版，大字界面已应用' : '已切回标准版');
+    return;
+  }
   if (event.target.closest('[data-auth-role]')) {
     window.selectedAuthRole = event.target.closest('[data-auth-role]').dataset.authRole;
     document.querySelectorAll('[data-auth-role]').forEach(button => button.classList.toggle('selected', button.dataset.authRole === window.selectedAuthRole));
@@ -5211,6 +5240,7 @@ if (window.KangbanAuth) window.KangbanAuth.initialize().then(applyAuthSession).c
   const gate = document.getElementById('authGate'); if (gate) gate.hidden = false;
 });
 displayToday(); renderHomeAlerts(); renderRole(); renderRecords(); navigate(state.currentRole === 'escort' ? 'escort' : 'home');
+syncElderCareModeUI();
 setInterval(checkMedicationReminders, 60000);
 setTimeout(checkMedicationReminders, 1500);
 setInterval(checkCustomReminders, 60000);
