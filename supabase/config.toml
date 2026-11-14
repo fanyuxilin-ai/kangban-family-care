@@ -15,3 +15,6 @@ enable_signup = true
 [storage]
 enabled = true
 file_size_limit = "20MiB"
+
+[functions.process-member-safety-alerts]
+verify_jwt = false

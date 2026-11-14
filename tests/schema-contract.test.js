@@ -69,3 +69,47 @@ test('resume storage paths bypass legacy UUID casts and upsert stays owner scope
   assert.match(sql, /split_part\(name,\s*'\/',\s*2\)\s*=\s*\(select auth\.uid\(\)\)::text[\s\S]*?public\.is_active_escort\(\)/i);
   assert.match(sql, /owner_id\s*=\s*\(select auth\.uid\(\)\)::text/i);
 });
+
+function safetyMigrationText() {
+  const migrationName = fs.readdirSync(migrationDirectory).find(name => name.includes('member_safety_checkin'));
+  assert.ok(migrationName, 'member safety migration must exist');
+  return fs.readFileSync(path.join(migrationDirectory, migrationName), 'utf8');
+}
+
+test('member safety tables are family scoped and protected by RLS', () => {
+  const sql = safetyMigrationText();
+  for (const name of ['member_safety_settings', 'member_safety_signals', 'member_safety_alerts', 'member_safety_alert_events', 'member_safety_recipients', 'member_safety_notifications']) {
+    assert.match(sql, new RegExp(`create\\s+table\\s+public\\.${name}\\b`, 'i'), `${name} must exist`);
+    assert.match(sql, new RegExp(`alter\\s+table\\s+public\\.${name}\\s+enable\\s+row\\s+level\\s+security`, 'i'), `${name} must enable RLS`);
+    if (name === 'member_safety_notifications') {
+      assert.doesNotMatch(sql, /create\s+policy\s+[a-z_]+\s+on\s+public\.member_safety_notifications\b/i, 'outbox is server-only and intentionally has no client policy');
+      assert.match(sql, /revoke all on public\.[\s\S]*?member_safety_notifications from anon, authenticated/i);
+    } else {
+      assert.match(sql, new RegExp(`create\\s+policy\\s+[a-z_]+\\s+on\\s+public\\.${name}\\b`, 'i'), `${name} must have an explicit policy`);
+    }
+    assert.match(sql, new RegExp(`${name}[\\s\\S]*?family_id\\s+uuid`, 'i'), `${name} must be scoped to a family`);
+  }
+});
+
+test('member safety RPCs validate family access, signal source, and alert resolution', () => {
+  const sql = safetyMigrationText();
+  for (const fn of ['configure_member_safety', 'list_member_safety_recipients', 'record_member_safety_signal', 'resolve_member_safety_alert', 'claim_due_member_safety_alerts', 'complete_member_safety_notification']) {
+    assert.match(sql, new RegExp(`function\\s+public\\.${fn}\\s*\\(`, 'i'), `missing ${fn}`);
+  }
+  assert.match(sql, /record_member_safety_signal[\s\S]*?is_family_member/i);
+  assert.match(sql, /record_member_safety_signal[\s\S]*?health_measurement[\s\S]*?self_check/i);
+  assert.match(sql, /configure_member_safety[\s\S]*?self_check_user_id/i);
+  assert.match(sql, /p_source='self_check'[\s\S]*?s\.self_check_user_id=auth\.uid\(\)/i);
+  assert.match(sql, /resolve_member_safety_alert[\s\S]*?confirmed_safe[\s\S]*?contacting[\s\S]*?unable_to_reach/i);
+  assert.match(sql, /revoke all on function public\.claim_due_member_safety_alerts[\s\S]*?authenticated/i);
+  assert.match(sql, /grant execute on function public\.claim_due_member_safety_alerts[\s\S]*?service_role/i);
+  assert.match(sql, /revoke all on function public\.complete_member_safety_notification[\s\S]*?authenticated/i);
+  assert.match(sql, /grant execute on function public\.complete_member_safety_notification[\s\S]*?service_role/i);
+});
+
+test('safety alert scheduler uses Vault and invokes the Edge Function every five minutes', () => {
+  const sql = fs.readFileSync(path.join(migrationDirectory, '20261114100000_schedule_member_safety_alerts.sql'), 'utf8');
+  assert.match(sql, /cron\.schedule[\s\S]*?\*\/5 \* \* \* \*/i);
+  assert.match(sql, /vault\.decrypted_secrets[\s\S]*?kangban_safety_cron_token/i);
+  assert.match(sql, /functions\/v1\/process-member-safety-alerts/i);
+});
